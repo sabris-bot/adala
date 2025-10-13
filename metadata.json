@@ -1,0 +1,9 @@
+{
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "name": "عدالة - منظومة الإدارة القانونية المتكاملة (V3 - Final Build)",
+  "description": "",
+  "prompt": ""
+}

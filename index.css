@@ -1,0 +1,403 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .animate-fade-in-right {
+    animation: fade-in-right 0.5s ease-out forwards;
+  }
+  @keyframes fade-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}
+
+body {
+  @apply bg-neutral-bg text-neutral-text; /* Updated default light mode */
+  font-family: 'Tajawal', sans-serif;
+}
+
+html.dark body {
+  @apply bg-dm-background text-dm-text; /* Updated dark mode body */
+}
+
+/* Scrollbar styling - Modern Justice Theme */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: #B0BEC5 #F5F7FA; /* thumb track for Firefox - secondary.light neutral-bg */
+}
+.scrollbar-thin::-webkit-scrollbar {
+  width: 8px;
+  height: 8px; /* For horizontal scrollbars as well */
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: #F5F7FA; /* neutral-bg */
+  border-radius: 10px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #B0BEC5; /* secondary.light */
+  border-radius: 10px;
+  border: 2px solid #F5F7FA; /* neutral-bg - padding effect */
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #90A4AE; /* Slightly darker secondary.light */
+}
+
+/* NEW: Scrollbar buttons for WebKit/Blink */
+.scrollbar-thin::-webkit-scrollbar-button {
+  display: block;
+  width: 8px; /* Match scrollbar width for vertical scrollbar buttons */
+  height: 10px; /* Height of the button area for vertical scrollbar */
+  background-color: #F5F7FA; /* Match track color */
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 6px 6px; /* Size of the arrow image, adjusted for smaller button */
+}
+.scrollbar-thin::-webkit-scrollbar-button:hover {
+  background-color: #E2E8F0; /* Slightly different on hover */
+}
+
+/* Up arrow for vertical scrollbar */
+.scrollbar-thin::-webkit-scrollbar-button:start:decrement { 
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='%23B0BEC5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+}
+/* Down arrow for vertical scrollbar */
+.scrollbar-thin::-webkit-scrollbar-button:end:increment { 
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='%23B0BEC5' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+}
+/* TODO: Add :horizontal pseudo-classes if horizontal scrollbar buttons are needed with different arrows */
+
+
+/* Dark mode scrollbar - Modern Justice Theme */
+html.dark .scrollbar-thin {
+  scrollbar-color: #4A5568 #102A3A; /* thumb track for Firefox - secondary.dark dm-background */
+}
+html.dark .scrollbar-thin::-webkit-scrollbar-track {
+  background: #102A3A; /* dm-background */
+}
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: #4A5568; /* secondary.dark */
+  border-color: #102A3A; /* dm-background */
+}
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #607D8B; /* secondary.DEFAULT */
+}
+
+/* NEW: Dark mode Scrollbar buttons for WebKit/Blink */
+html.dark .scrollbar-thin::-webkit-scrollbar-button {
+  background-color: #102A3A; /* Match dark track color */
+}
+html.dark .scrollbar-thin::-webkit-scrollbar-button:hover {
+  background-color: #1E3C50; /* Slightly different on hover (dm-card) */
+}
+
+/* Dark Up arrow */
+html.dark .scrollbar-thin::-webkit-scrollbar-button:start:decrement { 
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='%234A5568' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+}
+/* Dark Down arrow */
+html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment { 
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 20 20' fill='%234A5568' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+
+/* --- NEW PRINT STYLES FOR REPORTS PAGE --- */
+@media print {
+  /* Generic class to hide elements not meant for printing */
+  .print-hide {
+    display: none !important;
+  }
+  
+  /* Reset body for printing */
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Hide all direct children of #root except the main content's parent div */
+  body > #root > div > aside,
+  body > #root > div > div > header {
+    display: none !important;
+  }
+  
+  /* Reset main content area to take full width */
+  body > #root > div > div {
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  /* Isolate the printable report wrapper */
+  body > #root > div > div > main > div > .printable-report-wrapper {
+    visibility: visible !important;
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 1cm !important; /* A4-like margins */
+    box-shadow: none !important;
+    border: none !important;
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Hide the filter card inside the main content area */
+  .report-selection-card {
+    display: none !important;
+  }
+
+  /* Display the print-only header inside the wrapper */
+  .printable-report-wrapper .report-print-header {
+    display: block !important;
+    text-align: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #ccc;
+  }
+  
+  .report-print-header h1 {
+    font-size: 1.5rem !important;
+    font-weight: bold;
+    color: black !important;
+  }
+  
+  .report-print-header p {
+    font-size: 0.9rem !important;
+    color: #555 !important;
+  }
+  
+  /* Force dark text and visible borders on all elements within the printable area */
+  .printable-report-wrapper, .printable-report-wrapper * {
+    color: black !important;
+    background-color: white !important;
+    border-color: #ccc !important; /* Make borders visible */
+  }
+
+  /* Page break control */
+  h1, h2, h3, h4, h5, h6, .card {
+    page-break-after: avoid;
+  }
+  tr, li, .card-in-list-report {
+    page-break-inside: avoid;
+  }
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  /* Hide the print button inside the wrapper */
+  .print-report-button {
+    display: none !important;
+  }
+
+  /* Ensure SVG charts are visible */
+  svg, .recharts-surface {
+    visibility: visible !important;
+  }
+
+  /* --- NEW PRINT STYLES FOR MIND MAP --- */
+  #printable-mindmap-area, #printable-mindmap-area * {
+    visibility: visible !important;
+  }
+  #printable-mindmap-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    padding: 1cm !important;
+    background: white !important;
+  }
+  #printable-mindmap-area .node-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+    color: black !important; /* Force text color for printing */
+  }
+  /* Ensure backgrounds print if needed - might be blocked by browser settings */
+  .bg-primary, .bg-secondary, .bg-accent, .bg-red-500, .bg-blue-600, .bg-green-600, .bg-yellow-500, .bg-purple-600, .bg-pink-600, .bg-teal-500, .bg-gray-500 {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  /* --- NEW PRINT STYLES FOR LEGAL RESOURCE DETAILS --- */
+  
+  /* Hide the main app content when printing from the modal */
+  .fixed.inset-0.z-50 ~ div {
+      display: none !important;
+  }
+  
+  /* Reset the modal overlay and container for printing */
+  .fixed.inset-0.z-50 {
+      position: static !important;
+      overflow: visible !important;
+      background: none !important;
+      backdrop-filter: none !important;
+  }
+  .fixed.inset-0.z-50 > div {
+      position: static !important;
+      width: 100% !important;
+      max-width: 100% !important;
+      height: auto !important;
+      max-height: none !important;
+      box-shadow: none !important;
+      border: none !important;
+      transform: none !important;
+      display: block !important;
+  }
+  
+  /* Hide the modal header */
+  .fixed.inset-0.z-50 > div > div:first-child {
+      display: none !important;
+  }
+
+  /* Expand the modal content area and isolate the printable wrapper */
+  .fixed.inset-0.z-50 .printable-resource-wrapper {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: 100% !important;
+      padding: 1.5cm !important;
+      max-height: none !important;
+      overflow-y: visible !important;
+  }
+
+  /* Show the print-only header */
+  .printable-resource-wrapper .resource-print-header {
+      display: block !important;
+      text-align: center;
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #ccc;
+  }
+  
+  .resource-print-header h1 {
+      font-size: 1.5rem !important;
+  }
+
+  /* General styles for the printable content */
+  .printable-resource-wrapper, .printable-resource-wrapper * {
+      color: black !important;
+      background: white !important;
+  }
+  .printable-resource-wrapper .bg-gray-100,
+  .printable-resource-wrapper .bg-yellow-50 {
+      border: 1px solid #eee !important;
+  }
+  .printable-resource-wrapper a {
+      text-decoration: none !important;
+      color: black !important;
+  }
+  .printable-resource-wrapper a[href]::after {
+      content: " (" attr(href) ")" !important;
+      font-size: 9pt;
+      color: #555;
+  }
+  /* Hide status badge from printing */
+  .printable-resource-wrapper .rounded-full {
+      display: none !important;
+  }
+
+}
+
+/* --- NEW MIND MAP NODE SHAPES --- */
+.node-card.shape-rectangle {
+    border-radius: 0;
+}
+.node-card.shape-pill {
+    border-radius: 9999px;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+}
+.node-card.shape-oval {
+    border-radius: 50%;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+}
+.node-card.shape-diamond {
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    border-radius: 0;
+}
+.node-card.shape-parallelogram {
+    transform: skewX(-20deg);
+}
+.node-card.shape-parallelogram > * {
+    transform: skewX(20deg);
+}
+/* --- MIND MAP LAYOUT STYLES --- */
+.tree-h, .tree-h ul, .tree-h li { position: relative; }
+.tree-h ul { padding-right: 20px; }
+.tree-h li { display: flex; align-items: center; margin: 10px 0; }
+.tree-h li .node-display { margin-right: 10px; }
+.tree-h li::before {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    width: 20px;
+    height: 2px;
+    background-color: #9ca3af;
+}
+.tree-h li::after {
+    content: '';
+    position: absolute;
+    right: -20px;
+    top: 0;
+    height: 100%;
+    width: 2px;
+    background-color: #9ca3af;
+}
+.tree-h li:first-child::after { top: 50%; height: 50%; }
+.tree-h li:last-child::after { height: 50%; }
+.tree-h li:only-child::after { display: none; }
+.dark .tree-h li::before, .dark .tree-h li::after { background-color: #4b5563; }
+
+.tree-v, .tree-v ul, .tree-v li { position: relative; }
+.tree-v ul { display: flex; justify-content: center; padding-top: 20px; }
+.tree-v li { display: flex; flex-direction: column; align-items: center; padding: 0 10px; }
+.tree-v .node-display::after {
+    content: '';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 20px;
+    background-color: #9ca3af;
+}
+.tree-v li::before {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    height: 20px;
+    background-color: #9ca3af;
+}
+.tree-v li::after {
+    content: '';
+    position: absolute;
+    top: -20px;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background-color: #9ca3af;
+}
+.tree-v li:first-child::after { left: 50%; width: 50%; }
+.tree-v li:last-child::after { width: 50%; }
+.tree-v li:only-child::after { display: none; }
+.dark .tree-v .node-display::after, .dark .tree-v li::before, .dark .tree-v li::after { background-color: #4b5563; }
+.resource-print-header {
+  display: none;
+}
