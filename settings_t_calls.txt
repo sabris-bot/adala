@@ -1,0 +1,95 @@
+104:        { id: 'office', label: t('office_profile', { defaultValue: 'ملف المكتب' }), icon: <BuildingOffice2Icon className="w-5 h-5"/> },
+105:        { id: 'users', label: t('users', { defaultValue: 'المستخدمين' }), icon: <UsersIcon className="w-5 h-5"/> },
+106:        { id: 'roles', label: t('roles', { defaultValue: 'الصلاحيات' }), icon: <ShieldCheckIcon className="w-5 h-5"/> },
+107:        { id: 'prefs', label: t('preferences', { defaultValue: 'التفضيلات' }), icon: <AdjustmentsHorizontalIcon className="w-5 h-5"/> },
+108:        { id: 'security', label: t('security', { defaultValue: 'الأمان' }), icon: <LockClosedIcon className="w-5 h-5"/> },
+109:        { id: 'integrations', label: t('integrations', { defaultValue: 'الارتباطات' }), icon: <PuzzlePieceIcon className="w-5 h-5"/> },
+110:        { id: 'billing', label: t('billing', { defaultValue: 'الاشتراك' }), icon: <BanknotesIcon className="w-5 h-5"/> },
+130:                    <h1 className="text-4xl font-black text-gray-900 tracking-tighter dark:text-dm-text">{t('settings', { defaultValue: 'الإعدادات والتهيئة' })}</h1>
+132:                        <CogIcon className="w-3 h-3"/> {t('settings_instructions', { defaultValue: 'إدارة النظام، المستخدمين، وتخصيص بيئة العمل القانونية' })}
+167:                            <h4 className="font-black text-sm mb-2 text-indigo-200">{t('backup', { defaultValue: 'النسخ الاحتياطي' })}</h4>
+168:                            <p className="text-[10px] text-indigo-100/70 leading-relaxed mb-4">{t('backup_desc', { defaultValue: 'يتم حفظ نسخة احتياطية من كافة البيانات بانتظام في خوادم مشفرة.' })}</p>
+169:                            <Button variant="outline" size="sm" className="w-full border-white/20 hover:bg-white/10 text-white rounded-xl h-10 text-[10px]">{t('start_manual_backup', { defaultValue: 'بدأ نسخ يدوي الآن' })}</Button>
+196:                            <h3 className="text-xl font-black text-gray-900">{t('admin_activity_log', { defaultValue: 'سجل النشاطات الإدارية' })}</h3>
+198:                        <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase text-primary">{t('view_full_log', { defaultValue: 'عرض السجل الكامل' })}</Button>
+255:                    <span className="text-[10px] font-black mt-1">{t('change_logo', { defaultValue: 'تغيير الشعار' })}</span>
+259:                    <p className="text-gray-400 text-xs font-bold mt-1">{t('license_number', { defaultValue: 'رقم الترخيص' })}: {info.license}</p>
+264:                <Input label={t('legal_entity_name', { defaultValue: 'اسم المنشأة القانونية' })} value={info.name} onChange={e => setInfo({...info, name: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+265:                <Input label={t('unified_id', { defaultValue: 'الرقم الموحد للجهة' })} value={info.unifiedId} onChange={e => setInfo({...info, unifiedId: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+266:                <Input label={t('professional_license_no', { defaultValue: 'رقم الترخيص المهني' })} value={info.license} onChange={e => setInfo({...info, license: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+267:                <Input label={t('official_email', { defaultValue: 'البريد الإلكتروني الرسمي' })} value={info.email} onChange={e => setInfo({...info, email: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+268:                <Input label={t('office_phone', { defaultValue: 'رقم هاتف المكتب' })} value={info.phone} onChange={e => setInfo({...info, phone: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+269:                <Input label={t('website', { defaultValue: 'الموقع الإلكتروني' })} value={info.website} onChange={e => setInfo({...info, website: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+271:                    <Input label={t('main_office_address', { defaultValue: 'عنوان المقر الرئيسي' })} value={info.address} onChange={e => setInfo({...info, address: e.target.value})} className="rounded-2xl bg-gray-50 border-none h-12" />
+274:                    <TextArea label={t('office_description', { defaultValue: 'وصف تعريفي للمكتب' })} value={info.description} onChange={e => setInfo({...info, description: e.target.value})} className="rounded-2xl bg-gray-50 border-none" rows={3} />
+279:                <Button variant="primary" className="px-12 rounded-2xl h-12 shadow-xl shadow-primary/20">{t('save_changes', { defaultValue: 'حفظ التغييرات' })}</Button>
+292:                <h3 className="text-xl font-black text-gray-900">{t('team_management', { defaultValue: 'إدارة فريق العمل' })}</h3>
+293:                <p className="text-xs font-bold text-gray-400 mt-1">{t('active_users_count', { defaultValue: 'لديك {{count}} مستخدم نشط من أصل 10 مقاعد', count: users.length })}</p>
+295:            <Button variant="primary" leftIcon={<PlusCircleIcon className="w-5 h-5"/>} className="px-8 rounded-2xl h-12" onClick={onAdd}>{t('add_new_member', { defaultValue: 'إضافة عضو جديد' })}</Button>
+301:                        <th className="p-6">{t('member', { defaultValue: 'العضو' })}</th>
+302:                        <th className="p-6">{t('role', { defaultValue: 'الدور' })}</th>
+303:                        <th className="p-6">{t('status', { defaultValue: 'الحالة' })}</th>
+304:                        <th className="p-6">{t('actions', { defaultValue: 'إجراءات' })}</th>
+349:                <h3 className="text-xl font-black text-gray-900 mb-2">{t('permissions_matrix_rbac', { defaultValue: 'مصفوفة الصلاحيات (RBAC)' })}</h3>
+350:                <p className="text-xs text-gray-400 font-bold max-w-xl leading-relaxed">{t('rbac_description', { defaultValue: 'تحكم بدقة في ميزات النظام التي يمكن لكل مجموعة من المستخدمين الوصول إليها. الأدوار المشرفة لديها صلاحيات كاملة افتراضياً.' })}</p>
+356:                            <th className="p-6 font-black text-gray-400 uppercase tracking-widest text-[10px] min-w-[250px]">{t('system_features', { defaultValue: 'ميزات النظام' })}</th>
+398:                <Button variant="primary" className="px-12 rounded-2xl h-12 shadow-xl shadow-primary/20">{t('save_all_permissions', { defaultValue: 'حفظ كافة الصلاحيات' })}</Button>
+408:        <h3 className="text-xl font-black text-gray-900 border-r-4 border-primary pr-4 dark:text-dm-text">{t('ui_preferences', { defaultValue: 'تفضيلات واجهة المستخدم' })}</h3>
+411:                label={t('jurisdiction_country', { defaultValue: "الدولة والنطاق القانوني" })} 
+418:                label={t('system_language', { defaultValue: "لغة واجهة النظام" })} 
+420:                    {value: 'ar', label: t('arabic', { defaultValue: 'العربية (موصى بها)' })}, 
+421:                    {value: 'en', label: t('english', { defaultValue: 'English' })}
+428:                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-1">{t('app_appearance', { defaultValue: 'مظهر التطبيق' })}</label>
+430:                    <button onClick={() => isDarkMode && toggleDarkMode()} className={`flex-1 rounded-xl text-xs font-black transition-all ${!isDarkMode ? 'bg-white shadow text-primary' : 'text-gray-400'}`}>{t('light_mode', { defaultValue: 'فاتح (Light)' })}</button>
+431:                    <button onClick={() => !isDarkMode && toggleDarkMode()} className={`flex-1 rounded-xl text-xs font-black transition-all ${isDarkMode ? 'bg-gray-800 shadow text-white' : 'text-gray-400'}`}>{t('dark_mode', { defaultValue: 'داكن (Dark)' })}</button>
+435:                label={t('default_currency', { defaultValue: "العملة الافتراضية" })} 
+442:                label={t('date_format', { defaultValue: "تنسيق التاريخ" })} 
+451:            <h4 className="text-sm font-black text-gray-800 uppercase tracking-widest dark:text-dm-text">{t('smart_features', { defaultValue: 'ميزات ذكية وتلقائية' })}</h4>
+454:                    { id: 'autoSave', label: t('auto_save', { defaultValue: 'الحفظ التلقائي للبيانات' }), desc: t('auto_save_desc', { defaultValue: 'حفظ المسودات والعقود تلقائياً أثناء الكتابة' }) },
+455:                    { id: 'smartSuggestions', label: t('smart_suggestions', { defaultValue: 'اقتراحات الذكاء الاصطناعي' }), desc: t('smart_suggestions_desc', { defaultValue: 'تفعيل المساعد الذكي لتقديم نصائح عند إدخال البيانات' }) },
+485:                <h3 className="text-xl font-black text-gray-900 tracking-tight">{t('login_account_protection', { defaultValue: 'حماية الدخول والحسابات' })}</h3>
+495:                            <p className="font-black text-indigo-900">{t('two_factor_auth_full', { defaultValue: 'المصادقة الثنائية (2FA)' })}</p>
+496:                            <p className="text-[10px] font-bold text-indigo-500 leading-relaxed max-w-sm mt-1">{t('two_factor_auth_desc_detailed', { defaultValue: 'أضف طبقة حماية إضافية لحسابك من خلال ربطه بتطبيق Google Authenticator أو إرسال رمز التحقق لهاتفك.' })}</p>
+504:                        {prefs.twoFactorEnabled ? t('disable_protection', { defaultValue: 'تعطيل الحماية' }) : t('enable_protection', { defaultValue: 'تفعيل الحماية' })}
+510:                        <h4 className="font-black text-sm text-gray-800 mb-4">{t('password_policy', { defaultValue: 'سياسة كلمات المرور' })}</h4>
+513:                                label={t('min_length', { defaultValue: "الحد الأدنى للطول" })} 
+514:                                options={[{value:'8', label: t('8_chars', { defaultValue: '8 أحرف' })}, {value:'12', label: t('12_chars', { defaultValue: '12 حرف' })}]} 
+526:                                <span className="text-[10px] font-black text-gray-600 uppercase">{t('require_symbols_numbers_caps', { defaultValue: 'طلب رموز وأرقام وحروف كبيرة' })}</span>
+531:                        <h4 className="font-black text-sm text-gray-800 mb-4">{t('active_sessions', { defaultValue: 'الجلسات المفتوحة' })}</h4>
+532:                        <p className="text-[10px] font-bold text-gray-400 mb-4">{t('active_devices_count', { defaultValue: 'هناك 3 أجهزة مسجلة دخول حالياً لنفس المكتب.' })}</p>
+533:                        <Button variant="outline" size="sm" className="w-full rounded-xl border-gray-200 text-gray-600 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100">{t('logout_all_devices', { defaultValue: 'تسجيل الخروج من كافة الأجهزة' })}</Button>
+547:            { id: 'google', name: 'Google Calendar & Mail', icon: <GlobeAltIcon className="w-8 h-8 text-blue-500"/>, status: t('connected', { defaultValue: 'متصل' }), desc: t('google_integration_desc', { defaultValue: 'مزامنة المواعيد القانونية والبريد الرسمي.' }) },
+548:            { id: 'outlook', name: 'Microsoft Outlook', icon: <EnvelopeIcon className="w-8 h-8 text-indigo-500"/>, status: t('not_connected', { defaultValue: 'غير متصل' }), desc: t('outlook_integration_desc', { defaultValue: 'ربط النظام ببيئة Office 365 الخاصة بالمؤسسة.' }) },
+549:            { id: 'whatsapp', name: 'WhatsApp Business API', icon: <PhoneIcon className="w-8 h-8 text-emerald-500"/>, status: t('not_connected', { defaultValue: 'غير متصل' }), desc: t('whatsapp_integration_desc', { defaultValue: 'إرسال إشعارات وتحديثات القضايا للموكلين آلياً.' }) },
+550:            { id: 'moj', name: t('justice_portal_kuwait', { defaultValue: 'بوابة العدل (الكويت)' }), icon: <BuildingOffice2Icon className="w-8 h-8 text-amber-600"/>, status: t('connected_view_only', { defaultValue: 'متصل (عرض فقط)' }), desc: t('moj_integration_desc', { defaultValue: 'جلب بيانات القضايا والرول الآلي من البوابة الرسمية.' }) },
+557:                    <Badge text={item.status} variant={item.status.includes(t('connected', { defaultValue: 'متصل' })) ? 'success' : 'secondary'} size="sm" />
+562:                    <Button variant="outline" size="sm" className="flex-1 rounded-xl border-gray-100 text-gray-600 group-hover:border-primary group-hover:text-primary">{item.status.includes(t('connected', { defaultValue: 'متصل' })) ? t('settings', { defaultValue: 'إعدادات' }) : t('link', { defaultValue: 'ربط' })}</Button>
+563:                    {item.status.includes(t('connected', { defaultValue: 'متصل' })) && (
+581:                    <Badge text={t('current_plan', { defaultValue: 'الخطة الحالية' })} variant="warning" size="sm" className="bg-white/20 text-white border-white/30" />
+582:                    <h3 className="text-4xl font-black tracking-tighter">{t('enterprise_plan_name', { defaultValue: 'باقة التميز القانوني (Enterprise)' })}</h3>
+583:                    <p className="text-primary-light/80 text-sm font-bold tracking-widest uppercase">{t('next_renewal_date', { defaultValue: 'تاريخ التجديد القادم: 12 ديسمبر 2024' })}</p>
+586:                    <Button className="bg-white text-primary hover:bg-white/90 rounded-[28px] h-14 px-12 font-black shadow-2xl shadow-black/20">{t('upgrade_subscription', { defaultValue: 'ترقية الاشتراك' })}</Button>
+587:                    <p className="text-[10px] text-center font-black text-white/50 uppercase tracking-widest">{t('change_anytime', { defaultValue: 'إمكانية التغيير في أي وقت' })}</p>
+595:                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('used_seats', { defaultValue: 'المقاعد المستخدمة' })}</p>
+608:                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{t('storage_space', { defaultValue: 'مساحة التخزين' })}</p>
+622:                    <h4 className="font-black text-gray-800 text-sm">{t('ai_consumption', { defaultValue: 'استهلاك الذكاء الاصطناعي' })}</h4>
+625:                    <div className="flex justify-between"><span>{t('contract_analysis', { defaultValue: 'تحليل عقود' })}</span> <span className="text-gray-400">45/200</span></div>
+626:                    <div className="flex justify-between"><span>{t('legal_translation', { defaultValue: 'ترجمة قانونية' })}</span> <span className="text-gray-400">12/Unlimited</span></div>
+627:                    <div className="flex justify-between"><span>{t('automated_search', { defaultValue: 'بحث آلي' })}</span> <span className="text-gray-400">890/5000</span></div>
+634:                <h4 className="text-xl font-black text-gray-900">{t('billing_history', { defaultValue: 'سجل الفواتير والدفعات' })}</h4>
+635:                <Button variant="outline" size="sm" className="rounded-xl border-gray-200">{t('download_statement', { defaultValue: 'تحميل كشف الحساب' })}</Button>
+641:                            <th className="p-6">{t('invoice_no', { defaultValue: 'رقم الفاتورة' })}</th>
+642:                            <th className="p-6">{t('date', { defaultValue: 'التاريخ' })}</th>
+643:                            <th className="p-6">{t('amount', { defaultValue: 'قيمة الدفعة' })}</th>
+644:                            <th className="p-6">{t('status', { defaultValue: 'الحالة' })}</th>
+645:                            <th className="p-6">{t('document', { defaultValue: 'المستند' })}</th>
+650:                            { id: '#INV-8871', date: '2024/05/01', amount: '250.000 KWD', status: t('paid', { defaultValue: 'مدفوع' }) },
+651:                            { id: '#INV-8742', date: '2024/04/10', amount: '250.000 KWD', status: t('paid', { defaultValue: 'مدفوع' }) },
+652:                            { id: '#INV-8601', date: '2024/03/12', amount: '250.000 KWD', status: t('paid', { defaultValue: 'مدفوع' }) },
+681:            <Input label={t('employee_full_name', { defaultValue: 'اسم الموظف بالكامل' })} value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required className="rounded-2xl bg-gray-50 border-none h-12" />
+682:            <Input label={t('assigned_email', { defaultValue: 'البريد الإلكتروني المخصص' })} type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required className="rounded-2xl bg-gray-50 border-none h-12" />
+685:                <Select label={t('job_role', { defaultValue: 'الدور الوظيفي' })} options={userRoleOptions} value={formData.role} onChange={e => setFormData({...formData, role: e.target.value as UserRole})} containerClassName="mb-0" />
+686:                <Select label={t('account_status', { defaultValue: 'حالة الحساب' })} options={userStatusOptions} value={formData.status} onChange={e => setFormData({...formData, status: e.target.value as UserStatus})} containerClassName="mb-0" />
+691:                <p className="text-[10px] font-bold text-amber-700 leading-relaxed">{t('invitation_sent_desc', { defaultValue: 'سيتم إرسال دعوة تلقائية وتعيين كلمة مرور مؤقتة عبر البريد الإلكتروني المدخل أعلاه.' })}</p>
+695:                <Button variant="outline" onClick={onCancel} className="rounded-xl px-8 underline-offset-4">{t('cancel', { defaultValue: 'إلغاء' })}</Button>
+696:                <Button type="submit" variant="primary" className="rounded-xl px-12 shadow-lg shadow-primary/20">{t('save_member', { defaultValue: 'حفظ العضو' })}</Button>

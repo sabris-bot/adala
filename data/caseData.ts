@@ -1,0 +1,161 @@
+
+import { Case, CaseStatus, RiskLevel, CaseMainType, CasePriority, CourtLevel, ExecutionActionType, ExecutionActionStatus, ExpertActionStatus, ExpertField, JudgmentOutcome } from '../types';
+
+export const initialCases: Case[] = [ 
+  { 
+    id: '1', 
+    title: 'مطالبة بتعويضات عن إخلال تعاقدي', 
+    caseNumber: 'CML-2024-101',
+    internalCaseNumber: 'MSA-C-001',
+    clientName: 'شركة الأمل للتجارة', 
+    clientRole: 'مدعي',
+    group: 'قضايا هامة',
+    caseMainType: CaseMainType.COMMERCIAL,
+    caseSubType: 'خرق عقد توريد',
+    status: CaseStatus.IN_PROGRESS, 
+    priority: CasePriority.HIGH,
+    riskLevel: RiskLevel.MEDIUM, 
+    assignedLawyer: 'أ. أحمد محمود', 
+    courtName: 'المحكمة الكلية - تجاري', 
+    courtLevel: CourtLevel.FIRST_INSTANCE,
+    opposingPartyName: 'شركة المقاولون المتحدون',
+    opponentRole: 'مدعى عليه',
+    filingDate: '2024-03-15',
+    hearings: [
+      { id: 'h1-1', date: '2024-04-20', type: 'مرافعة', status: 'Completed'},
+      { id: 'h1-2', date: '2024-06-10', type: 'مرافعة', status: 'Completed'},
+      { id: 'h1-3', date: '2024-09-15', type: 'تقديم مستندات', status: 'Scheduled', notes: 'المتابعة مع قسم الإعلانات' }
+    ],
+    caseFiles: [
+        { id: 'f1', fileName: 'عقد التوريد الأساسي.pdf', fileType: 'Contract', uploadedAt: '2024-03-10', description: 'العقد موضوع النزاع' },
+        { id: 'f2', fileName: 'الإنذار الرسمي.pdf', fileType: 'Legal Notice', uploadedAt: '2024-03-12', description: 'إنذار بضرورة التنفيذ قبل رفع الدعوى' },
+        { id: 'f3', fileName: 'صحيفة الدعوى.pdf', fileType: 'Pleading', uploadedAt: '2024-03-15', description: 'صحيفة افتتاح الدعوى' }
+    ],
+    judgmentSummary: 'لم يصدر حكم بعد',
+    createdDate: '2024-03-01',
+    description: 'دعوى مرفوعة من شركة الأمل ضد شركة المقاولون بسبب تأخرهم في توريد مواد بناء حسب العقد المبرم، مما تسبب في خسائر مالية لموكلنا.',
+  },
+  { 
+    id: '2', 
+    title: 'نزاع عمالي - فصل تعسفي', 
+    caseNumber: 'LAB-2024-055',
+    internalCaseNumber: 'MSA-L-002',
+    clientName: 'سارة عبدالله أحمد', 
+    clientRole: 'مدعي',
+    group: 'قضايا مكتب الرياض',
+    caseMainType: CaseMainType.LABOR,
+    status: CaseStatus.OPEN, 
+    priority: CasePriority.NORMAL,
+    riskLevel: RiskLevel.LOW, 
+    assignedLawyer: 'أ. فاطمة علي', 
+    courtName: 'المحكمة العمالية', 
+    courtLevel: CourtLevel.FIRST_INSTANCE,
+    opposingPartyName: 'شركة الخدمات الحديثة',
+    opponentRole: 'مدعى عليه',
+    filingDate: '2024-05-10',
+    hearings: [{id: 'h2-1', date: '2024-08-25', type: 'تبادل مذكرات', status: 'Scheduled'}],
+    caseFiles: [
+        { id: 'f2-1', fileName: 'عقد العمل.pdf', fileType: 'Contract', uploadedAt: '2024-05-01' },
+        { id: 'f2-2', fileName: 'قرار إنهاء الخدمة.pdf', fileType: 'Decision', uploadedAt: '2024-05-05' }
+    ],
+    createdDate: '2024-05-01',
+    description: 'تطالب الموظفة بتعويض عن الفصل التعسفي ومستحقات نهاية الخدمة التي لم تصرف لها.',
+  },
+  { 
+    id: '3', 
+    title: 'استئناف حكم إخلاء عقار', 
+    caseNumber: 'RE-APP-2024-088', 
+    internalCaseNumber: 'MSA-R-003',
+    clientName: 'مجموعة الأنوار العقارية', 
+    clientRole: 'مستأنف',
+    group: 'قضايا هامة',
+    caseMainType: CaseMainType.REAL_ESTATE,
+    status: CaseStatus.APPEALED, 
+    priority: CasePriority.HIGH,
+    riskLevel: RiskLevel.MEDIUM, 
+    assignedLawyer: 'أ. خالد جاسم', 
+    courtName: 'محكمة الاستئناف - إيجارات', 
+    courtLevel: CourtLevel.APPEALS_COURT, 
+    opposingPartyName: 'المستأجر (س)',
+    opponentRole: 'مستأنف ضده',
+    filingDate: '2024-03-01', 
+    hearings: [{id: 'h3-1', date: '2024-09-10', type: 'مرافعة', status: 'Scheduled'}],
+    judgmentSummary: 'الحكم الابتدائي: رفض الدعوى',
+    judgmentOutcome: JudgmentOutcome.LOST, 
+    createdDate: '2023-10-20', 
+    description: 'استئناف على حكم أول درجة القاضي برفض دعوى الإخلاء لعدم ثبوت الضرر.',
+  },
+  {
+    id: '8',
+    title: 'تنفيذ حكم مطالبة مالية',
+    caseNumber: 'EXEC-2024-001',
+    internalCaseNumber: 'MSA-EX-008',
+    clientName: 'مؤسسة البناء الحديث',
+    clientRole: 'مدعي',
+    caseMainType: CaseMainType.CIVIL,
+    status: CaseStatus.IN_PROGRESS, 
+    priority: CasePriority.HIGH,
+    riskLevel: RiskLevel.LOW, 
+    assignedLawyer: 'أ. خالد جاسم',
+    courtName: 'إدارة التنفيذ المدني',
+    courtLevel: CourtLevel.SPECIALIZED_COURT,
+    opposingPartyName: 'شركة المقاولات الهندسية',
+    opponentRole: 'مدعى عليه',
+    filingDate: '2024-07-01',
+    judgmentDate: '2024-05-30',
+    judgmentSummary: 'تم فتح ملف تنفيذ للحكم الصادر في القضية CIV-2023-1234.',
+    judgmentOutcome: JudgmentOutcome.WON,
+    createdDate: '2024-07-01',
+    executionActions: [
+      {
+        id: 'exec1',
+        actionType: ExecutionActionType.BANK_ACCOUNT_FREEZE,
+        applicationDate: '2024-07-05',
+        status: ExecutionActionStatus.ACTIVE,
+        effectiveDate: '2024-07-10',
+        notes: 'تم الحجز على الحسابات البنكية للمدين.'
+      },
+      {
+        id: 'exec2',
+        actionType: ExecutionActionType.TRAVEL_BAN,
+        applicationDate: '2024-07-05',
+        status: ExecutionActionStatus.PENDING_SUBMISSION,
+        notes: 'طلب منع السفر قيد التقديم.'
+      }
+    ]
+  },
+  {
+    id: '9',
+    title: 'نزاع محاسبي بين شركاء',
+    caseNumber: 'COM-EXP-2024-112',
+    internalCaseNumber: 'MSA-C-009',
+    clientName: 'شريك (أ)',
+    clientRole: 'مدعي',
+    caseMainType: CaseMainType.COMMERCIAL,
+    status: CaseStatus.ON_HOLD,
+    priority: CasePriority.HIGH,
+    riskLevel: RiskLevel.HIGH,
+    assignedLawyer: 'أ. ليلى منصور الهاجري',
+    courtName: 'المحكمة الكلية - تجاري',
+    courtLevel: CourtLevel.FIRST_INSTANCE,
+    opposingPartyName: 'شريك (ب)',
+    opponentRole: 'مدعى عليه',
+    filingDate: '2024-02-10',
+    createdDate: '2024-02-01',
+    expertActions: [
+      {
+        id: 'exp1',
+        referralDate: '2024-06-15',
+        expertField: ExpertField.ACCOUNTING,
+        assignedTask: 'فحص دفاتر الشركة وتحديد حصة كل شريك من الأرباح والخسائر عن السنة المالية 2023.',
+        status: ExpertActionStatus.IN_PROGRESS,
+        expertName: 'مكتب الخبرة المحاسبية',
+        notes: 'تم ندب خبير من إدارة الخبراء، ومن المتوقع إيداع التقرير خلال 3 أشهر.'
+      }
+    ],
+    hearings: [
+        { id: 'h9-1', date: '2024-06-15', type: 'إحالة للخبرة', status: 'Completed'},
+        { id: 'h9-2', date: '2024-09-20', type: 'بانتظار ورود تقرير الخبير', status: 'Scheduled'}
+    ]
+  }
+];

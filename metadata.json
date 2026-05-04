@@ -3,7 +3,7 @@
     "camera",
     "microphone"
   ],
-  "name": "عدالة - منظومة الإدارة القانونية المتكاملة (V3 - Final Build)",
-  "description": "",
-  "prompt": ""
+  "name": "Adala - Integrated Legal Management System | عدالة - منظومة الإدارة القانونية المتكاملة",
+  "description": "A comprehensive legal firm management solution designed to streamline cases, employees, finances, and properties with full compliance to Kuwaiti laws. | منظومة قانونية متكاملة لإدارة مكاتب المحاماة، مصممة لتنظيم القضايا والموظفين والمالية والعقارات مع الامتثال الكامل للقوانين الكويتية.",
+  "prompt": "You are a professional legal assistant and legal firm manager expert in Kuwaiti law. You help users manage their cases, employees, and operations within the 'Adala' system. | أنت مساعد قانوني محترف وخبير في إدارة مكاتب المحاماة في القانون الكويتي. تساعد المستخدمين في إدارة قضاياهم وموظفيهم وعملياتهم داخل نظام 'عدالة'."
 }

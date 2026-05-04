@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import Card from '../components/ui/Card';
-import { UsersIcon, CalculatorIcon, CalendarDaysIcon, UserCircleIcon, CurrencyDollarIcon, ExclamationTriangleIcon, ChatBubbleLeftEllipsisIcon, GavelIcon } from '../constants';
+import { 
+    UsersIcon, CalculatorIcon, CalendarDaysIcon, UserCircleIcon, 
+    CurrencyDollarIcon, ExclamationTriangleIcon, ChatBubbleLeftEllipsisIcon, 
+    GavelIcon, IdentificationIcon, DocumentTextIcon, ShieldCheckIcon, 
+    BuildingOffice2Icon
+} from '../constants';
 import Button from '../components/ui/Button';
+import { initialEmployees } from './EmployeeProfilePage';
 
 interface FeatureCardProps {
   title: string;
@@ -34,6 +40,33 @@ const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, linkTo, i
 
 
 const EmployeeAffairsPage: React.FC = () => {
+  const complianceStats = useMemo(() => {
+    const today = new Date();
+    const thirtyDaysFromNow = new Date();
+    thirtyDaysFromNow.setDate(today.getDate() + 30);
+
+    let expiringCivilIds = 0;
+    let expiringPassports = 0;
+    let expiringResidencies = 0;
+
+    initialEmployees.forEach(emp => {
+      if (emp.civilIdExpiry) {
+        const expiry = new Date(emp.civilIdExpiry);
+        if (expiry <= thirtyDaysFromNow) expiringCivilIds++;
+      }
+      if (emp.passportExpiry) {
+        const expiry = new Date(emp.passportExpiry);
+        if (expiry <= thirtyDaysFromNow) expiringPassports++;
+      }
+      if (emp.residencyExpiry) {
+        const expiry = new Date(emp.residencyExpiry);
+        if (expiry <= thirtyDaysFromNow) expiringResidencies++;
+      }
+    });
+
+    return { expiringCivilIds, expiringPassports, expiringResidencies };
+  }, []);
+
   const features: FeatureCardProps[] = [
     {
       title: 'ملفات الموظفين',
@@ -94,13 +127,51 @@ const EmployeeAffairsPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-primary-dark">إدارة شؤون الموظفين الشاملة</h1>
       </div>
       
-      <Card title="مقدمة حول إدارة شؤون الموظفين">
-        <p className="text-gray-700 leading-relaxed">
-          تم تصميم وحدة شؤون الموظفين في "قانوني برو" لتوفير مجموعة متكاملة من الأدوات لإدارة كافة الجوانب القانونية والإدارية المتعلقة بموظفي مؤسستك. 
-          تهدف هذه الوحدة إلى ضمان الامتثال لأحكام <strong>قانون العمل الكويتي رقم 6 لسنة 2010 في القطاع الأهلي</strong> وتعديلاته، وتسهيل العمليات الإدارية، وحفظ حقوق كل من الموظفين والمؤسسة. 
-          ستجد هنا أدوات لحساب مستحقات نهاية الخدمة بدقة، إدارة الإجازات بفعالية، الاحتفاظ بملفات الموظفين محدثة، وتتبع الطلبات والإجراءات المختلفة المتعلقة بهم.
-        </p>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card title="مقدمة حول إدارة شؤون الموظفين" className="lg:col-span-2">
+          <p className="text-gray-700 leading-relaxed">
+            تم تصميم وحدة شؤون الموظفين في "قانوني برو" لتوفير مجموعة متكاملة من الأدوات لإدارة كافة الجوانب القانونية والإدارية المتعلقة بموظفي مؤسستك. 
+            تهدف هذه الوحدة إلى ضمان الامتثال لأحكام <strong>قانون العمل الكويتي رقم 6 لسنة 2010 في القطاع الأهلي</strong> وتعديلاته، وتسهيل العمليات الإدارية، وحفظ حقوق كل من الموظفين والمؤسسة. 
+          </p>
+          <div className="mt-4 flex items-center p-3 bg-blue-50 text-blue-700 rounded-lg border border-blue-100 text-sm">
+            <ShieldCheckIcon className="w-5 h-5 me-2" />
+            <span>النظام محدث وفقاً لآخر تعديلات قانون العمل الكويتي والقرارات الوزارية المنظمة للعمل في القطاع الخاص.</span>
+          </div>
+        </Card>
+
+        <Card title="تنبيهات الامتثال (المستندات)" className="border-t-4 border-red-500">
+           <div className="space-y-3">
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                 <div className="flex items-center">
+                    <IdentificationIcon className="w-5 h-5 text-gray-400 me-2" />
+                    <span className="text-sm">البطاقة المدنية (تنتهي قريباً)</span>
+                 </div>
+                 <span className={`font-bold ${complianceStats.expiringCivilIds > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {complianceStats.expiringCivilIds}
+                 </span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                 <div className="flex items-center">
+                    <DocumentTextIcon className="w-5 h-5 text-gray-400 me-2" />
+                    <span className="text-sm">جواز السفر (ينتهي قريباً)</span>
+                 </div>
+                 <span className={`font-bold ${complianceStats.expiringPassports > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                    {complianceStats.expiringPassports}
+                 </span>
+              </div>
+              <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                 <div className="flex items-center">
+                    <BuildingOffice2Icon className="w-5 h-5 text-gray-400 me-2" />
+                    <span className="text-sm">الإقامة (تنتهي قريباً)</span>
+                 </div>
+                 <span className={`font-bold ${complianceStats.expiringResidencies > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {complianceStats.expiringResidencies}
+                 </span>
+              </div>
+              <p className="text-[10px] text-gray-400 text-center italic">تظهر التنبيهات للمستندات التي تنتهي خلال 30 يوماً.</p>
+           </div>
+        </Card>
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {features.map(feature => (

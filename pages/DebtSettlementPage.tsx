@@ -6,19 +6,19 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
-import { ReceiptPercentIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, BriefcaseIcon, DocumentTextIcon } from '../constants';
+import { PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, ReceiptPercentIcon, PrinterIcon } from '../constants';
 import { 
     DebtSettlementRecord, SettlementStatus, SettlementInstallment, InstallmentStatus,
-    Tenant, LeaseAgreement, Case // Added Case
+    Tenant, LeaseAgreement, Case 
 } from '../types';
-import { settlementStatusOptions, installmentStatusOptions } from '../constants'; 
-import { mockTenants as initialTenants, mockProperties, mockLeaseAgreements } from './PropertyManagementPage'; 
-import { initialCases } from './CaseListPage'; // Correct import path for initialCases
+import { settlementStatusOptions } from '../constants'; 
+import { mockTenants as initialTenants, mockProperties, mockLeaseAgreements } from '../data/propertyData'; 
+import { initialCases } from '../data/caseData';
 import { SettlementStatusBadge, InstallmentStatusBadge } from '../components/ui/Badge';
 
 
 // Function to generate mock settlement records
-export const getMockSettlementRecords = (): DebtSettlementRecord[] => { // Added export
+export const getMockSettlementRecords = (): DebtSettlementRecord[] => {
     const tenant1 = initialTenants.find(t => t.fullNameAr === 'أحمد عبدالله محمد');
     const leaseForTenant1 = mockLeaseAgreements.find(l => l.tenantId === tenant1?.id);
     const evictionCaseForTenant1 = initialCases.find(c => c.caseNumber === 'RENT-EVICT-001-2024');
@@ -399,8 +399,20 @@ const DebtSettlementPage: React.FC = () => {
         cases={initialCases}
       />
       {viewingSettlement && (
-           <Modal isOpen={!!viewingSettlement} onClose={() => setViewingSettlement(null)} title={`تفاصيل تسوية مديونية: ${viewingSettlement.tenantName}`} size="xl">
-                <div className="space-y-3 p-2 max-h-[75vh] overflow-y-auto scrollbar-thin">
+            <Modal isOpen={!!viewingSettlement} onClose={() => setViewingSettlement(null)} title={`تفاصيل تسوية مديونية: ${viewingSettlement.tenantName}`} size="xl">
+                <div className="space-y-3 p-2 max-h-[75vh] overflow-y-auto scrollbar-thin printable-sheet">
+                    {/* Legal Print Header */}
+                    <div className="legal-print-header container mx-auto">
+                        <div className="title-box text-right">
+                            <h1 className="text-2xl font-black text-primary">منظومة عدالة القانونية</h1>
+                            <p className="text-xs text-gray-500 font-bold">تقرير تفصيلي لتسوية مديونية مستأجر</p>
+                            <p className="text-[10px] text-gray-400 mt-1">تاريخ الاستخراج: {new Date().toLocaleDateString('ar-EG')}</p>
+                        </div>
+                        <div className="logo-box">
+                            <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white font-black text-2xl italic shadow-xl">ع</div>
+                        </div>
+                    </div>
+
                     <Card title="ملخص التسوية" className="bg-gray-50" titleClassName="text-sm">
                          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                             <p><strong>المستأجر:</strong> {viewingSettlement.tenantName}</p>
@@ -445,7 +457,8 @@ const DebtSettlementPage: React.FC = () => {
                     )}
                     {viewingSettlement.notes && <Card title="ملاحظات" className="bg-yellow-50 border-yellow-200" titleClassName="text-sm text-yellow-700"><pre className="whitespace-pre-wrap font-sans text-xs p-1">{viewingSettlement.notes}</pre></Card>}
                 </div>
-                <div className="mt-3 flex justify-end p-2 border-t">
+                <div className="mt-3 flex justify-end p-2 border-t gap-2 no-print">
+                     <Button variant="outline" className="print-hide" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة / PDF</Button>
                      <Button onClick={() => { setViewingSettlement(null); handleEditSettlement(viewingSettlement);}}>تعديل</Button>
                 </div>
            </Modal>

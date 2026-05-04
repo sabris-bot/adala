@@ -6,106 +6,25 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
-import { MaintenanceRequest, MaintenanceCategory, MaintenancePriority, MaintenanceStatus, RequestAttachment, Property, PropertyUnitStatus, PropertyType } from '../types';
-import { WrenchScrewdriverIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, PaperClipIcon } from '../constants';
-import { maintenanceCategoryOptions, maintenancePriorityOptions, maintenanceStatusOptions } from '../constants';
-import { Badge, BadgeColor } from '../components/ui/Badge'; // Import BadgeColor
+import { 
+    MaintenanceRequest, MaintenanceCategory, MaintenancePriority, 
+    MaintenanceStatus, RequestAttachment, Property, PropertyUnitStatus, 
+    PropertyType, PropertyUnit 
+} from '../types';
+import { mockProperties, mockMaintenanceRequests } from '../data/propertyData';
+import { 
+    WrenchScrewdriverIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, 
+    FolderIcon, InformationCircleIcon, PaperClipIcon, ArrowRightIcon
+} from '../constants';
+import { 
+    maintenanceCategoryOptions, maintenancePriorityOptions, 
+    maintenanceStatusOptions 
+} from '../constants';
+import { Badge, BadgeColor } from '../components/ui/Badge';
+import { Link } from 'react-router-dom';
 
-// Simplified local mock properties for this page
-const mockPropertiesForMaintenance: Array<Pick<Property, 'id' | 'name' | 'units' | 'type'>> = [ // Added 'type' to Pick
-  { id: 'prop1', name: 'بناية النخيل السكنية', type: PropertyType.BUILDING, units: [{id: 'u1a', propertyId:'prop1', unitNumber:'شقة 101', status: PropertyUnitStatus.RENTED}, {id: 'u1b', propertyId:'prop1', unitNumber:'شقة 102', status: PropertyUnitStatus.VACANT}] },
-  { id: 'prop2', name: 'فيلا السعادة - السرة', type: PropertyType.VILLA, units: [] },
-  { id: 'prop3', name: 'مجمع النور التجاري - محل 5', type: PropertyType.SHOP, units: [] },
-  { id: 'prop5', name: 'برج الأعمال المركزي', type: PropertyType.BUILDING, units: [{id: 'u5a', propertyId:'prop5', unitNumber:'مكتب 1201', status: PropertyUnitStatus.RENTED}, {id: 'u5b', propertyId:'prop5', unitNumber:'مكتب 1202', status: PropertyUnitStatus.VACANT}] },
-  { id: 'prop-land', name: 'أرض فضاء - جنوب عبدالله المبارك', type: PropertyType.LAND, units: [] },
-];
-
-export const mockMaintenanceRequests: MaintenanceRequest[] = [ // Added export
-  {
-    id: 'mreq1',
-    propertyId: 'prop1',
-    propertyName: 'بناية النخيل السكنية',
-    unitId: 'u1a',
-    propertyUnitName: 'شقة 101',
-    reportedBy: 'أحمد عبدالله (المستأجر)',
-    reporterContact: '98765432',
-    requestDate: '2024-07-15',
-    description: 'تسريب مياه من صنبور المطبخ، يتطلب فحصًا عاجلاً.',
-    category: MaintenanceCategory.PLUMBING,
-    priority: MaintenancePriority.URGENT,
-    status: MaintenanceStatus.ASSIGNED_TO_VENDOR,
-    assignedToVendorName: 'شركة الصيانة السريعة',
-    scheduledDate: '2024-07-16',
-    estimatedCost: 25,
-    createdAt: '2024-07-15',
-  },
-  {
-    id: 'mreq2',
-    propertyId: 'prop5',
-    propertyName: 'برج الأعمال المركزي',
-    unitId: 'u5b',
-    propertyUnitName: 'مكتب 1202',
-    reportedBy: 'مدير المكتب (المستأجر)',
-    requestDate: '2024-06-20',
-    description: 'أحد مكيفات الهواء لا يعمل بشكل جيد، يحتاج إلى فحص وصيانة.',
-    category: MaintenanceCategory.HVAC,
-    priority: MaintenancePriority.MEDIUM,
-    status: MaintenanceStatus.COMPLETED_CLOSED,
-    assignedToVendorName: 'فني التكييف المعتمد',
-    scheduledDate: '2024-06-22',
-    completionDate: '2024-06-23',
-    cost: 40,
-    estimatedCost: 35,
-    invoiceNumber: 'INV-AC-0623',
-    completionNotes: 'تم تنظيف الفلاتر وإعادة شحن غاز الفريون. يعمل المكيف الآن بكفاءة.',
-    createdAt: '2024-06-20',
-  },
-  {
-    id: 'mreq3',
-    propertyId: 'prop2',
-    propertyName: 'فيلا السعادة - السرة',
-    reportedBy: 'حارس الفيلا',
-    requestDate: '2024-08-01',
-    description: 'باب الكراج الرئيسي لا يفتح بشكل كامل، قد يحتاج إلى تزييت أو تعديل.',
-    category: MaintenanceCategory.STRUCTURAL,
-    priority: MaintenancePriority.LOW,
-    status: MaintenanceStatus.PENDING_APPROVAL,
-    createdAt: '2024-08-01',
-  },
-   {
-    id: 'mreq4',
-    propertyId: 'prop1',
-    propertyName: 'بناية النخيل السكنية',
-    unitId: 'u1d',
-    propertyUnitName: 'محل رقم 1 - أرضي',
-    reportedBy: 'مستأجر المحل الجديد',
-    requestDate: '2024-07-28',
-    description: 'بعض وحدات الإضاءة في سقف المحل لا تعمل. يرجى فحص الدائرة الكهربائية.',
-    category: MaintenanceCategory.ELECTRICAL,
-    priority: MaintenancePriority.HIGH,
-    status: MaintenanceStatus.IN_PROGRESS,
-    assignedToVendorName: 'كهربائي العمارة - سيد أحمد',
-    scheduledDate: '2024-07-29',
-    estimatedCost: 15,
-    notes: "تم التواصل مع الكهربائي، سيقوم بالفحص خلال 24 ساعة.",
-    createdAt: '2024-07-28',
-  },
-  {
-    id: 'mreq5',
-    propertyId: 'prop5',
-    propertyName: 'برج الأعمال المركزي',
-    reportedBy: 'مدير أمن البرج',
-    requestDate: '2024-07-20',
-    description: 'أحد مصاعد الخدمة يصدر صوتًا غريبًا ويتوقف أحيانًا بين الأدوار.',
-    category: MaintenanceCategory.ELEVATOR,
-    priority: MaintenancePriority.URGENT,
-    status: MaintenanceStatus.ON_HOLD_PARTS_NEEDED,
-    assignedToVendorName: 'شركة مصاعد أوتيس',
-    scheduledDate: '2024-07-21',
-    notes: 'فني الشركة حضر، ويحتاج إلى طلب قطعة غيار خاصة. متوقع وصولها خلال أسبوع.',
-    createdAt: '2024-07-20',
-  },
-];
+// Use central mock properties
+const mockPropertiesForMaintenance = mockProperties;
 
 const getStatusBadgeColor = (status: MaintenanceStatus): BadgeColor => {
     switch(status) {
@@ -156,7 +75,7 @@ const MaintenanceRequestFormModal: React.FC<MaintenanceRequestFormModalProps> = 
     }, [initialData, properties]);
 
     const [formData, setFormData] = useState<Partial<MaintenanceRequest>>(getInitialFormData);
-    const [availableUnits, setAvailableUnits] = useState<Property['units']>([]);
+    const [availableUnits, setAvailableUnits] = useState<PropertyUnit[]>([]);
 
     useEffect(() => {
         if (isOpen) {
@@ -328,6 +247,9 @@ const PropertyMaintenancePage: React.FC = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-center">
         <div className="flex items-center mb-4 md:mb-0">
+            <Link to="/property-management" className="p-2 bg-gray-100 hover:bg-gray-200 rounded-full me-4 transition-colors">
+                <ArrowRightIcon className="w-5 h-5 text-gray-600" />
+            </Link>
             <WrenchScrewdriverIcon className="w-8 h-8 text-primary me-3" />
             <h1 className="text-3xl font-bold text-primary-dark">سجلات صيانة العقارات</h1>
         </div>

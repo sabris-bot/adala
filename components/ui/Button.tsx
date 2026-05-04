@@ -7,6 +7,8 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
   isLoading?: boolean;
+  fullWidth?: boolean;
+  iconOnly?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -16,10 +18,14 @@ const Button: React.FC<ButtonProps> = ({
   leftIcon,
   rightIcon,
   isLoading = false,
+  fullWidth = false,
+  iconOnly = false,
   className = '',
-  ...props
+  ...rest
 }) => {
   const baseStyles = "font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dm-background transition-all duration-150 ease-in-out inline-flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed shadow-sm hover:shadow-md";
+  
+  const widthClass = fullWidth ? "w-full" : "";
 
   // Updated variants for "Modern Justice" theme
   const variantStyles = {
@@ -32,16 +38,16 @@ const Button: React.FC<ButtonProps> = ({
   };
 
   const sizeStyles = {
-    sm: 'px-3 py-1.5 text-xs',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-2.5 text-base', // Slightly adjusted padding for lg
+    sm: iconOnly ? 'p-1.5' : 'px-3 py-1.5 text-xs',
+    md: iconOnly ? 'p-2' : 'px-4 py-2 text-sm',
+    lg: iconOnly ? 'p-2.5' : 'px-6 py-2.5 text-base', // Slightly adjusted padding for lg
   };
 
   return (
     <button
-      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${className}`}
-      disabled={isLoading || props.disabled}
-      {...props}
+      className={`${baseStyles} ${variantStyles[variant]} ${sizeStyles[size]} ${widthClass} ${className}`}
+      disabled={isLoading || rest.disabled}
+      {...rest}
     >
       {isLoading && (
         <svg className="animate-spin -ms-1 me-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

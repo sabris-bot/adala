@@ -1,6 +1,7 @@
-import { GoogleGenAI, GenerateContentResponse, Chat } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Chat, FunctionDeclaration, Type } from "@google/genai";
 import { GEMINI_TEXT_MODEL } from '../constants';
 import { GeminiAnalysisResult, RiskLevel, AISuggestedNode, MindMapEdge, Case, ComplianceRequirement } from "../types"; // Added Case & ComplianceRequirement
+import { initialCases } from "../data/caseData";
 
 // Ensure API_KEY is accessed correctly from environment variables
 const API_KEY = process.env.API_KEY;
@@ -12,10 +13,102 @@ if (API_KEY) {
   console.warn("Gemini API Key not found in process.env.API_KEY. AI features will be mocked or disabled.");
 }
 
+// --- Function Declarations for Gemini ---
+const searchCasesFunctionDeclaration: FunctionDeclaration = {
+  name: "searchCases",
+  parameters: {
+    type: Type.OBJECT,
+    description: "البحث عن القضايا في النظام بناءً على نص البحث (عنوان، رقم، اسم موكل أو خصم).",
+    properties: {
+      query: {
+        type: Type.STRING,
+        description: "نص البحث المراد استخدامه للعثور على القضايا.",
+      },
+    },
+    required: ["query"],
+  },
+};
+
+const getExecutionProceduresFunctionDeclaration: FunctionDeclaration = {
+  name: "getExecutionProcedures",
+  parameters: {
+    type: Type.OBJECT,
+    description: "الحصول على كافة إجراءات التنفيذ المسجلة لقضية معينة باستخدام معرف القضية (ID) أو رقم القضية.",
+    properties: {
+      caseId: {
+        type: Type.STRING,
+        description: "المعرف الفريد للقضية (ID) أو رقم القضية الآلي.",
+      },
+    },
+    required: ["caseId"],
+  },
+};
+
+// --- Implementation of Functions ---
+const searchCases = (query: string): any[] => {
+  const lowerQuery = query.toLowerCase();
+  return initialCases.filter(c => 
+    c.title.toLowerCase().includes(lowerQuery) ||
+    c.caseNumber.toLowerCase().includes(lowerQuery) ||
+    c.clientName.toLowerCase().includes(lowerQuery) ||
+    (c.opposingPartyName && c.opposingPartyName.toLowerCase().includes(lowerQuery))
+  ).map(c => ({
+    id: c.id,
+    title: c.title,
+    caseNumber: c.caseNumber,
+    clientName: c.clientName,
+    status: c.status
+  }));
+};
+
+const getExecutionProcedures = (caseId: string): any => {
+  const caseItem = initialCases.find(c => c.id === caseId || c.caseNumber === caseId);
+  if (!caseItem) return { error: "القضية غير موجودة." };
+  return {
+    caseTitle: caseItem.title,
+    caseNumber: caseItem.caseNumber,
+    executionActions: caseItem.executionActions || []
+  };
+};
+
 interface FileInput {
   base64Data: string;
   mimeType: string;
 }
+
+// --- Helper to extract JSON from text safely ---
+const extractJson = (text: string): string => {
+  // Common case: markdown code blocks
+  const fenceRegex = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/i;
+  const match = text.match(fenceRegex);
+  if (match && match[1]) {
+    return match[1].trim();
+  }
+
+  // Handle case where it might be wrapped in brackets/braces but has text around it
+  const startBrace = text.indexOf('{');
+  const endBrace = text.lastIndexOf('}');
+  const startBracket = text.indexOf('[');
+  const endBracket = text.lastIndexOf(']');
+
+  // Decide which one is likely the JSON wrapper
+  let start = -1;
+  let end = -1;
+
+  if (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) {
+    start = startBrace;
+    end = endBrace;
+  } else if (startBracket !== -1) {
+    start = startBracket;
+    end = endBracket;
+  }
+
+  if (start !== -1 && end !== -1 && end > start) {
+    return text.substring(start, end + 1);
+  }
+
+  return text.trim();
+};
 
 // --- Contract Analysis (Now Multimodal) ---
 const analyzeContract = async (text?: string, file?: FileInput): Promise<GeminiAnalysisResult> => {
@@ -78,13 +171,7 @@ const analyzeContract = async (text?: string, file?: FileInput): Promise<GeminiA
       },
     });
 
-    let jsonStr = response.text.trim();
-    const fenceRegex = /^\`\`\`(\w*)?\s*\n?(.*?)\n?\s*\`\`\`$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-    
+    const jsonStr = extractJson(response.text);
     const parsedData = JSON.parse(jsonStr) as GeminiAnalysisResult;
     
     // Validate and normalize risk levels
@@ -133,37 +220,43 @@ const analyzeContract = async (text?: string, file?: FileInput): Promise<GeminiA
 };
 
 
-// --- Legal Chatbot (Multimodal) ---
-const getChatbotResponse = async (message: string, file?: FileInput): Promise<string> => {
+// --- Legal Chatbot (Multimodal & Tool-Aware & History-Aware) ---
+interface ChatMessage {
+  role: "user" | "model";
+  parts: { text: string }[];
+}
+
+const getChatbotResponse = async (message: string, history: ChatMessage[] = [], file?: FileInput): Promise<string> => {
   if (!ai) {
     console.warn("Gemini AI not initialized. Returning mock data for chatbot.");
     let fileInfo = file ? ` وملف مرفق من نوع ${file.mimeType}` : '';
     return Promise.resolve(`أنا مساعدك القانوني الذكي. في الوضع العادي، يمكنني الإجابة على استفساراتك القانونية وتحليل المستندات. (خدمة AI غير نشطة حاليًا). سؤالك كان: "${message}"${fileInfo}.`);
   }
 
-  const systemInstruction = `أنت مساعد قانوني خبير ومتقدم للغاية، متخصص في قوانين الشرق الأوسط، مع تركيز خاص على الكويت ودول الخليج. أنت مبني على أحدث نماذج الذكاء الاصطناعي التوليدي (Gemini) وقادر على التعامل مع المدخلات متعددة الوسائط (نصوص، صور مستندات، ملفات PDF).
+  const systemInstruction = `أنت مساعد قانوني خبير ومتقدم للغاية، متخصص في قوانين الشرق الأوسط، مع تركيز دقيق وعميق على قوانين دولة الكويت (القانون المدني، قانون التجارة، قانون المرافعات، قانون العمل، قانون الجزاء، وقانون الشركات الكويتي). أنت مبني على أحدث نماذج الذكاء الاصطناعي التوليدي (Gemini) وقادر على التعامل مع المدخلات متعددة الوسائط.
 
-مهمتك هي تقديم مساعدة قانونية دقيقة، شاملة، ومستنيرة لمجموعة واسعة جدًا من الاستفسارات والطلبات. قدراتك تشمل ولا تقتصر على:
-1.  **تحليل المستندات:** إذا تم إرفاق ملف (صورة أو PDF)، قم أولاً بتحليل محتواه بدقة (استخدم OCR إذا لزم الأمر). ثم أجب على أي سؤال محدد حول المستند، أو قدم ملخصًا وتحليلاً شاملاً إذا لم يتم طرح سؤال محدد.
-2.  **الإجابة على استفسارات معقدة:** أجب على أسئلة تتعلق بأي حالة قانونية، أو استفسارات قانونية عامة أو متخصصة.
+مهمتك هي تقديم مساعدة قانونية دقيقة، شاملة، ومستنيرة لمجموعة واسعة من الاستفسارات. عند الإجابة على استفسارات تتعلق بالكويت، يجب عليك استحضار مواد القانون الكويتي ذات الصلة (مثل قانون العمل 6/2010، أو القانون المدني 67/1980) واستخدام المصطلحات القانونية الكويتية الدقيقة (مثلاً: "المحكمة الكلية"، "إدارة التنفيذ"، "مندوب الإعلان").
+
+قدراتك تشمل ولا تقتصر على:
+1.  **تحليل المستندات:** إذا تم إرفاق ملف، قم بتحليل محتواه بدقة وربطه بالقانون الكويتي إذا لزم الأمر.
+2.  **الإجابة على استفسارات معقدة:** أجب على أسئلة تتعلق بأي حالة قانونية.
 3.  **شرح المفاهيم والمصطلحات:** وضح أي مفهوم أو مصطلح قانوني بشكل مبسط ودقيق.
-4.  **تلخيص النصوص:** لخص أي نص قانوني يتم تقديمه لك، مع إبراز النقاط الجوهرية.
-5.  **المساعدة في الصياغة:** ساعد في صياغة مسودات أولية لمختلف أنواع الوثائق القانونية (مثل بنود العقود، فقرات المذكرات، الإنذارات، الطلبات).
-6.  **البحث القانوني:** ابحث وقدم معلومات عن قوانين محددة، مواد قانونية، أو مبادئ قضائية عامة ذات صلة بالاستفسار.
-7.  **تحليل السيناريوهات:** حلل سيناريوهات قانونية افتراضية وقدم رأيًا مبدئيًا حول التبعات المحتملة.
-8.  **المقارنة القانونية:** قارن بين مفاهيم، تشريعات، أو إجراءات قانونية مختلفة، موضحًا الفروقات والتشابهات.
+4.  **تلخيص النصوص:** لخص أي نص قانوني يتم تقديمه لك.
+5.  **المساعدة في الصياغة:** ساعد في صياغة مسودات أولية لمختلف أنواع الوثائق القانونية.
+6.  **البحث القانوني:** ابحث وقدم معلومات عن قوانين محددة أو مبادئ قضائية.
+7.  **تحليل السيناريوهات:** حلل سيناريوهات قانونية افتراضية.
+8.  **الوصول إلى بيانات النظام:** يمكنك البحث عن القضايا والحصول على تفاصيل إجراءات التنفيذ باستخدام الأدوات المتاحة لك.
 
 **قواعد هامة:**
-- إذا لم تكن متأكدًا من إجابة، أو إذا كان السؤال يتطلب استشارة قانونية متخصصة تتجاوز المعلومات العامة، كن واضحًا جدًا في ذلك وأنصح المستخدم بالرجوع إلى محامٍ مختص فورًا.
+- إذا لم تكن متأكدًا من إجابة، أنصح المستخدم بالرجوع إلى محامٍ مختص فورًا.
 - كن دائمًا مهنيًا ومساعدًا.
-- قدم إجاباتك بتنسيق واضح ومنظم (استخدم القوائم النقطية، العناوين، والتنسيق الغامق لتحسين القراءة).
+- قدم إجاباتك بتنسيق واضح ومنظم (استخدم Markdown للتنسيق مثل العناوين والقوائم).
 - أكد دائمًا على أن المعلومات المقدمة هي لأغراض إرشادية ولا تغني عن استشارة محامٍ مرخص.`;
   
-  let contents: any;
-  const parts = [];
+  const currentParts = [];
 
   if (file) {
-    parts.push({
+    currentParts.push({
       inlineData: {
         mimeType: file.mimeType,
         data: file.base64Data,
@@ -171,11 +264,13 @@ const getChatbotResponse = async (message: string, file?: FileInput): Promise<st
     });
   }
 
-  // Always add the text part, even if it's an empty string. It carries the main prompt context.
   const promptText = message || (file ? "الرجاء تحليل وتلخيص المستند المرفق." : "مرحباً");
-  parts.push({ text: promptText });
+  currentParts.push({ text: promptText });
 
-  contents = [{ role: "user", parts }];
+  const contents = [
+    ...history,
+    { role: "user", parts: currentParts }
+  ];
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -183,8 +278,49 @@ const getChatbotResponse = async (message: string, file?: FileInput): Promise<st
       contents: contents,
       config: {
         systemInstruction: systemInstruction,
+        tools: [{ functionDeclarations: [searchCasesFunctionDeclaration, getExecutionProceduresFunctionDeclaration] }],
       },
     });
+
+    // Check for function calls
+    const functionCalls = response.functionCalls;
+    if (functionCalls) {
+      const toolResponses: any[] = [];
+      for (const call of functionCalls) {
+        if (call.name === "searchCases") {
+          const results = searchCases(call.args.query as string);
+          toolResponses.push({
+            functionResponse: {
+              name: "searchCases",
+              response: { result: results }
+            }
+          });
+        } else if (call.name === "getExecutionProcedures") {
+          const results = getExecutionProcedures(call.args.caseId as string);
+          toolResponses.push({
+            functionResponse: {
+              name: "getExecutionProcedures",
+              response: { result: results }
+            }
+          });
+        }
+      }
+
+      // Send tool responses back to model
+      const secondResponse = await ai.models.generateContent({
+        model: GEMINI_TEXT_MODEL,
+        contents: [
+          ...contents,
+          { role: "model", parts: response.candidates[0].content.parts },
+          { role: "user", parts: toolResponses }
+        ],
+        config: {
+          systemInstruction: systemInstruction,
+        }
+      });
+      return secondResponse.text;
+    }
+
     return response.text;
   } catch (error) {
     console.error("Error getting chatbot response:", error);
@@ -285,12 +421,7 @@ const generateMindMap = async (input: MindMapInput): Promise<{ nodes: AISuggeste
             },
         });
 
-        let jsonStr = response.text.trim();
-        const fenceRegex = /^\`\`\`(?:json)?\s*\n?(.*?)\n?\s*\`\`\`$/si;
-        const match = jsonStr.match(fenceRegex);
-        if (match && match[1]) {
-            jsonStr = match[1].trim();
-        }
+        const jsonStr = extractJson(response.text);
         
         let parsedData: AISuggestedNode[];
         try {
@@ -322,8 +453,81 @@ const generateMindMap = async (input: MindMapInput): Promise<{ nodes: AISuggeste
 };
 
 
+const generateLegalForm = async (prompt: string, file?: FileInput): Promise<{ 
+    title: string; 
+    category: string; 
+    description: string; 
+    contentTemplate: string; 
+    variables: string[]; 
+    instructions: string; 
+}> => {
+    if (!ai) {
+        console.warn("Gemini AI not initialized. Returning mock data for legal form generation.");
+        return Promise.resolve({
+            title: "نموذج قانوني مولد آلياً",
+            category: "CONTRACTS",
+            description: "هذا نموذج تجريبي تم توليده بسبب عدم توفر مفتاح API.",
+            contentTemplate: `هذا نص تجريبي لنموذج {{نوع_النموذج}}\n\nحرر في {{التاريخ}}\nبين كل من:\nالطرف الأول: {{الاسم_الأول}}\nالطرف الثاني: {{الاسم_الثاني}}`,
+            variables: ["نوع_النموذج", "التاريخ", "الاسم_الأول", "الاسم_الثاني"],
+            instructions: "تأكد من مراجعة النص قانونياً قبل الاستخدام."
+        });
+    }
+
+    const systemInstruction = `أنت خبير قانوني ومصاغ محترف متخصص في القوانين الكويتية. 
+    مهمتك هي إنشاء "نموذج قانوني" (Template) بناءً على طلب المستخدم أو استخراجه من مستند مرفق.
+    يجب أن تكون اللغة بليغة، فصيحة، ودقيقة قانونياً.
+    يجب أن يحتوي النموذج على "متغيرات" قابلة للتعبئة محاطة بأقواس متعرجة مزدوجة، مثل {{الاسم_الكامل}}.
+    
+    يجب أن يكون الرد بتنسيق JSON حصرياً ويحتوي على الحقول التالية:
+    1. "title": عنوان مناسب ومختصر للنموذج.
+    2. "category": فئة النموذج (أختر من: CONTRACTS, POWERS_OF_ATTORNEY, LEGAL_MEMOS, LAWSUITS, NOTICES, CORPORATE, OTHER).
+    3. "description": وصف موجز للنموذج وفائدته.
+    4. "contentTemplate": النص الكامل للنموذج مع المتغيرات {{متغير}}.
+    5. "variables": مصفوفة بأسماء المتغيرات المستخدمة في النص (بدون الأقواس).
+    6. "instructions": إرشادات قانونية هامة لمستخدم هذا النموذج.`;
+
+    const parts = [];
+    if (file) {
+        parts.push({
+            inlineData: {
+                mimeType: file.mimeType,
+                data: file.base64Data,
+            },
+        });
+        parts.push({ text: `قم باستخراج النص من هذا الملف وتحويله إلى "نموذج قانوني" احترافي مع إضافة متغيرات وتنسيقه بأسلوب بليغ. تعليمات إضافية: ${prompt}` });
+    } else {
+        parts.push({ text: `قم بإنشاء نموذج قانوني كويتي حسب الطلب التالي: ${prompt}` });
+    }
+
+    try {
+        const response: GenerateContentResponse = await ai.models.generateContent({
+            model: GEMINI_TEXT_MODEL,
+            contents: [{ role: "user", parts: parts }],
+            config: {
+                systemInstruction: systemInstruction,
+                responseMimeType: "application/json",
+                temperature: 0.2,
+            },
+        });
+
+        const jsonStr = extractJson(response.text);
+
+        try {
+            return JSON.parse(jsonStr);
+        } catch (parseError) {
+            console.error("Failed to parse legal form JSON:", jsonStr, parseError);
+            throw new Error("البيانات المستلمة من الذكاء الاصطناعي بتنسيق غير متوقع.");
+        }
+    } catch (error) {
+        console.error("Error generating legal form:", error);
+        throw new Error("فشل توليد النموذج القانوني. حاول مرة أخرى.");
+    }
+};
+
+
 export const geminiService = {
   analyzeContract,
   getChatbotResponse,
-  generateMindMap, 
+  generateMindMap,
+  generateLegalForm,
 };

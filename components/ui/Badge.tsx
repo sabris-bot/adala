@@ -1,4 +1,6 @@
+
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { 
     RiskLevel, CaseStatus, CasePriority, ComplianceStatus, LoanStatus, 
     InstallmentStatus, DisciplinaryActionStatus, EmployeeRequestStatus, 
@@ -12,19 +14,35 @@ import {
     KBASeminarRegistrationStatus, // Added for KBA Module
     MaintenanceStatus, // Added import for MaintenanceStatus
     ExecutionActionStatus, // Added for Case Execution Actions
-    ExpertActionStatus // NEW
+    ExpertActionStatus, // NEW
+    CompliancePriority
 } from '../../types';
 
 export type BadgeColor = 'green' | 'yellow' | 'red' | 'blue' | 'gray' | 'purple' | 'orange' | 'cyan' | 'pink' | 'indigo' | 'teal';
+export type BadgeVariant = 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info' | 'accent';
 
 interface BadgeProps {
   text: string;
-  color?: BadgeColor;
+  color?: BadgeColor | string;
+  variant?: BadgeVariant;
   className?: string;
   size?: 'xs' | 'sm';
 }
 
-export const Badge: React.FC<BadgeProps> = ({ text, color = 'gray', className = '', size = 'xs' }) => {
+export const Badge: React.FC<BadgeProps> = ({ text, color, variant, className = '', size = 'xs' }) => {
+  const { t } = useTranslation();
+  const variantMap: Record<BadgeVariant, BadgeColor> = {
+    primary: 'blue',
+    secondary: 'gray',
+    success: 'green',
+    warning: 'yellow',
+    danger: 'red',
+    info: 'cyan',
+    accent: 'purple'
+  };
+
+  const finalColor = (variant ? variantMap[variant] : color || 'gray') as BadgeColor;
+
   const colorStyles: Record<BadgeColor, string> = {
     green: 'bg-success/20 text-green-700 dark:bg-green-700/30 dark:text-green-300', 
     yellow: 'bg-warning/20 text-yellow-700 dark:bg-yellow-700/30 dark:text-yellow-300', 
@@ -46,20 +64,20 @@ export const Badge: React.FC<BadgeProps> = ({ text, color = 'gray', className = 
 
   return (
     <span
-      className={`rounded-full font-semibold inline-block whitespace-nowrap ${sizeStyles[size]} ${colorStyles[color]} ${className}`}
+      className={`rounded-full font-semibold inline-block whitespace-nowrap ${sizeStyles[size]} ${colorStyles[finalColor] || colorStyles.gray} ${className}`}
     >
-      {text}
+      {t(text, { defaultValue: text })}
     </span>
   );
 };
 
-export const RiskLevelBadge: React.FC<{ level: RiskLevel, size?: 'xs' | 'sm' }> = ({ level, size }) => {
+export const RiskLevelBadge: React.FC<{ level: RiskLevel, size?: 'xs' | 'sm', className?: string }> = ({ level, size, className }) => {
   let color: BadgeColor = 'gray';
   if (level === RiskLevel.LOW) color = 'green';
   else if (level === RiskLevel.MEDIUM) color = 'yellow';
   else if (level === RiskLevel.HIGH) color = 'orange';
   else if (level === RiskLevel.CRITICAL) color = 'red';
-  return <Badge text={level} color={color} size={size}/>;
+  return <Badge text={level} color={color} size={size} className={className}/>;
 };
 
 export const CaseStatusBadge: React.FC<{ status: CaseStatus, size?: 'xs' | 'sm' }> = ({ status, size }) => {
@@ -110,6 +128,17 @@ export const ComplianceStatusBadge: React.FC<{ status: ComplianceStatus, size?: 
     case ComplianceStatus.NOT_APPLICABLE: case ComplianceStatus.CANCELLED: color = 'gray'; break;
   }
   return <Badge text={status} color={color} size={size} />;
+};
+
+export const CompliancePriorityBadge: React.FC<{ priority: CompliancePriority, size?: 'xs' | 'sm' }> = ({ priority, size }) => {
+    let color: BadgeColor = 'gray';
+    switch(priority) {
+      case CompliancePriority.LOW: color = 'green'; break;
+      case CompliancePriority.MEDIUM: color = 'blue'; break;
+      case CompliancePriority.HIGH: color = 'orange'; break;
+      case CompliancePriority.CRITICAL: color = 'red'; break;
+    }
+    return <Badge text={priority} color={color} size={size} />;
 };
 
 export const LoanStatusBadge: React.FC<{ status: LoanStatus, size?: 'xs' | 'sm' }> = ({ status, size }) => {

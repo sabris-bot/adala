@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -5,7 +6,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
-import { ChatBubbleLeftEllipsisIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, DocumentTextIcon } from '../constants';
+import { ChatBubbleLeftEllipsisIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, DocumentTextIcon, PrinterIcon, CheckCircleIcon, XCircleIcon, OFFICE_NAME } from '../constants';
 import { 
     Employee, EmployeeRequest, EmployeeRequestType, EmployeeRequestStatus, 
     SalaryCertificateRequestDetails, ExperienceLetterRequestDetails, LeaveEncashmentRequestDetails, 
@@ -14,69 +15,10 @@ import {
 } from '../types';
 import { employeeRequestTypeOptions, employeeRequestStatusOptions, contractTypeKuwaitOptions } from '../constants';
 import { EmployeeRequestStatusBadge } from '../components/ui/Badge';
+import { initialEmployees } from './EmployeeProfilePage';
 
-const mockEmployees: Employee[] = [
-  {
-    id: 'emp-001',
-    employeeId: 'EMP001',
-    fullNameAr: 'أحمد محمود مبارك',
-    fullNameEn: 'Ahmed Mahmoud Mubarak',
-    civilId: '285010112345',
-    nationality: 'كويتي',
-    jobTitle: 'محام أول',
-    department: 'القسم التجاري',
-    joiningDate: '2018-05-15',
-    contractType: ContractTypeKuwait.UNLIMITED,
-    basicSalary: 1200,
-    allowances: [{ name: 'بدل سكن', value: 200, subjectToIndemnity: true }, { name: 'بدل انتقال', value: 50 }],
-    email: 'ahmed.m@example.com',
-    phone: '98765432',
-    status: 'Active',
-    photoUrl: 'https://picsum.photos/seed/emp1/100/100',
-    annualLeaveEntitlement: 30,
-    leaveTakenThisYear: 5,
-    monthlySalaryForLeaveCalc: 1400, 
-  },
-  {
-    id: 'emp-002',
-    employeeId: 'EMP002',
-    fullNameAr: 'فاطمة علي حسين',
-    civilId: '290030323456',
-    nationality: 'مصرية',
-    jobTitle: 'مساعدة قانونية',
-    department: 'قسم القضايا العمالية',
-    joiningDate: '2020-01-20',
-    contractType: ContractTypeKuwait.LIMITED,
-    basicSalary: 750,
-    allowances: [{ name: 'بدل سكن', value: 150, subjectToIndemnity: true }],
-    email: 'fatima.a@example.com',
-    phone: '65432109',
-    status: 'Active',
-    photoUrl: 'https://picsum.photos/seed/emp2/100/100',
-    annualLeaveEntitlement: 30,
-    leaveTakenThisYear: 10,
-    monthlySalaryForLeaveCalc: 900, 
-  },
-  {
-    id: 'emp-003',
-    employeeId: 'EMP003',
-    fullNameAr: 'علي محمد جاسم',
-    civilId: '300070734567',
-    nationality: 'كويتي',
-    jobTitle: 'سكرتير تنفيذي',
-    department: 'الإدارة',
-    joiningDate: '2022-11-01',
-    contractType: ContractTypeKuwait.UNLIMITED,
-    basicSalary: 600,
-    allowances: [],
-    status: 'Active',
-    annualLeaveEntitlement: 30,
-    leaveTakenThisYear: 0,
-    monthlySalaryForLeaveCalc: 600,
-  }
-];
-
-export const initialRequests: EmployeeRequest[] = [ // Added export
+// --- Mock Data ---
+export const initialRequests: EmployeeRequest[] = [
   {
     id: 'req1',
     employeeId: 'emp-001',
@@ -105,7 +47,7 @@ export const initialRequests: EmployeeRequest[] = [ // Added export
     details: {
       numberOfDays: 5,
       currentLeaveBalance: 20, 
-      calculatedAmount: (900/26) * 5, // Use 26 working days for leave calculation
+      calculatedAmount: (750/26) * 5, 
     } as LeaveEncashmentRequestDetails,
     hrAdminNotes: 'تمت الموافقة على تسييل 5 أيام. سيتم الصرف مع راتب الشهر القادم.',
     createdAt: '2024-06-15',
@@ -151,6 +93,21 @@ export const initialRequests: EmployeeRequest[] = [ // Added export
       desiredOutcome: "صرف البدل المستحق بأسرع وقت."
     } as GrievanceFormDetails,
     createdAt: '2024-07-25',
+  },
+  {
+      id: 'req6',
+      employeeId: 'emp-004',
+      employeeName: 'نورة خالد السبيعي',
+      requestType: EmployeeRequestType.DATA_UPDATE_REQUEST,
+      requestDate: '2024-08-05',
+      status: EmployeeRequestStatus.COMPLETED,
+      details: {
+          fieldToUpdate: 'العنوان',
+          oldValue: 'الرياض',
+          newValue: 'الكويت - السالمية',
+          reasonForUpdate: 'الانتقال للإقامة الدائمة'
+      } as DataUpdateRequestDetails,
+      createdAt: '2024-08-05',
   }
 ];
 
@@ -205,7 +162,7 @@ const getDefaultDetailsForRequestType = (requestType: EmployeeRequestType): Empl
         case EmployeeRequestType.OTHER:
             return { typeNote: '' };
         default:
-            return { typeNote: '' }; // Fallback to a valid type
+            return { typeNote: '' };
     }
 };
 
@@ -213,16 +170,15 @@ interface EmployeeRequestFormProps {
   initialData?: Partial<EmployeeRequest> | null;
   onSubmit: (data: EmployeeRequest) => void;
   onCancel: () => void;
-  employees: Array<Pick<Employee, 'id' | 'fullNameAr' | 'employeeId' | 'annualLeaveEntitlement' | 'leaveTakenThisYear' | 'department' | 'jobTitle' | 'joiningDate'>>;
-  isAdminView?: boolean; 
+  employees: Employee[];
 }
 
-const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, onSubmit, onCancel, employees, isAdminView = false }) => {
+const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, onSubmit, onCancel, employees }) => {
     const [formData, setFormData] = useState<Partial<EmployeeRequest>>({});
 
     useEffect(() => {
         const defaultData: Partial<EmployeeRequest> = {
-            employeeId: isAdminView && employees.length > 0 ? employees[0].id : (employees.find(e => e.id === 'user-id-placeholder') || employees[0])?.id,
+            employeeId: employees.length > 0 ? employees[0].id : '',
             requestType: EmployeeRequestType.SALARY_CERTIFICATE,
             requestDate: new Date().toISOString().split('T')[0],
             status: EmployeeRequestStatus.PENDING,
@@ -239,7 +195,7 @@ const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, 
         } else {
             setFormData(defaultData);
         }
-    }, [initialData, employees, isAdminView]);
+    }, [initialData, employees]);
 
   const selectedEmployeeData = employees.find(emp => emp.id === formData.employeeId);
   const availableLeaveBalance = selectedEmployeeData?.annualLeaveEntitlement !== undefined && selectedEmployeeData?.leaveTakenThisYear !== undefined 
@@ -314,10 +270,10 @@ const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, 
               <Input label="اسم الجهة الموجهة إليها الشهادة" name="specificRecipient" value={details.specificRecipient || ''} onChange={handleDetailChange} />
             )}
             <label className="flex items-center mt-2">
-              <input type="checkbox" className="form-checkbox" name="includeSalaryDetails" checked={!!details.includeSalaryDetails} onChange={handleDetailChange} />
-              <span className="ms-2 text-sm">تضمين تفاصيل الراتب في الشهادة</span>
+              <input type="checkbox" className="form-checkbox text-primary h-4 w-4" name="includeSalaryDetails" checked={!!details.includeSalaryDetails} onChange={handleDetailChange} />
+              <span className="ms-2 text-sm text-gray-700">تضمين تفاصيل الراتب في الشهادة</span>
             </label>
-            <Select label="لغة الشهادة" name="language" value={details.language || 'ar'} onChange={handleDetailChange} options={[{value:'ar', label:'العربية'}, {value:'en', label:'الإنجليزية'}]} />
+            <Select label="لغة الشهادة" name="language" value={details.language || 'ar'} onChange={handleDetailChange} options={[{value:'ar', label:'العربية'}, {value:'en', label:'الإنجليزية'}]} containerClassName="mt-2" />
           </>
         );
       case EmployeeRequestType.EXPERIENCE_LETTER:
@@ -334,72 +290,72 @@ const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, 
       case EmployeeRequestType.LEAVE_ENCASHMENT:
         return (
           <>
-            <p className="text-sm text-gray-600 bg-gray-100 p-2 rounded-md">الرصيد السنوي المتاح للتسييل حاليًا: <strong className="text-primary">{availableLeaveBalance}</strong> أيام.</p>
+            <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 p-2 rounded-md mb-2 flex justify-between items-center">
+                <span>الرصيد المتاح حاليًا:</span>
+                <strong className="text-primary text-lg">{availableLeaveBalance} يوم</strong>
+            </div>
             <Input label="عدد أيام الإجازة المطلوب تسييلها" name="numberOfDays" type="number" value={String(details.numberOfDays || 0)} onChange={handleDetailChange} max={availableLeaveBalance} min={1} required />
-            { (details.numberOfDays || 0) > availableLeaveBalance && <p className="text-xs text-danger">العدد المطلوب يتجاوز الرصيد المتاح.</p>}
+            { (details.numberOfDays || 0) > availableLeaveBalance && <p className="text-xs text-danger mt-1">العدد المطلوب يتجاوز الرصيد المتاح.</p>}
           </>
         );
       case EmployeeRequestType.GRIEVANCE_FORM:
         return (
             <>
-                <Input label="طبيعة التظلم/الشكوى" name="grievanceNature" value={details.grievanceNature || ''} onChange={handleDetailChange} required />
-                <TextArea label="وصف تفصيلي للتظلم/الشكوى" name="detailedDescription" value={details.detailedDescription || ''} onChange={handleDetailChange} rows={5} required />
-                <TextArea label="النتيجة المرجوة من هذا التظلم (اختياري)" name="desiredOutcome" value={details.desiredOutcome || ''} onChange={handleDetailChange} rows={2}/>
+                <Input label="عنوان التظلم/الشكوى" name="grievanceNature" value={details.grievanceNature || ''} onChange={handleDetailChange} required placeholder="مثال: تظلم من تقييم الأداء، تأخير مستحقات..." />
+                <TextArea label="شرح تفصيلي للمشكلة" name="detailedDescription" value={details.detailedDescription || ''} onChange={handleDetailChange} rows={5} required />
+                <TextArea label="ما هي النتيجة التي ترجوها؟" name="desiredOutcome" value={details.desiredOutcome || ''} onChange={handleDetailChange} rows={2}/>
             </>
         );
       case EmployeeRequestType.TRANSFER_REQUEST:
         return (
             <>
-                <Input label="القسم الحالي" name="currentDepartment" value={details.currentDepartment || selectedEmployeeData?.department || ''} onChange={handleDetailChange} required />
-                <Input label="الوظيفة الحالية" name="currentPosition" value={details.currentPosition || selectedEmployeeData?.jobTitle || ''} onChange={handleDetailChange} required />
-                <Input label="القسم المطلوب النقل إليه" name="requestedDepartment" value={details.requestedDepartment || ''} onChange={handleDetailChange} required />
-                <Input label="الوظيفة المطلوبة" name="requestedPosition" value={details.requestedPosition || ''} onChange={handleDetailChange} required />
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="القسم الحالي" name="currentDepartment" value={details.currentDepartment || selectedEmployeeData?.department || ''} onChange={handleDetailChange} readOnly className="bg-gray-100" />
+                    <Input label="الوظيفة الحالية" name="currentPosition" value={details.currentPosition || selectedEmployeeData?.jobTitle || ''} onChange={handleDetailChange} readOnly className="bg-gray-100" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="القسم المطلوب النقل إليه" name="requestedDepartment" value={details.requestedDepartment || ''} onChange={handleDetailChange} required />
+                    <Input label="الوظيفة المطلوبة" name="requestedPosition" value={details.requestedPosition || ''} onChange={handleDetailChange} required />
+                </div>
                 <TextArea label="سبب طلب النقل" name="reasonForTransfer" value={details.reasonForTransfer || ''} onChange={handleDetailChange} rows={3} required />
             </>
         );
        case EmployeeRequestType.DOCUMENT_REQUEST:
         return (
             <>
-                <Input label="اسم المستند المطلوب" name="documentNeeded" value={details.documentNeeded || ''} onChange={handleDetailChange} placeholder="مثال: نسخة من عقد العمل، شهادة تحويل راتب" required />
-                <TextArea label="سبب طلب المستند (اختياري)" name="reasonForRequest" value={details.reasonForRequest || ''} onChange={handleDetailChange} rows={2}/>
+                <Input label="اسم المستند المطلوب" name="documentNeeded" value={details.documentNeeded || ''} onChange={handleDetailChange} placeholder="مثال: صورة جواز السفر، نسخة العقد..." required />
+                <TextArea label="سبب الحاجة للمستند (اختياري)" name="reasonForRequest" value={details.reasonForRequest || ''} onChange={handleDetailChange} rows={2}/>
             </>
         );
       case EmployeeRequestType.DATA_UPDATE_REQUEST:
         return (
             <>
-                <Input label="البيان المراد تعديله" name="fieldToUpdate" value={details.fieldToUpdate || ''} onChange={handleDetailChange} placeholder="مثال: العنوان، رقم الهاتف" required />
-                <Input label="القيمة القديمة (للتوثيق)" name="oldValue" value={details.oldValue || ''} onChange={handleDetailChange} />
-                <Input label="القيمة الجديدة" name="newValue" value={details.newValue || ''} onChange={handleDetailChange} required />
-                <TextArea label="سبب طلب التعديل (اختياري)" name="reasonForUpdate" value={details.reasonForUpdate || ''} onChange={handleDetailChange} rows={2}/>
+                <Input label="نوع البيانات المراد تعديلها" name="fieldToUpdate" value={details.fieldToUpdate || ''} onChange={handleDetailChange} placeholder="مثال: رقم الهاتف، العنوان، الحالة الاجتماعية" required />
+                <div className="grid grid-cols-2 gap-4">
+                    <Input label="القيمة القديمة" name="oldValue" value={details.oldValue || ''} onChange={handleDetailChange} />
+                    <Input label="القيمة الجديدة (الصحيحة)" name="newValue" value={details.newValue || ''} onChange={handleDetailChange} required />
+                </div>
+                <TextArea label="ملاحظات / سبب التعديل" name="reasonForUpdate" value={details.reasonForUpdate || ''} onChange={handleDetailChange} rows={2}/>
             </>
         );
       case EmployeeRequestType.OTHER:
-        return <TextArea label="تفاصيل الطلب الآخر" name="typeNote" value={details.typeNote || ''} onChange={handleDetailChange} rows={4} required />;
+        return <TextArea label="تفاصيل الطلب" name="typeNote" value={details.typeNote || ''} onChange={handleDetailChange} rows={4} required />;
       default:
-        return <p className="text-gray-500">يرجى اختيار نوع طلب لعرض الحقول المناسبة.</p>;
+        return <p className="text-gray-500 italic">يرجى اختيار نوع طلب لعرض الحقول المناسبة.</p>;
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto p-1">
-      {isAdminView && (
-          <Select label="اختيار الموظف" name="employeeId" value={formData.employeeId} options={employees.map(e => ({ value: e.id, label: `${e.fullNameAr} (${e.employeeId})` }))} onChange={handleChange} required />
-      )}
+      <Select label="اختيار الموظف" name="employeeId" value={formData.employeeId} options={employees.map(e => ({ value: e.id, label: `${e.fullNameAr} (${e.employeeId})` }))} onChange={handleChange} required />
       <Select label="نوع الطلب" name="requestType" value={formData.requestType} options={employeeRequestTypeOptions} onChange={handleChange} required />
       
-      <Card title="تفاصيل الطلب" className="bg-gray-50" titleClassName="text-sm">
+      <Card title="بيانات الطلب" className="bg-gray-50 border-gray-200" titleClassName="text-sm">
           {renderDetailsFields()}
       </Card>
       
       <TextArea label="ملاحظات إضافية (اختياري)" name="notes" value={formData.notes || ''} onChange={handleChange} rows={2} />
       
-      {isAdminView && (
-        <Card title="معالجة الطلب (للمسؤول)" className="border-t pt-4" titleClassName="text-sm">
-          <Select label="تحديث حالة الطلب" name="status" value={formData.status} options={employeeRequestStatusOptions} onChange={handleChange} />
-          <TextArea label="ملاحظات المسؤول/الموارد البشرية" name="hrAdminNotes" value={formData.hrAdminNotes || ''} onChange={handleChange} rows={3} />
-        </Card>
-      )}
-
       <div className="flex justify-end space-x-3 space-x-reverse pt-4">
         <Button type="button" variant="outline" onClick={onCancel}>إلغاء</Button>
         <Button type="submit" variant="primary">{formData.id ? 'حفظ التعديلات' : 'تقديم الطلب'}</Button>
@@ -408,7 +364,7 @@ const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, 
   );
 };
 
-// View Leave Request Modal
+// View Request Modal
 interface ViewRequestDetailsModalProps {
   request: EmployeeRequest | null;
   employee: Employee | undefined;
@@ -434,79 +390,102 @@ const ViewRequestDetailsModal: React.FC<ViewRequestDetailsModalProps> = ({ reque
                                 (request.requestType === EmployeeRequestType.SALARY_CERTIFICATE || request.requestType === EmployeeRequestType.EXPERIENCE_LETTER);
 
     return (
-        <Modal isOpen={!!request} onClose={onClose} title={`تفاصيل طلب: ${request.requestType} - ${request.employeeName}`} size="lg">
-            <div className="space-y-3 max-h-[75vh] overflow-y-auto p-2">
-                <Card title="معلومات الطلب الأساسية" className="bg-gray-50" titleClassName="text-sm">
-                    <p><strong>الموظف:</strong> {request.employeeName} (ID: {request.employeeId})</p>
-                    <p><strong>نوع الطلب:</strong> {request.requestType}</p>
-                    <p><strong>تاريخ الطلب:</strong> {formatDate(request.requestDate)}</p>
-                    <p><strong>الحالة الحالية:</strong> <EmployeeRequestStatusBadge status={request.status} size="sm"/></p>
-                    {request.notes && <p><strong>ملاحظات الموظف:</strong> {request.notes}</p>}
-                </Card>
+        <Modal isOpen={!!request} onClose={onClose} title={`طلب رقم #${request.id.slice(-4)}: ${request.requestType}`} size="lg">
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto p-1">
+                {/* Header Info */}
+                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border">
+                    <div>
+                        <h3 className="font-bold text-gray-800">{request.employeeName}</h3>
+                        <p className="text-xs text-gray-500 flex flex-col gap-1 mt-1">
+                            <span>ID: {request.employeeId} | التاريخ: {formatDate(request.requestDate)}</span>
+                            {request.completionDate && (
+                                <span className="text-primary-dark font-semibold">تاريخ إنجاز المعاملة: {formatDate(request.completionDate)}</span>
+                            )}
+                        </p>
+                    </div>
+                    <EmployeeRequestStatusBadge status={request.status} size="sm"/>
+                </div>
                 
-                <Card title="تفاصيل محتوى الطلب" className="bg-gray-50" titleClassName="text-sm">
+                {/* Request Content based on Type */}
+                <Card title="تفاصيل الطلب" className="bg-white" titleClassName="text-sm">
                     {request.requestType === EmployeeRequestType.SALARY_CERTIFICATE && (
-                        <>
-                            <p><strong>الغرض:</strong> {details.purposeType === 'general' ? 'لمن يهمه الأمر' : `لـ ${details.specificRecipient || details.purposeType}`}</p>
-                            <p><strong>تضمين تفاصيل الراتب:</strong> {details.includeSalaryDetails ? 'نعم' : 'لا'}</p>
-                            <p><strong>اللغة:</strong> {details.language === 'ar' ? 'العربية' : 'الإنجليزية'}</p>
-                        </>
+                        <div className="text-sm space-y-2">
+                            <p><span className="text-gray-500">الغرض:</span> {details.purposeType === 'general' ? 'لمن يهمه الأمر' : `لـ ${details.specificRecipient || details.purposeType}`}</p>
+                            <p><span className="text-gray-500">تفاصيل الراتب:</span> {details.includeSalaryDetails ? 'مطلوب ذكرها' : 'غير مطلوبة'}</p>
+                            <p><span className="text-gray-500">اللغة:</span> {details.language === 'ar' ? 'العربية' : 'الإنجليزية'}</p>
+                        </div>
                     )}
                     {request.requestType === EmployeeRequestType.EXPERIENCE_LETTER && (
-                         <>
-                            <p><strong>لغة الشهادة:</strong> {details.language === 'ar' ? 'العربية' : 'الإنجليزية'}</p>
+                         <div className="text-sm space-y-2">
+                            <p><span className="text-gray-500">اللغة:</span> {details.language === 'ar' ? 'العربية' : 'الإنجليزية'}</p>
                             {(details.specificPeriodFrom || details.specificPeriodTo) && (
-                                <p><strong>فترة الخبرة المطلوبة:</strong> من {formatDate(details.specificPeriodFrom)} إلى {formatDate(details.specificPeriodTo)}</p>
+                                <p><span className="text-gray-500">الفترة المحددة:</span> من {formatDate(details.specificPeriodFrom)} إلى {formatDate(details.specificPeriodTo)}</p>
                             )}
-                            {details.highlightResponsibilities && <p><strong>المسؤوليات المطلوب ذكرها:</strong> <pre className="whitespace-pre-wrap font-sans text-sm p-1 bg-white border rounded">{details.highlightResponsibilities}</pre></p>}
-                        </>
+                            {details.highlightResponsibilities && (
+                                <div>
+                                    <span className="text-gray-500 block mb-1">المسؤوليات المراد إبرازها:</span>
+                                    <p className="bg-gray-50 p-2 rounded border text-gray-700">{details.highlightResponsibilities}</p>
+                                </div>
+                            )}
+                        </div>
                     )}
                     {request.requestType === EmployeeRequestType.LEAVE_ENCASHMENT && (
-                        <p><strong>عدد أيام الإجازة المطلوب تسييلها:</strong> {details.numberOfDays} أيام</p>
+                        <p className="text-sm"><span className="text-gray-500">عدد الأيام المطلوب تسييلها:</span> <strong className="text-lg">{details.numberOfDays}</strong> يوم</p>
                     )}
-                     {request.requestType === EmployeeRequestType.DOCUMENT_REQUEST && <p><strong>المستند المطلوب:</strong> {details.documentNeeded}</p>}
-                     {request.requestType === EmployeeRequestType.OTHER && <p><strong>تفاصيل الطلب:</strong> {details.typeNote}</p>}
-                     {/* Display for other types like Grievance, Transfer, Data Update */}
+                     {request.requestType === EmployeeRequestType.DOCUMENT_REQUEST && <p className="text-sm"><span className="text-gray-500">المستند:</span> <strong>{details.documentNeeded}</strong></p>}
+                     
                      {request.requestType === EmployeeRequestType.GRIEVANCE_FORM && (
-                        <>
-                            <p><strong>طبيعة التظلم:</strong> {details.grievanceNature}</p>
-                            <p><strong>الوصف التفصيلي:</strong> <pre className="whitespace-pre-wrap font-sans text-sm p-1 bg-white border rounded">{details.detailedDescription}</pre></p>
-                            {details.desiredOutcome && <p><strong>النتيجة المرجوة:</strong> {details.desiredOutcome}</p>}
-                        </>
+                        <div className="text-sm space-y-2">
+                            <p><strong>العنوان:</strong> {details.grievanceNature}</p>
+                            <div className="bg-red-50 p-2 rounded border border-red-100 text-red-900">
+                                <span className="block text-xs font-bold text-red-700 mb-1">التفاصيل:</span>
+                                {details.detailedDescription}
+                            </div>
+                            {details.desiredOutcome && <p className="text-gray-600"><strong>المطلوب:</strong> {details.desiredOutcome}</p>}
+                        </div>
                      )}
                      {request.requestType === EmployeeRequestType.TRANSFER_REQUEST && (
-                        <>
-                            <p><strong>من:</strong> {details.currentDepartment} - {details.currentPosition}</p>
-                            <p><strong>إلى:</strong> {details.requestedDepartment} - {details.requestedPosition}</p>
-                            <p><strong>سبب النقل:</strong> {details.reasonForTransfer}</p>
-                        </>
+                        <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-2 rounded">
+                            <div>
+                                <p className="text-xs text-gray-500">الحالي</p>
+                                <p>{details.currentDepartment} / {details.currentPosition}</p>
+                            </div>
+                            <div>
+                                <p className="text-xs text-gray-500">المطلوب</p>
+                                <p className="font-bold text-primary">{details.requestedDepartment} / {details.requestedPosition}</p>
+                            </div>
+                            <div className="col-span-2 text-xs text-gray-600 mt-1"><strong>السبب:</strong> {details.reasonForTransfer}</div>
+                        </div>
                      )}
                      {request.requestType === EmployeeRequestType.DATA_UPDATE_REQUEST && (
-                        <>
-                            <p><strong>البيان المراد تعديله:</strong> {details.fieldToUpdate}</p>
-                            <p><strong>القيمة القديمة:</strong> {details.oldValue || '-'}</p>
-                            <p><strong>القيمة الجديدة:</strong> {details.newValue}</p>
-                            {details.reasonForUpdate && <p><strong>سبب التعديل:</strong> {details.reasonForUpdate}</p>}
-                        </>
+                        <div className="text-sm grid grid-cols-2 gap-4">
+                            <p className="col-span-2"><strong>البيان:</strong> {details.fieldToUpdate}</p>
+                            <p className="text-red-500 line-through">{details.oldValue || '(فارغ)'}</p>
+                            <p className="text-green-600 font-bold">{details.newValue}</p>
+                        </div>
                      )}
+                     {request.notes && <p className="text-sm mt-3 pt-2 border-t text-gray-500"><strong>ملاحظات إضافية:</strong> {request.notes}</p>}
                 </Card>
 
-                <Card title="معالجة الطلب (للمسؤول)" className="border-t pt-3" titleClassName="text-sm">
-                    <Select label="تحديث حالة الطلب" value={newStatus} options={employeeRequestStatusOptions} onChange={(e) => setNewStatus(e.target.value as EmployeeRequestStatus)} />
-                    <TextArea label="ملاحظات المسؤول/الموارد البشرية" value={hrNotes} onChange={(e) => setHrNotes(e.target.value)} rows={3} className="mt-2"/>
-                    <div className="mt-3 flex justify-end space-x-2 space-x-reverse">
-                        {canPrintCertificate && employee && (
-                             <Button variant="secondary" onClick={() => onPrintCertificate(request, employee)}>عرض/طباعة الشهادة</Button>
-                        )}
-                        <Button variant="primary" onClick={handleStatusUpdate}>تحديث الحالة</Button>
+                {/* Admin Actions */}
+                <Card title="إجراءات الإدارة" className="border-t-4 border-primary" titleClassName="text-sm">
+                    <Select label="تحديث الحالة" value={newStatus} options={employeeRequestStatusOptions} onChange={(e) => setNewStatus(e.target.value as EmployeeRequestStatus)} containerClassName="mb-3"/>
+                    <TextArea label="ملاحظات إدارية / سبب الرفض" value={hrNotes} onChange={(e) => setHrNotes(e.target.value)} rows={3} placeholder="اكتب ملاحظاتك هنا..."/>
+                    <div className="mt-4 flex justify-between items-center">
+                        <div>
+                             {canPrintCertificate && employee && (
+                                <Button variant="secondary" size="sm" onClick={() => onPrintCertificate(request, employee)} leftIcon={<PrinterIcon className="w-4"/>}>طباعة الشهادة الرسمية</Button>
+                            )}
+                        </div>
+                        <Button variant="primary" onClick={handleStatusUpdate} leftIcon={<CheckCircleIcon className="w-4"/>}>حفظ وتحديث</Button>
                     </div>
                 </Card>
-                {request.completionDate && <p className="text-xs text-gray-500">تاريخ الإكمال: {formatDate(request.completionDate)}</p>}
             </div>
         </Modal>
     );
 };
 
+// Printable Certificate Modal
 const PrintableCertificateModal: React.FC<{
   isOpen: boolean;
   onClose: () => void;
@@ -518,98 +497,142 @@ const PrintableCertificateModal: React.FC<{
   const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric'}) : '-';
   const today = formatDate(new Date().toISOString());
   const details = request.details as any;
-  const companyName = "[اسم الشركة هنا]"; // Placeholder, should be dynamic
+  const companyName = OFFICE_NAME; // Should be dynamic from settings
   
   let certificateContent = '';
   let title = "شهادة";
 
+  // Template Logic
   if (request.requestType === EmployeeRequestType.SALARY_CERTIFICATE) {
     title = "شهادة راتب";
     const totalAllowances = employee.allowances?.reduce((sum, al) => sum + al.value, 0) || 0;
     const totalSalary = employee.basicSalary + totalAllowances;
-    const salaryDetailsText = details.includeSalaryDetails ? 
-        `ويتقاضى المذكور راتباً أساسياً شهرياً وقدره ( ${employee.basicSalary.toFixed(3)} د.ك )${totalAllowances > 0 ? ` بالإضافة إلى بدلات أخرى شهرية وقدرها ( ${totalAllowances.toFixed(3)} د.ك )، ليصبح إجمالي الراتب الشهري ( ${totalSalary.toFixed(3)} د.ك ).` : '.'}`
-        : '';
-    const recipientText = details.purposeType === 'general' ? 'لمن يهمه الأمر' 
-        : (details.specificRecipient ? `إلى السيد مدير/ ${details.specificRecipient}` : 'لمن يهمه الأمر');
+    
+    // Arabic Template
+    if (details.language !== 'en') {
+         certificateContent = `
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; text-decoration: underline;">شهادة راتب</h2>
+                <p>التاريخ: ${today}</p>
+            </div>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;"><strong>${details.purposeType === 'general' ? 'إلى من يهمه الأمر' : `إلى السادة / ${details.specificRecipient || details.purposeType}`}،،،</strong></p>
 
-    certificateContent = `
-        <div style="text-align: center; margin-bottom: 20px;">
-            <p>التاريخ: ${today}</p>
-            ${details.language === 'en' ? `<p>Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'})}</p>` : ''}
-        </div>
-        <p style="text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 25px;">${title}</p>
-        ${details.language === 'en' ? `<p style="text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 25px;">Salary Certificate</p>` : ''}
-        
-        <p style="margin-bottom: 20px;">${recipientText}</p>
-        ${details.language === 'en' ? `<p style="margin-bottom: 20px;">${details.purposeType === 'general' ? 'To Whom It May Concern' : (details.specificRecipient ? `To: The Manager, ${details.specificRecipient}` : 'To Whom It May Concern')}</p>` : ''}
+            <p style="font-size: 16px; line-height: 2; text-align: justify; margin-bottom: 20px;">
+                تشهد <strong>${companyName}</strong> بأن السيد/ <strong>${employee.fullNameAr}</strong>، 
+                ${employee.nationality} الجنسية، ويحمل بطاقة مدنية رقم (<strong>${employee.civilId}</strong>)، 
+                يعمل لدينا بوظيفة (<strong>${employee.jobTitle}</strong>) اعتبارًا من تاريخ ${formatDate(employee.joiningDate)} ولا يزال على رأس عمله حتى تاريخه.
+            </p>
+            
+            ${details.includeSalaryDetails ? `
+            <div style="margin: 20px 0; border: 1px solid #000; padding: 15px;">
+                <p style="font-weight: bold; text-align: center; margin-bottom: 10px;">تفاصيل الراتب الشهري</p>
+                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+                    <tr>
+                        <td style="padding: 5px; border-bottom: 1px solid #ccc;">الراتب الأساسي:</td>
+                        <td style="padding: 5px; border-bottom: 1px solid #ccc; text-align: left;">${employee.basicSalary.toFixed(3)} د.ك</td>
+                    </tr>
+                    ${employee.allowances?.map(all => `
+                    <tr>
+                        <td style="padding: 5px; border-bottom: 1px solid #ccc;">${all.name}:</td>
+                        <td style="padding: 5px; border-bottom: 1px solid #ccc; text-align: left;">${all.value.toFixed(3)} د.ك</td>
+                    </tr>`).join('') || ''}
+                    <tr>
+                        <td style="padding: 10px 5px; font-weight: bold;">إجمالي الراتب:</td>
+                        <td style="padding: 10px 5px; font-weight: bold; text-align: left;">${totalSalary.toFixed(3)} د.ك</td>
+                    </tr>
+                </table>
+            </div>
+            ` : ''}
+            
+            <p style="font-size: 14px; margin-top: 20px;">وقد أُعطيت له هذه الشهادة بناءً على طلبه لتقديمها لـ ${details.specificRecipient || 'من يهمه الأمر'}، دون أدنى مسؤولية على الشركة تجاه حقوق الغير.</p>
+            
+            <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+                <div style="text-align: center;">
+                    <p style="font-weight: bold;">مدير الموارد البشرية</p>
+                    <p style="margin-top: 40px;">.........................</p>
+                </div>
+                <div style="text-align: center;">
+                    <p style="font-weight: bold;">الختم الرسمي</p>
+                    <div style="width: 80px; height: 80px; border: 2px dashed #ccc; border-radius: 50%; margin: 10px auto;"></div>
+                </div>
+            </div>
+        `;
+    } else {
+        // English Template (Simplified)
+        title = "Salary Certificate";
+         certificateContent = `
+            <div style="text-align: center; margin-bottom: 30px; direction: ltr;">
+                <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; text-decoration: underline;">Salary Certificate</h2>
+                <p>Date: ${new Date().toLocaleDateString('en-US')}</p>
+            </div>
+            
+            <div style="direction: ltr;">
+                <p style="font-size: 16px; margin-bottom: 20px;"><strong>To Whom It May Concern,</strong></p>
 
-        <p>تشهد شركة/مؤسسة ${companyName} بأن السيد/ ${employee.fullNameAr}، ${employee.nationality} الجنسية، حامل البطاقة المدنية رقم (${employee.civilId})، يعمل لدينا بوظيفة (${employee.jobTitle}) اعتبارًا من تاريخ ${formatDate(employee.joiningDate)} وحتى تاريخه.</p>
-        ${details.language === 'en' ? `<p>This is to certify that Mr./Ms. ${employee.fullNameEn || employee.fullNameAr}, ${employee.nationality} national, holder of Civil ID No. (${employee.civilId}), is employed by ${companyName} as (${employee.jobTitle}) since ${formatDate(employee.joiningDate)} and is still working with us to date.</p>` : ''}
-        
-        ${details.includeSalaryDetails ? `<p>${salaryDetailsText}</p>` : ''}
-        ${details.includeSalaryDetails && details.language === 'en' ? `<p>The aforementioned employee receives a monthly basic salary of KWD ${employee.basicSalary.toFixed(3)}${totalAllowances > 0 ? `, in addition to other monthly allowances amounting to KWD ${totalAllowances.toFixed(3)}, making the total monthly salary KWD ${totalSalary.toFixed(3)}.` : '.'}</p>` : ''}
-        
-        <p>وقد أُعطيت له هذه الشهادة بناءً على طلبه، دون أدنى مسؤولية على الشركة تجاه حقوق الغير.</p>
-        ${details.language === 'en' ? `<p>This certificate has been issued upon the employee's request, without any liability on the part of the company towards third parties.</p>` : ''}
-        
-        <div style="margin-top: 40px;">
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'};">وتفضلوا بقبول فائق الاحترام،</p>
-            ${details.language === 'en' ? `<p style="text-align: left;">Sincerely,</p>` : ''}
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'}; margin-top: 30px;">إدارة الموارد البشرية</p>
-            ${details.language === 'en' ? `<p style="text-align: left;">Human Resources Department</p>` : ''}
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'};">${companyName}</p>
-        </div>
-    `;
+                <p style="font-size: 16px; line-height: 2; text-align: justify; margin-bottom: 20px;">
+                    This is to certify that Mr./Ms. <strong>${employee.fullNameEn || employee.fullNameAr}</strong>, 
+                    <strong>${employee.nationality}</strong> national, holder of Civil ID No. (<strong>${employee.civilId}</strong>), 
+                    is employed with <strong>${companyName}</strong> as (<strong>${employee.jobTitle}</strong>) since ${new Date(employee.joiningDate).toLocaleDateString('en-US')}.
+                </p>
+                
+                ${details.includeSalaryDetails ? `
+                <p>The employee receives a total monthly salary of <strong>KWD ${(employee.basicSalary + (employee.allowances?.reduce((s,a)=>s+a.value,0)||0)).toFixed(3)}</strong>.</p>
+                ` : ''}
+                
+                <p style="font-size: 14px; margin-top: 20px;">This certificate is issued upon the employee's request without any liability on the company.</p>
+                
+                <div style="margin-top: 60px;">
+                    <p style="font-weight: bold;">Human Resources Department</p>
+                    <p>${companyName}</p>
+                </div>
+            </div>
+        `;
+    }
+
   } else if (request.requestType === EmployeeRequestType.EXPERIENCE_LETTER) {
     title = "شهادة خبرة";
-    const periodFrom = details.specificPeriodFrom ? formatDate(details.specificPeriodFrom) : formatDate(employee.joiningDate);
-    const periodTo = details.specificPeriodTo ? formatDate(details.specificPeriodTo) : 'تاريخه';
-    const periodFromEn = details.specificPeriodFrom ? new Date(details.specificPeriodFrom).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'}) : new Date(employee.joiningDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'});
-    const periodToEn = details.specificPeriodTo ? new Date(details.specificPeriodTo).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'}) : 'date hereof';
-
-
-    certificateContent = `
-        <div style="text-align: center; margin-bottom: 20px;">
-             <p>التاريخ: ${today}</p>
-            ${details.language === 'en' ? `<p>Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric'})}</p>` : ''}
+    // Simplified logic for experience letter
+     certificateContent = `
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h2 style="font-size: 24px; font-weight: bold; margin-bottom: 10px; text-decoration: underline;">شهادة خبرة</h2>
+            <p>التاريخ: ${today}</p>
         </div>
-        <p style="text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 25px;">${title}</p>
-         ${details.language === 'en' ? `<p style="text-align: center; font-size: 1.4em; font-weight: bold; margin-bottom: 25px;">Experience Certificate</p>` : ''}
-
-        <p style="margin-bottom: 20px;">لمن يهمه الأمر</p>
-        ${details.language === 'en' ? `<p style="margin-bottom: 20px;">To Whom It May Concern</p>` : ''}
-
-        <p>تشهد شركة/مؤسسة ${companyName} بأن السيد/ ${employee.fullNameAr}، ${employee.nationality} الجنسية، حامل البطاقة المدنية رقم (${employee.civilId})، قد عمل لدينا بوظيفة (${employee.jobTitle}) خلال الفترة من ${periodFrom} وحتى ${periodTo}.</p>
-        ${details.language === 'en' ? `<p>This is to certify that Mr./Ms. ${employee.fullNameEn || employee.fullNameAr}, ${employee.nationality} national, holder of Civil ID No. (${employee.civilId}), has worked with ${companyName} as (${employee.jobTitle}) during the period from ${periodFromEn} until ${periodToEn}.</p>` : ''}
         
-        <p>وخلال فترة عمله معنا، أظهر المذكور كفاءة وتفانياً في أداء مهامه الوظيفية.</p>
-        ${details.language === 'en' ? `<p>During his/her tenure with us, he/she demonstrated efficiency and dedication in performing his/her job duties.</p>` : ''}
+        <p style="font-size: 16px; margin-bottom: 20px;"><strong>إلى من يهمه الأمر،،،</strong></p>
 
-        ${details.highlightResponsibilities ? `<p>ومن أبرز مسؤولياته كانت: <br/> <pre style="font-family: inherit; white-space: pre-wrap; padding-right:15px;">${details.highlightResponsibilities}</pre></p>` : ''}
-        ${details.highlightResponsibilities && details.language === 'en' ? `<p>His/Her key responsibilities included: <br/> <pre style="font-family: inherit; white-space: pre-wrap; padding-left:15px;">${details.highlightResponsibilities}</pre></p>` : ''}
+        <p style="font-size: 16px; line-height: 2; text-align: justify; margin-bottom: 20px;">
+            تشهد إدارة <strong>${companyName}</strong> بأن السيد/ <strong>${employee.fullNameAr}</strong> قد عمل لدينا في وظيفة (<strong>${employee.jobTitle}</strong>) 
+            في الفترة من <strong>${formatDate(details.specificPeriodFrom || employee.joiningDate)}</strong> وحتى <strong>${formatDate(details.specificPeriodTo) || 'تاريخه'}</strong>.
+        </p>
         
-        <p>وقد أُعطيت له هذه الشهادة بناءً على طلبه، لتقديمها للجهات التي قد يهمها الأمر، دون أدنى مسؤولية على الشركة.</p>
-        ${details.language === 'en' ? `<p>This certificate has been issued upon his/her request, to be presented to whom it may concern, without any liability on the part of the company.</p>` : ''}
+        <p style="font-size: 16px; line-height: 2; text-align: justify; margin-bottom: 20px;">
+            وخلال فترة عمله، اتسم بالمواظبة وحسن السلوك والكفاءة في أداء المهام الموكلة إليه.
+            ${details.highlightResponsibilities ? `<br/><br/><strong>أبرز المهام:</strong> ${details.highlightResponsibilities}` : ''}
+        </p>
+
+        <p style="font-size: 14px; margin-top: 20px;">وقد أعطيت له هذه الشهادة بناءً على طلبه، متمنين له دوام التوفيق والنجاح.</p>
         
-         <div style="margin-top: 40px;">
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'};">وتفضلوا بقبول فائق الاحترام،</p>
-            ${details.language === 'en' ? `<p style="text-align: left;">Sincerely,</p>` : ''}
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'}; margin-top: 30px;">إدارة الموارد البشرية</p>
-            ${details.language === 'en' ? `<p style="text-align: left;">Human Resources Department</p>` : ''}
-            <p style="text-align: ${details.language === 'en' ? 'left' : 'right'};">${companyName}</p>
+        <div style="margin-top: 60px; display: flex; justify-content: space-between;">
+            <div style="text-align: center;">
+                <p style="font-weight: bold;">المدير العام</p>
+                <p style="margin-top: 40px;">.........................</p>
+            </div>
+             <div style="text-align: center;">
+                <p style="font-weight: bold;">الختم الرسمي</p>
+                <div style="width: 80px; height: 80px; border: 2px dashed #ccc; border-radius: 50%; margin: 10px auto;"></div>
+            </div>
         </div>
     `;
   }
 
-
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <div id="printable-certificate-content" className="p-4 print-statement" style={{direction: details.language === 'en' ? 'ltr' : 'rtl'}} dangerouslySetInnerHTML={{ __html: certificateContent }}>
+      <div id="printable-certificate-content" className="p-8 print-statement bg-white text-black font-serif" style={{direction: details.language === 'en' ? 'ltr' : 'rtl'}} dangerouslySetInnerHTML={{ __html: certificateContent }}>
       </div>
       <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end print-hide-in-modal">
         <Button variant="outline" onClick={onClose} className="me-2">إغلاق</Button>
-        <Button variant="primary" onClick={() => window.print()}>طباعة الشهادة</Button>
+        <Button variant="primary" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4"/>}>طباعة الشهادة</Button>
       </div>
     </Modal>
   );
@@ -628,6 +651,14 @@ const EmployeeRequestsPage: React.FC = () => {
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
   const [requestToPrint, setRequestToPrint] = useState<{request: EmployeeRequest, employee: Employee} | null>(null);
 
+  const stats = useMemo(() => {
+      return {
+          total: requests.length,
+          pending: requests.filter(r => r.status === EmployeeRequestStatus.PENDING).length,
+          processing: requests.filter(r => r.status === EmployeeRequestStatus.PROCESSING).length,
+          completed: requests.filter(r => r.status === EmployeeRequestStatus.COMPLETED || r.status === EmployeeRequestStatus.APPROVED).length,
+      }
+  }, [requests]);
 
   const filteredRequests = useMemo(() => {
     return requests.filter(req =>
@@ -687,15 +718,7 @@ const EmployeeRequestsPage: React.FC = () => {
         return req;
     }));
     if (viewingRequest && viewingRequest.id === requestId) {
-        setViewingRequest(prev => prev ? ({
-            ...prev,
-            status: newStatus,
-            hrAdminNotes: hrNotes,
-            updatedAt: new Date().toISOString().split('T')[0],
-            completionDate: (newStatus === EmployeeRequestStatus.COMPLETED || newStatus === EmployeeRequestStatus.REJECTED || newStatus === EmployeeRequestStatus.CANCELLED) 
-                            ? new Date().toISOString().split('T')[0] 
-                            : prev.completionDate,
-        }) : null);
+        setViewingRequest(null);
     }
   };
   
@@ -718,24 +741,26 @@ const EmployeeRequestsPage: React.FC = () => {
         </Button>
       </div>
 
-       <Card className="bg-blue-50 border-blue-200">
-        <div className="flex items-start">
-            <InformationCircleIcon className="w-6 h-6 text-blue-600 me-3 mt-1 flex-shrink-0" />
-            <div>
-                <h3 className="text-md font-semibold text-blue-700 mb-1">إدارة طلبات الموظفين</h3>
-                <p className="text-sm text-blue-600 leading-relaxed">
-                    تتيح هذه الوحدة للموظفين تقديم طلبات إدارية متنوعة مثل طلب شهادة راتب، شهادة خبرة، تسييل رصيد إجازات، أو تقديم تظلم. كما تمكن الإدارة من متابعة هذه الطلبات ومعالجتها بكفاءة. 
-                    <br/>يتم توثيق جميع مراحل الطلب من التقديم وحتى الإنجاز أو الرفض.
-                </p>
-            </div>
-        </div>
-      </Card>
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card className="flex items-center p-3 bg-white border-l-4 border-blue-500 shadow-sm">
+             <div><p className="text-xs text-gray-500">إجمالي الطلبات</p><p className="text-xl font-bold">{stats.total}</p></div>
+          </Card>
+          <Card className="flex items-center p-3 bg-white border-l-4 border-yellow-500 shadow-sm">
+             <div><p className="text-xs text-gray-500">معلقة</p><p className="text-xl font-bold">{stats.pending}</p></div>
+          </Card>
+          <Card className="flex items-center p-3 bg-white border-l-4 border-cyan-500 shadow-sm">
+             <div><p className="text-xs text-gray-500">قيد المعالجة</p><p className="text-xl font-bold">{stats.processing}</p></div>
+          </Card>
+          <Card className="flex items-center p-3 bg-white border-l-4 border-green-500 shadow-sm">
+             <div><p className="text-xs text-gray-500">مكتملة</p><p className="text-xl font-bold">{stats.completed}</p></div>
+          </Card>
+       </div>
       
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
             <Input placeholder="ابحث باسم الموظف أو ملاحظات..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} containerClassName="mb-0"/>
-            <Select label="تصفية بنوع الطلب" options={[{value: '', label: 'الكل'}, ...employeeRequestTypeOptions]} value={filterType} onChange={e => setFilterType(e.target.value as EmployeeRequestType | '')} containerClassName="mb-0"/>
-            <Select label="تصفية بالحالة" options={[{value: '', label: 'الكل'}, ...employeeRequestStatusOptions]} value={filterStatus} onChange={e => setFilterStatus(e.target.value as EmployeeRequestStatus | '')} containerClassName="mb-0"/>
+            <Select options={[{value: '', label: 'كل الأنواع'}, ...employeeRequestTypeOptions]} value={filterType} onChange={e => setFilterType(e.target.value as EmployeeRequestType | '')} containerClassName="mb-0"/>
+            <Select options={[{value: '', label: 'كل الحالات'}, ...employeeRequestStatusOptions]} value={filterStatus} onChange={e => setFilterStatus(e.target.value as EmployeeRequestStatus | '')} containerClassName="mb-0"/>
         </div>
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 text-sm">
@@ -747,49 +772,37 @@ const EmployeeRequestsPage: React.FC = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                     {filteredRequests.map(req => (
                         <tr key={req.id} className="hover:bg-primary-light/5">
-                            <td className="px-3 py-2 whitespace-nowrap font-medium">{req.employeeName}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{req.requestType}</td>
-                            <td className="px-3 py-2 whitespace-nowrap">{formatDate(req.requestDate)}</td>
-                            <td className="px-3 py-2 whitespace-nowrap"><EmployeeRequestStatusBadge status={req.status}/></td>
-                            <td className="px-3 py-2 whitespace-nowrap space-x-1 space-x-reverse">
+                            <td className="px-3 py-2 font-medium">{req.employeeName}</td>
+                            <td className="px-3 py-2">{req.requestType}</td>
+                            <td className="px-3 py-2">{formatDate(req.requestDate)}</td>
+                            <td className="px-3 py-2"><EmployeeRequestStatusBadge status={req.status}/></td>
+                            <td className="px-3 py-2 space-x-1 space-x-reverse">
                                 <Button variant="ghost" size="sm" onClick={() => handleViewRequest(req)} title="عرض التفاصيل"><EyeIcon className="w-4 h-4 text-primary" /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleEditRequest(req)} title="تعديل/معالجة"><PencilIcon className="w-4 h-4 text-yellow-600" /></Button>
-                                { (req.status === EmployeeRequestStatus.PENDING || req.status === EmployeeRequestStatus.CANCELLED) &&
-                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteRequest(req.id)} className="text-danger hover:text-red-700" title="حذف"><TrashIcon className="w-4 h-4" /></Button>
-                                }
+                                <Button variant="ghost" size="sm" onClick={() => handleEditRequest(req)} title="تعديل"><PencilIcon className="w-4 h-4 text-yellow-600" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteRequest(req.id)} className="text-danger"><TrashIcon className="w-4 h-4" /></Button>
                             </td>
                         </tr>
                     ))}
                     {filteredRequests.length === 0 && (
-                        <tr><td colSpan={5} className="text-center py-10 text-gray-500"><FolderIcon className="w-12 h-12 mx-auto mb-2 text-gray-400"/>لا توجد طلبات تطابق بحثك.</td></tr>
+                        <tr><td colSpan={5} className="text-center py-10 text-gray-500"><FolderIcon className="w-12 h-12 mx-auto mb-2 text-gray-400"/>لا توجد طلبات تطابق البحث.</td></tr>
                     )}
                 </tbody>
             </table>
         </div>
       </Card>
 
-      <Modal isOpen={isFormModalOpen} onClose={() => { setIsFormModalOpen(false); setEditingRequest(null);}} title={editingRequest?.id ? `تعديل طلب: ${editingRequest.employeeName}` : "تقديم طلب موظف جديد"} size="lg">
+      <Modal isOpen={isFormModalOpen} onClose={() => { setIsFormModalOpen(false); setEditingRequest(null);}} title={editingRequest?.id ? `تعديل طلب: ${editingRequest.employeeName}` : "تقديم طلب إداري جديد"} size="xl">
           <EmployeeRequestForm 
             initialData={editingRequest} 
             onSubmit={handleFormSubmit} 
             onCancel={() => { setIsFormModalOpen(false); setEditingRequest(null); }} 
-            employees={mockEmployees.map(e => ({
-                id: e.id, 
-                fullNameAr: e.fullNameAr, 
-                employeeId: e.employeeId,
-                annualLeaveEntitlement: e.annualLeaveEntitlement || 0, 
-                leaveTakenThisYear: e.leaveTakenThisYear || 0,
-                department: e.department,
-                jobTitle: e.jobTitle,
-                joiningDate: e.joiningDate,
-            }))}
-            isAdminView={true} 
+            employees={initialEmployees}
           />
       </Modal>
       
       <ViewRequestDetailsModal 
         request={viewingRequest} 
-        employee={mockEmployees.find(emp => emp.id === viewingRequest?.employeeId)}
+        employee={initialEmployees.find(emp => emp.id === viewingRequest?.employeeId)}
         onClose={() => setViewingRequest(null)} 
         onUpdateStatus={handleUpdateStatus}
         onPrintCertificate={handleOpenPrintModal}

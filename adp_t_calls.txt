@@ -1,0 +1,89 @@
+182:            alert(t('fill_required_fields', { defaultValue: 'يرجى تعبئة الحقول الأساسية (العنوان، التاريخ، الوقت)' }));
+192:        <Modal isOpen={isOpen} onClose={onClose} title={initialData ? t('edit_appointment', { defaultValue: 'تعديل موعد' }) : t('add_new_appointment', { defaultValue: 'إضافة موعد جديد' })} size="md">
+194:                <Input label={t('appointment_title', { defaultValue: 'عنوان الموعد / الاجتماع' })} name="title" value={formData.title || ''} onChange={handleChange} required />
+196:                    <Input label={t('date', { defaultValue: 'التاريخ' })} type="date" name="date" value={formData.date || ''} onChange={handleChange} required />
+197:                    <Input label={t('time', { defaultValue: 'الوقت' })} type="time" name="time" value={formData.time || ''} onChange={handleChange} required />
+199:                <Input label={t('location', { defaultValue: 'المكان' })} name="location" value={formData.location || ''} onChange={handleChange} />
+200:                <Input label={t('attendees', { defaultValue: 'الحضور (أسماء)' })} name="attendees" value={formData.attendees || ''} onChange={handleChange} />
+201:                <TextArea label={t('details_agenda', { defaultValue: 'التفاصيل / الأجندة' })} name="description" value={formData.description || ''} onChange={handleChange} rows={3} />
+202:                <Select label={t('status', { defaultValue: 'الحالة' })} name="status" value={formData.status} onChange={handleChange} options={[{value:'Scheduled', label: t('scheduled', { defaultValue: 'مجدول' })}, {value:'Completed', label: t('completed', { defaultValue: 'تم' })}, {value:'Cancelled', label: t('cancelled', { defaultValue: 'ملغي' })}]} />
+205:                    <Button type="button" variant="outline" onClick={onClose}>{t('cancel', { defaultValue: 'إلغاء' })}</Button>
+206:                    <Button type="submit">{initialData ? t('save_changes', { defaultValue: 'حفظ التعديلات' }) : t('add_appointment', { defaultValue: 'إضافة الموعد' })}</Button>
+232:        <Modal isOpen={!!event} onClose={onClose} title={isHearing ? t('hearing_details', { defaultValue: 'تفاصيل الجلسة' }) : t('appointment_details', { defaultValue: 'تفاصيل الموعد' })} size="lg">
+235:                    <h2 className="text-xl font-bold">{isHearing ? t('court_hearing_card', { defaultValue: 'بطاقة جلسة محكمة' }) : t('appointment_card', { defaultValue: 'بطاقة موعد' })}</h2>
+244:                    <Card title={t('details', { defaultValue: 'التفاصيل' })} className="bg-gray-50" titleClassName="text-sm">
+245:                        <p className="text-sm mb-2"><strong>{t('date', { defaultValue: 'التاريخ' })}:</strong> {event.date}</p>
+246:                        <p className="text-sm mb-2"><strong>{t('time', { defaultValue: 'الوقت' })}:</strong> {event.time}</p>
+247:                        <p className="text-sm mb-2"><strong>{t('location', { defaultValue: 'المكان' })}:</strong> {event.location}</p>
+248:                        <p className="text-sm mb-2"><strong>{t('status', { defaultValue: 'الحالة' })}:</strong> {event.status}</p>
+252:                        <Card title={t('related_case_data', { defaultValue: 'بيانات القضية المرتبطة' })} className="bg-gray-50" titleClassName="text-sm">
+253:                            <p className="text-sm mb-2"><strong>{t('case_number', { defaultValue: 'رقم القضية' })}:</strong> {relatedCase.caseNumber}</p>
+254:                            <p className="text-sm mb-2"><strong>{t('client', { defaultValue: 'الموكل' })}:</strong> {relatedCase.clientName}</p>
+255:                            <p className="text-sm mb-2"><strong>{t('opponent', { defaultValue: 'الخصم' })}:</strong> {relatedCase.opposingPartyName}</p>
+256:                            <p className="text-sm mb-2"><strong>{t('lawyer', { defaultValue: 'المحامي' })}:</strong> {relatedCase.assignedLawyer}</p>
+261:                        <Card title={t('attendees', { defaultValue: 'الحضور' })} className="bg-gray-50" titleClassName="text-sm">
+268:                    <Card title={t('notes_description', { defaultValue: 'ملاحظات / وصف' })}>
+274:                <Button variant="outline" onClick={onClose}>{t('close', { defaultValue: 'إغلاق' })}</Button>
+275:                <Button onClick={handlePrint} leftIcon={<PrinterIcon className="w-4"/>}>{t('print_details', { defaultValue: 'طباعة التفاصيل' })}</Button>
+337:            subtitle: `${t('client', { defaultValue: 'الموكل' })}: ${h.clientName}`,
+338:            location: h.courtRoomOrLocation || t('undefined', { defaultValue: 'غير محدد' }),
+339:            status: h.status === 'Scheduled' ? t('scheduled_f', { defaultValue: 'مجدولة' }) : h.status === 'Completed' ? t('completed_f', { defaultValue: 'منتهية' }) : h.status === 'Postponed' ? t('postponed_f', { defaultValue: 'مؤجلة' }) : t('cancelled_f', { defaultValue: 'ملغاة' }),
+350:            subtitle: a.attendees ? `${t('attendees', { defaultValue: 'الحضور' })}: ${a.attendees}` : undefined,
+351:            location: a.location || t('undefined', { defaultValue: 'غير محدد' }),
+352:            status: a.status === 'Scheduled' ? t('scheduled', { defaultValue: 'مجدول' }) : a.status === 'Completed' ? t('completed', { defaultValue: 'تم' }) : t('cancelled', { defaultValue: 'ملغي' }),
+657:                            <h1 className="text-2xl font-black text-gray-800 dark:text-white">{t('docket_system_title', { defaultValue: 'نظام الرول الآلي وإدارة المواعيد' })}</h1>
+658:                            <p className="text-sm text-gray-500 font-bold">{t('docket_system_subtitle', { defaultValue: 'بوابة العدل الذكية لإدارة الجلسات والخبراء والمواعيد الإجرائية' })}</p>
+669:                            {t('moj_inquiry', { defaultValue: 'الاستعلام القضائي (MOJ)' })}
+677:                            {t('add_new_appointment', { defaultValue: 'إضافة موعد جديد' })}
+680:                            <button onClick={() => window.print()} className="p-2 hover:bg-gray-100 text-gray-600 border-l" title={t('print', { defaultValue: 'طباعة' })}><PrinterIcon className="w-5 h-5"/></button>
+681:                            <button onClick={handleExportCSV} className="p-2 hover:bg-gray-100 text-gray-600" title={t('export_excel', { defaultValue: 'تصدير Excel' })}><DocumentDuplicateIcon className="w-5 h-5"/></button>
+692:                        {t('daily_roll_hearings', { defaultValue: 'الرول اليومي والجلسات' })}
+699:                        {t('expert_meetings', { defaultValue: 'جلسات الخبراء (Expert)' })}
+707:                        {t('procedural_deadlines_calculator', { defaultValue: 'حاسبة المواعيد الإجرائية' })}
+725:                                <button onClick={() => setViewMode('day')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'day' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('daily_roll', { defaultValue: 'رول يومي' })}</button>
+726:                                <button onClick={() => setViewMode('week')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'week' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('weekly_roll', { defaultValue: 'رول أسبوعي' })}</button>
+727:                                <button onClick={() => setViewMode('month')} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${viewMode === 'month' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'}`}>{t('monthly_planner', { defaultValue: 'مخطط شهري' })}</button>
+740:                                    placeholder={t('search_placeholder_docket', { defaultValue: 'ابحث عن رقم قضية، موكل، أو مكان...' })}
+756:                                    >{t('all', { defaultValue: 'الكل' })}</button>
+760:                                    >{t('hearings_only', { defaultValue: 'الجلسات فقط' })}</button>
+764:                                    >{t('appointments_only', { defaultValue: 'المواعيد فقط' })}</button>
+766:                                <div className="text-[10px] text-gray-400 font-bold">{t('showing_x_results', { count: filteredEvents.length, defaultValue: `عرض ${filteredEvents.length} نتيجة مختارة` })}</div>
+773:                                        <h2 className="text-2xl font-black mb-1">{t('report_for', { type: filterType === 'hearings' ? t('hearings_count', { defaultValue: 'الجلسات' }) : filterType === 'appointments' ? t('appointments_count', { defaultValue: 'المواعيد' }) : t('general_roll', { defaultValue: 'الرول العام' }), defaultValue: `كشف ${filterType === 'hearings' ? 'الجلسات' : filterType === 'appointments' ? 'المواعيد' : 'الرول العام'}` })}</h2>
+774:                                        <p className="text-sm font-bold text-gray-600">{t('period', { defaultValue: 'الفترة' })}: {getRangeLabel()}</p>
+777:                                        <div className="text-center font-black text-xl mb-1">{t('justice', { defaultValue: 'عدالة' })}</div>
+782:                                    <div>{t('print_date', { defaultValue: 'تاريخ الطباعة' })}: {new Date().toLocaleDateString('ar-EG')}</div>
+783:                                    <div className="text-center">{t('by', { defaultValue: 'بواسطة' })}: {window.location.hostname}</div>
+784:                                    <div className="text-left">{t('records_count', { defaultValue: 'عدد السجلات' })}: {filteredEvents.length}</div>
+793:                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('no_current_records', { defaultValue: 'لا توجد سجلات حالية' })}</h3>
+794:                                    <p className="text-sm text-gray-500">{t('try_changing_filters', { defaultValue: 'جرب تغيير التاريخ أو معايير البحث' })}</p>
+801:                                                <th className="px-4 py-4 font-black">{t('time', { defaultValue: 'الوقت' })}</th>
+802:                                                <th className="px-4 py-4 font-black">{t('event_case_details', { defaultValue: 'تفاصيل الحدث / القضية' })}</th>
+803:                                                <th className="px-4 py-4 font-black">{t('location_court', { defaultValue: 'المكان / المحكمة' })}</th>
+804:                                                <th className="px-4 py-4 font-black">{t('admin_status', { defaultValue: 'الحالة الإدارية' })}</th>
+805:                                                <th className="px-4 py-4 font-black">{t('member_notes', { defaultValue: 'ملاحظات العضو' })}</th>
+806:                                                <th className="px-4 py-4 font-black text-left print:hidden">{t('actions', { defaultValue: 'إجراءات' })}</th>
+827:                        <Card title={t('manage_active_expert_meetings', { defaultValue: 'إدارة جلسات الخبراء النشطة' })} icon={<UsersIcon className="w-5 h-5 text-accent"/>}>
+832:                                            <th className="px-4 py-3">{t('case', { defaultValue: 'القضية' })}</th>
+833:                                            <th className="px-4 py-3">{t('expert_field_name', { defaultValue: 'تخصص الخبرة / الخبير' })}</th>
+834:                                            <th className="px-4 py-3">{t('assigned_task', { defaultValue: 'المهمة الموكلة' })}</th>
+835:                                            <th className="px-4 py-3">{t('referral_date', { defaultValue: 'تاريخ الإحالة' })}</th>
+836:                                            <th className="px-4 py-3">{t('status', { defaultValue: 'الحالة' })}</th>
+837:                                            <th className="px-4 py-3 text-left">{t('actions', { defaultValue: 'إجراءات' })}</th>
+849:                                <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300">{t('legal_note_kuwait', { defaultValue: 'ملاحظة قانونية لمواطني الكويت' })}</h4>
+850:                                <p className="text-xs text-blue-600 dark:text-blue-400 leading-relaxed">{t('expert_department_compliance_note', { defaultValue: 'وفقاً لقانون الإثبات الكويتي، تلتزم إدارة الخبراء بتحديد الجلسات خلال المواعيد المحددة في قرار الندب. يرجى تزويد النظام بتقرير مسبق لمراجعة الدفوع القانونية قبل جلسة المناقشة.' })}</p>
+866:                            <Card title={t('deadline_calculation_criteria', { defaultValue: 'معايير حساب المواعيد' })} icon={<CalculatorIcon className="w-5 h-5 text-primary"/>}>
+869:                                        label={t('judgment_issuance_date', { defaultValue: 'تاريخ صدور الحكم' })}
+873:                                        helperText={t('calculation_starts_next_day', { defaultValue: 'يبدأ الحساب من اليوم التالي وفق مادة 17 مرافعات' })}
+876:                                        label={t('client_distance_km', { defaultValue: 'مسافة الموكل (كم)' })}
+880:                                        placeholder={t('example_50km', { defaultValue: 'مثال: 50 كم' })}
+883:                                        label={t('custom_additional_days', { defaultValue: 'أيام إضافية مخصصة' })}
+887:                                        placeholder={t('example_7days', { defaultValue: 'مثال: 7 أيـام' })}
+892:                                            {t('important_legal_texts', { defaultValue: 'نصوص قانونية هامة:' })}
+894:                                        <p className="text-gray-500 italic">{t('article_16_distance_rule', { defaultValue: '"مادة 16: يضاف ميعاد مسافة يوم واحد لكل 50 كم"' })}</p>
+895:                                        <p className="text-gray-500 italic">{t('article_18_holiday_extension', { defaultValue: '"مادة 18: يمتد الميعاد لأول يوم عمل إذا صادف عطلة رسمية"' })}</p>
+904:                                <ArrowPathIcon className="w-5 h-5 text-primary"/> {t('inferred_legal_deadlines', { defaultValue: 'المواعيد القانونية المستنتجة' })}
+912:                                            <span className="text-xs bg-gray-50 dark:bg-gray-800 px-2 py-0.5 rounded font-mono font-bold text-gray-500 italic">{t('x_days_deadline', { count: res.days, defaultValue: `${res.days} يوماً ميعاد` })}</span>
+913:                                            {dlDistance > 0 && <span className="text-[10px] text-accent font-bold">+{t('distance_deadline', { defaultValue: ' ميعاد مسافة' })}</span>}
+918:                                        <div className="text-[10px] text-gray-400 font-bold mb-1">{t('final_expiry_deadline', { defaultValue: 'الموعد النهائي للسقوط' })}</div>
+923:                                            {res.isExpired ? t('case_expired', { defaultValue: 'القضية تجاوزت الموعد' }) : t('days_remaining_before_expiry', { count: res.daysRemaining, defaultValue: `متبقي ${res.daysRemaining} يوماً قبل السقوط` })}
+928:                            <Button variant="ghost" fullWidth className="border-2 border-dashed border-gray-200 dark:border-gray-800 mt-4 text-gray-400">{t('customize_new_deadline', { defaultValue: 'تخصيص ميعاد إضافي جديد' })}</Button>

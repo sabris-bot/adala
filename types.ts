@@ -9,9 +9,12 @@ import React from 'react';
 // --- GENERAL ---
 export interface NavItem {
   name: string;
+  translationKey?: string;
   path: string;
   icon: React.FC<React.SVGProps<SVGSVGElement>>;
   children?: NavItem[];
+  sectionHeader?: string; // Optional header text to display before this item in the sidebar
+  sectionTranslationKey?: string;
 }
 
 export interface FinancialItem {
@@ -22,14 +25,77 @@ export interface FinancialItem {
 }
 
 // --- COUNTRY CONTEXT ---
-export type CountryCode = 'KW' | 'SA' | 'AE' | 'EG' | 'JO';
+export type CountryCode = 'KW' | 'SA' | 'AE' | 'EG' | 'JO' | 'BH' | 'QA' | 'OM';
 
-export interface Country {
+export interface LaborLawConfig {
+  indemnityRules: {
+    firstPeriodYears: number;
+    firstPeriodDaysPerYear: number;
+    subsequentPeriodDaysPerYear: number;
+    maxIndemnityMonths?: number; 
+    resignationAdjustment: {
+      under3Years: number; // multiplier (0 to 1)
+      threeToFiveYears: number;
+      fiveToTenYears: number;
+      overTenYears: number;
+    };
+  };
+  annualLeaveDays: number;
+  sickLeaveRules: {
+    fullPayDays: number;
+    threeQuarterPayDays: number;
+    halfPayDays: number;
+    quarterPayDays: number;
+    noPayDays: number;
+  };
+  references?: {
+    annualLeaveArticle?: string;
+    sickLeaveArticle?: string;
+    indemnityArticle?: string;
+    disciplinaryArticle?: string;
+    lawNameAr?: string;
+  };
+  disciplinaryRules?: {
+    maxDeductionDaysPerMonth: number;
+    investigationRequired: boolean;
+    appealPeriodDays: number;
+    rules: {
+        article: string;
+        text: string;
+    }[];
+  };
+}
+
+export interface Jurisdiction {
   code: CountryCode;
   name: string;
+  nameEn: string;
   currencyCode: string;
   currencySymbol: string;
-  flag?: string; // Optional: path to flag SVG or emoji
+  currencyNameAr: string;
+  flag: string;
+  laborLaw: LaborLawConfig;
+  legalInterest: {
+    civilRate: number;
+    commercialRate: number;
+    isCappedAtPrincipal: boolean;
+    defaultAttorneyFeesPercent?: number;
+    defaultAttorneyFeesMin?: number;
+  };
+  courtFeesConfig: {
+    fixedFees: {
+      totalCourt: number;
+      partialCourt: number;
+      appeal: number;
+      cassation: number;
+      petition: number;
+      expert: number;
+    };
+    proportionalRules: {
+      minFee: number;
+      tiers: { limit: number; rate: number }[];
+    };
+  };
 }
 
 // --- CASE MANAGEMENT ---
@@ -63,12 +129,12 @@ export enum CasePriority {
 }
 
 export enum CourtLevel {
-  FIRST_INSTANCE = "محكمة أول درجة",
+  FIRST_INSTANCE = "المحكمة الكلية (أول درجة)",
   APPEALS_COURT = "محكمة الاستئناف",
   CASSATION_COURT = "محكمة التمييز",
   CONSTITUTIONAL_COURT = "المحكمة الدستورية",
-  SPECIALIZED_COURT = "محكمة متخصصة (تجارية، عمالية، إلخ)",
-  ADMINISTRATIVE_COURT = "محكمة إدارية",
+  SPECIALIZED_COURT = "محكمة الأسرة",
+  ADMINISTRATIVE_COURT = "المحكمة الكلية - الدائرة الإدارية",
 }
 
 export enum RiskLevel {
@@ -76,6 +142,14 @@ export enum RiskLevel {
   MEDIUM = "متوسط",
   HIGH = "مرتفع",
   CRITICAL = "حرج",
+}
+
+export enum JudgmentOutcome {
+  WON = "فوز",
+  LOST = "خسارة",
+  SETTLED = "تسوية",
+  PARTIAL_WIN = "فوز جزئي",
+  PENDING = "انتظار",
 }
 
 export interface Hearing {
@@ -221,7 +295,7 @@ export interface Case {
   closedDate?: string;
   judgmentDate?: string;
   judgmentSummary?: string;
-  judgmentOutcome?: 'Won' | 'Lost' | 'Settled' | 'PartialWin' | 'Pending';
+  judgmentOutcome?: JudgmentOutcome;
 }
 
 // --- CONTRACT ANALYSIS (AI) ---
@@ -361,6 +435,13 @@ export enum ComplianceFrequency {
   ONE_TIME = "مرة واحدة",
 }
 
+export enum CompliancePriority {
+  LOW = "منخفضة",
+  MEDIUM = "متوسطة",
+  HIGH = "عالية",
+  CRITICAL = "حرجة",
+}
+
 export interface ComplianceRequirement {
   id: string;
   title: string;
@@ -370,6 +451,7 @@ export interface ComplianceRequirement {
   frequency: ComplianceFrequency;
   dueDate?: string; 
   status: ComplianceStatus;
+  priority: CompliancePriority; // Added Priority
   assignedTo?: string; 
   lastReviewDate?: string; 
   nextReviewDate?: string; 
@@ -400,6 +482,37 @@ export interface Allowance {
   subjectToIndemnity?: boolean; 
 }
 
+export interface EmergencyContact {
+  name: string;
+  phone: string;
+  relation: string;
+}
+
+export interface EmployeeAsset {
+  id: string;
+  assetName: string;
+  serialNumber?: string;
+  assignedDate: string;
+  returnedDate?: string;
+  notes?: string;
+}
+
+export interface EmployeeTraining {
+  id: string;
+  courseName: string;
+  provider?: string;
+  completionDate: string;
+  expiryDate?: string;
+  certificateUrl?: string;
+}
+
+export interface EducationalQualification {
+  degree: string;
+  major: string;
+  university: string;
+  graduationYear: string;
+}
+
 export interface Employee {
   id: string;
   employeeId: string; 
@@ -428,6 +541,24 @@ export interface Employee {
   notes?: string; 
   specializations?: CaseMainType[]; // For lawyer list in Legal Representation
   frequentedCourts?: CourtLevel[]; // For lawyer list in Legal Representation
+  
+  // Kuwait Documentation & Finance Integration
+  civilIdExpiry?: string;
+  passportNumber?: string;
+  passportExpiry?: string;
+  residencyExpiry?: string;
+  bankIban?: string;
+  bankName?: string;
+
+  // New Comprehensive Fields
+  managerId?: string;
+  managerName?: string;
+  emergencyContact?: EmergencyContact;
+  assets?: EmployeeAsset[];
+  trainings?: EmployeeTraining[];
+  qualifications?: EducationalQualification[];
+  skills?: string[];
+  bloodType?: string;
 }
 
 // -- End of Service (Kuwait Specific for now) --
@@ -436,21 +567,28 @@ export enum ContractTypeKuwait {
   UNLIMITED = "غير محدد المدة",
 }
 export enum TerminationReasonKuwait {
-  COMPANY_TERMINATION_UNJUSTIFIED = "إنهاء من قبل الشركة (غير مبرر - المادة 51)",
-  COMPANY_TERMINATION_JUSTIFIED = "إنهاء من قبل الشركة (بسبب مشروع - المادة 41)",
-  RESIGNATION_PROBATION = "استقالة خلال فترة التجربة (المادة 53أ)",
-  RESIGNATION_LT_3Y = "استقالة العامل (أقل من 3 سنوات خدمة - عقد غير محدد)",
-  RESIGNATION_3_TO_LT_5Y = "استقالة العامل (3 إلى أقل من 5 سنوات خدمة - عقد غير محدد)",
-  RESIGNATION_5_TO_LT_10Y = "استقالة العامل (5 إلى أقل من 10 سنوات خدمة - عقد غير محدد)",
-  RESIGNATION_GE_10Y = "استقالة العامل (10 سنوات خدمة فأكثر - عقد غير محدد)",
-  RESIGNATION_LIMITED_LT_5Y = "استقالة العامل (عقد محدد المدة - خدمة أقل من 5 سنوات - المادة 52)",
-  RESIGNATION_LIMITED_GE_5Y = "استقالة العامل (عقد محدد المدة - خدمة 5 سنوات فأكثر - المادة 52)",
-  CONTRACT_EXPIRY_LIMITED = "انتهاء مدة العقد محدد المدة وعدم التجديد",
-  FEMALE_MARRIAGE_RESIGNATION = "استقالة العاملة بسبب الزواج خلال سنة (المادة 53ب)",
-  RETIREMENT_AGE = "بلوغ سن التقاعد",
-  DISABILITY_OR_DEATH = "عجز كلي أو وفاة العامل",
-  FORCE_MAJEURE = "قوة قاهرة",
-  OTHER_FULL_ENTITLEMENT = "أسباب أخرى تستوجب كامل المكافأة (مثل حكم قضائي)",
+  // Employer Actions (Dismissal)
+  DISMISSAL_WITH_NOTICE = "إنهاء العقد من قبل صاحب العمل (مع مهلة إخطار) - استحقاق كامل",
+  DISMISSAL_WITHOUT_NOTICE_ART_41 = "فصل العامل للأسباب الواردة بالمادة 41 (خطأ جسيم/غياب) - حرمان من المكافأة",
+  CLOSURE_OR_BANKRUPTCY = "إغلاق المنشأة أو إفلاسها - استحقاق كامل",
+
+  // Contract Expiry
+  CONTRACT_EXPIRY = "انتهاء مدة العقد (للعقود المحددة) - استحقاق كامل",
+
+  // Resignation (Employee Actions)
+  RESIGNATION_UNDER_3_YEARS = "استقالة (خدمة أقل من 3 سنوات) - لا مكافأة",
+  RESIGNATION_3_TO_5_YEARS = "استقالة (خدمة 3 - 5 سنوات) - نصف المكافأة",
+  RESIGNATION_5_TO_10_YEARS = "استقالة (خدمة 5 - 10 سنوات) - ثلثي المكافأة",
+  RESIGNATION_OVER_10_YEARS = "استقالة (خدمة أكثر من 10 سنوات) - مكافأة كاملة",
+  
+  // Specific Statutory Entitlements (Full Indemnity cases)
+  RESIGNATION_ART_48_EMPLOYER_FAULT = "ترك العمل لخطأ صاحب العمل/اعتداء (مادة 48) - استحقاق كامل",
+  RESIGNATION_WOMAN_MARRIAGE = "استقالة العاملة بسبب الزواج (خلال سنة من الزواج) - المادة 53 - استحقاق كامل",
+  
+  // Natural Causes / Force Majeure
+  RETIREMENT_AGE = "بلوغ سن التقاعد - استحقاق كامل",
+  DEATH_OR_TOTAL_DISABILITY = "الوفاة أو العجز الكلي - استحقاق كامل",
+  WORK_INJURY_DISABILITY = "إصابة عمل أدت للعجز أو الوفاة - استحقاق كامل",
 }
 export interface EndOfServiceInputs {
   companyName: string;
@@ -545,6 +683,10 @@ export enum LoanType {
   HOUSING = "سلفة إسكانية",
   CAR = "سلفة سيارة",
   EMERGENCY = "سلفة طارئة",
+  MARRIAGE = "منحة/قرض زواج",
+  SOCIAL = "قرض اجتماعي",
+  FURNITURE = "سلفة أثاث",
+  EDUCATION = "سلفة دراسية",
   OTHER = "أخرى",
 }
 export enum LoanStatus {
@@ -605,13 +747,22 @@ export enum ViolationTypeKuwait {
     ATTENDANCE_ABSENCE = "غياب بدون إذن",
     POLICY_CODE_OF_CONDUCT = "مخالفة لائحة وسياسات الشركة",
     CONFIDENTIALITY_BREACH = "إفشاء أسرار العمل",
+    INSUBORDINATION = "عدم تنفيذ الأوامر (عصيان إداري)",
+    PROPERTY_DAMAGE = "إتلاف ممتلكات المنشأة",
+    MISCONDUCT_HARASSMENT = "التطاول أو الاعتداء على الزملاء أو الرؤساء",
+    SAFETY_VIOLATION = "مخالفة تعليمات الأمن والسلامة المهنية",
+    FORGERY_TAMPARING = "التزوير في المحررات أو التلاعب في البصمة",
+    ALCOHOL_DRUGS = "الحضور تحت تأثير المسكرات أو العقاقير",
     OTHER = "مخالفات أخرى",
 }
 export enum DisciplinaryPenaltyKuwait {
     VERBAL_WARNING = "تنبيه شفوي",
     WRITTEN_WARNING = "إنذار كتابي",
-    DEDUCTION_FROM_WAGE = "خصم من الأجر",
-    SUSPENSION = "إيقاف عن العمل",
+    DEDUCTION_FROM_WAGE = "خصم من الأجر (بحد أقصى 5 أيام)",
+    SUSPENSION_WITHOUT_PAY = "إيقاف عن العمل بدون أجر",
+    SUSPENSION_WITH_HALF_PAY = "إيقاف عن العمل بقرار تأديبي (نصف أجر)",
+    DELAY_ANNUAL_INCREMENT = "تأجيل موعد العلاوة السنوية",
+    DENIAL_OF_PROMOTION = "الحرمان من الترقية",
     TERMINATION_WITH_INDEMNITY = "فصل من الخدمة مع صرف المكافأة",
     TERMINATION_WITHOUT_INDEMNITY = "فصل من الخدمة بدون مكافأة (مادة 41)",
 }
@@ -726,6 +877,9 @@ export interface EmployeeRequest {
     attachments?: RequestAttachment[];
     createdAt: string;
     updatedAt?: string;
+    signatureUrl?: string; // Digital Signature
+    signedBy?: string;
+    signedAt?: string;
 }
 
 // --- PROPERTY MANAGEMENT ---
@@ -767,153 +921,6 @@ export enum RentPaymentStatus {
     CANCELLED = "ملغى",
     WAIVED = "معفى منه",
 }
-export enum SettlementStatus {
-    ACTIVE = "نشطة (جاري السداد)",
-    PAID_IN_FULL = "مسددة بالكامل",
-    DEFAULTED = "متعثرة",
-    LEGAL_ACTION_PENDING = "تم اتخاذ إجراء قانوني",
-    CANCELLED = "ملغاة",
-}
-
-export interface Property {
-    id: string;
-    name: string;
-    type: PropertyType;
-    address: string;
-    ownerName?: string;
-    paciNumber?: string;
-    description?: string;
-    generalNotes?: string;
-    propertyCategory?: PropertyCategoryKuwait;
-    units?: PropertyUnit[];
-    status?: PropertyUnitStatus; // For single-unit properties like a Villa or Shop
-    currentLeaseId?: string; // For single-unit properties
-    createdAt: string;
-    updatedAt?: string;
-}
-export interface PropertyUnit {
-    id: string;
-    propertyId: string;
-    unitNumber: string;
-    floor?: string;
-    areaSqM?: number;
-    bedrooms?: number;
-    bathrooms?: number;
-    status: PropertyUnitStatus;
-    currentLeaseId?: string;
-    unitType?: PropertyUnitTypeKuwait;
-    intendedUse?: PropertyIntendedUseKuwait;
-    amenities?: string;
-}
-export interface Tenant {
-    id: string;
-    fullNameAr: string;
-    civilIdOrPassport: string;
-    nationality: string;
-    phone: string;
-    email?: string;
-    address?: string;
-    occupation?: string;
-    notes?: string;
-    createdAt: string;
-    updatedAt?: string;
-}
-export enum LeaseTermType {
-    FIXED = "محدد المدة",
-    RENEWABLE = "محدد المدة (قابل للتجديد)",
-    OPEN_ENDED = "غير محدد المدة (بعد انتهاء المدة الأولى)",
-}
-export interface LeaseAgreement {
-    id: string;
-    contractNumber: string;
-    propertyId: string;
-    unitId?: string; // Optional if property is single-unit
-    tenantId: string;
-    startDate: string;
-    endDate: string;
-    rentAmount: number;
-    rentFrequency: RentPaymentFrequency;
-    paymentDueDateDay?: number;
-    depositAmount?: number;
-    status: LeaseAgreementStatus;
-    leaseTermType?: LeaseTermType;
-    purposeOfLease?: string;
-    rentIncludes?: string[];
-    termsAndConditions?: string;
-    latePaymentFee?: number;
-    noticePeriodDays?: number;
-    attachments?: RequestAttachment[];
-    relatedCaseIds?: string[];
-    debtSettlementId?: string;
-    notes?: string;
-    createdAt: string;
-    updatedAt?: string;
-}
-export enum PaymentMethod {
-    CASH = "نقدي",
-    BANK_TRANSFER = "تحويل بنكي",
-    CHEQUE = "شيك",
-    CREDIT_CARD = "بطاقة ائتمان",
-    ONLINE_PAYMENT = "دفع إلكتروني",
-    OTHER = "أخرى",
-}
-export interface RentPayment {
-    id: string;
-    leaseAgreementId: string;
-    paymentDate: string;
-    dueDate: string;
-    amountDue: number;
-    amountPaid: number;
-    status: RentPaymentStatus;
-    paymentMethod?: PaymentMethod;
-    referenceNumber?: string;
-    paymentForPeriod: string;
-    isSettlement?: boolean;
-    partOfSettlementId?: string;
-    notes?: string;
-    recordedAt: string;
-}
-export interface EvictionNoticeRecord {
-    id: string;
-    leaseAgreementId: string;
-    propertyId: string;
-    unitId?: string;
-    tenantId: string;
-    noticeDate: string;
-    reason: string;
-    status: 'Sent' | 'CourtCaseFiled' | 'Resolved';
-    notes?: string;
-}
-export interface ClearanceCertificateRecord {
-    id: string;
-    leaseAgreementId: string;
-    propertyId: string;
-    tenantId: string;
-    issueDate: string;
-    notes?: string;
-}
-export interface SettlementInstallment extends Installment {}
-export interface DebtSettlementRecord {
-    id: string;
-    tenantId: string;
-    tenantName: string;
-    leaseAgreementId: string;
-    leaseContractNumber: string;
-    propertyId: string;
-    propertyName?: string;
-    originalDebtAmount: number;
-    settlementDate: string;
-    settledAmount: number;
-    amountCollectedViaLegal?: number;
-    relatedCaseId?: string;
-    relatedCaseNumber?: string;
-    status: SettlementStatus;
-    installmentPlan?: SettlementInstallment[];
-    totalInstallmentsPaidAmount?: number;
-    notes?: string;
-    createdAt: string;
-    updatedAt?: string;
-}
 export enum PropertyCategoryKuwait {
     PRIVATE_RESIDENTIAL = "سكن خاص",
     INVESTMENT_RESIDENTIAL = "استثماري (سكني)",
@@ -940,6 +947,215 @@ export enum PropertyIntendedUseKuwait {
     STORAGE = "تخزين",
     INDUSTRIAL_ACTIVITY = "نشاط صناعي",
     OTHER = "استخدام آخر",
+}
+
+export interface PropertyUnit {
+    id: string;
+    propertyId: string;
+    unitNumber: string;
+    floor?: string;
+    areaSqM?: number;
+    bedrooms?: number;
+    bathrooms?: number;
+    status: PropertyUnitStatus;
+    currentLeaseId?: string;
+    unitType?: PropertyUnitTypeKuwait;
+    intendedUse?: PropertyIntendedUseKuwait;
+    amenities?: string;
+}
+
+export interface Property {
+    id: string;
+    name: string;
+    type: PropertyType;
+    address: string;
+    ownerName?: string;
+    paciNumber?: string;
+    description?: string;
+    generalNotes?: string;
+    propertyCategory?: PropertyCategoryKuwait;
+    units?: PropertyUnit[];
+    status?: PropertyUnitStatus; // For single-unit properties like a Villa or Shop
+    currentLeaseId?: string; // For single-unit properties
+    createdAt: string;
+    updatedAt?: string;
+}
+
+export interface Tenant {
+    id: string;
+    fullNameAr: string;
+    civilIdOrPassport: string;
+    nationality: string;
+    phone: string;
+    email?: string;
+    address?: string;
+    occupation?: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt?: string;
+    status?: 'Current' | 'Past';
+    emergencyContact?: {
+        name: string;
+        phone: string;
+        relation: string;
+    };
+    previousLandlord?: {
+        name: string;
+        phone: string;
+        rentalPeriod?: string;
+        notes?: string;
+    };
+}
+
+export enum LeaseTermType {
+    FIXED = "محدد المدة",
+    RENEWABLE = "محدد المدة (قابل للتجديد)",
+    OPEN_ENDED = "غير محدد المدة (بعد انتهاء المدة الأولى)",
+}
+
+export interface LeaseAgreement {
+    id: string;
+    contractNumber: string;
+    propertyId: string;
+    unitId?: string; // Optional if property is single-unit
+    tenantId: string;
+    startDate: string;
+    endDate: string;
+    rentAmount: number;
+    rentFrequency: RentPaymentFrequency;
+    paymentDueDateDay?: number;
+    depositAmount?: number;
+    status: LeaseAgreementStatus;
+    leaseTermType?: LeaseTermType;
+    purposeOfLease?: string;
+    rentIncludes?: string[];
+    termsAndConditions?: string;
+    additionalClauses?: string[];
+    latePaymentFee?: number;
+    noticePeriodDays?: number;
+    attachments?: RequestAttachment[];
+    notes?: string;
+    createdAt: string;
+    updatedAt?: string;
+    relatedCaseIds?: string[];
+    debtSettlementId?: string;
+}
+
+export enum PaymentMethod {
+    CASH = "نقدي",
+    KNET = "كي-نت",
+    BANK_TRANSFER = "تحويل بنكي",
+    CHEQUE = "شيك",
+    CREDIT_CARD = "بطاقة ائتمان",
+    ONLINE_PAYMENT = "دفع إلكتروني",
+    OTHER = "أخرى",
+}
+
+export interface RentPayment {
+    id: string;
+    leaseAgreementId: string;
+    paymentDate: string;
+    dueDate: string;
+    amountDue: number;
+    amountPaid: number;
+    status: RentPaymentStatus;
+    paymentMethod?: PaymentMethod;
+    referenceNumber?: string;
+    paymentForPeriod: string;
+    notes?: string;
+    recordedAt: string;
+    partOfSettlementId?: string;
+    isSettlement?: boolean;
+}
+
+// --- PROPERTY MANAGEMENT SUB-MODULES ---
+
+export enum SettlementStatus {
+    ACTIVE = "نشط (جاري السداد)",
+    PAID_IN_FULL = "مسدد بالكامل",
+    DEFAULTED = "متعثر",
+    LEGAL_ACTION_PENDING = "قيد الإجراء القانوني",
+    CANCELLED = "ملغى"
+}
+
+export enum PropertyDocumentType {
+    DEED = "وثيقة ملكية",
+    PACI_MAP = "مخطط معلومات مدنية",
+    BUILDING_PERMIT = "رخصة بناء",
+    SERVICE_CONTRACT_ELEVATOR = "عقد صيانة مصاعد",
+    INSURANCE_POLICY = "وثيقة تأمين",
+    PROPERTY_PHOTOS = "صور العقار",
+    OTHER = "أخرى"
+}
+
+export interface PropertyDocument {
+    id: string;
+    propertyId: string;
+    unitId?: string;
+    documentName: string;
+    documentType: PropertyDocumentType;
+    issueDate?: string;
+    expiryDate?: string;
+    referenceNumber?: string;
+    filePathOrLink?: string;
+    description?: string;
+    uploadedBy?: string;
+    uploadedAt: string;
+    tags?: string[];
+    relatedCaseIds?: string[];
+}
+
+export interface EvictionNoticeRecord {
+    id: string;
+    leaseAgreementId: string;
+    propertyId: string;
+    unitId?: string;
+    tenantId: string;
+    noticeDate: string;
+    reason: string;
+    status: 'Draft' | 'Sent' | 'Delivered' | 'Received' | 'CourtCaseFiled' | 'Executed' | 'Cancelled' | 'LegalActionInProgress';
+    notes?: string;
+}
+
+export interface ClearanceCertificateRecord {
+    id: string;
+    leaseAgreementId: string;
+    propertyId: string;
+    tenantId: string;
+    issueDate: string;
+    notes?: string;
+}
+
+export interface SettlementInstallment {
+    id: string;
+    installmentNumber: number;
+    dueDate: string;
+    amountDue: number;
+    amountPaid?: number;
+    paymentDate?: string;
+    status: InstallmentStatus;
+}
+
+export interface DebtSettlementRecord {
+    id: string;
+    tenantId: string;
+    tenantName: string;
+    leaseAgreementId: string;
+    leaseContractNumber?: string;
+    propertyId?: string;
+    propertyName?: string;
+    originalDebtAmount: number;
+    settlementDate: string;
+    settledAmount: number;
+    amountCollectedViaLegal?: number;
+    status: SettlementStatus;
+    relatedCaseId?: string;
+    relatedCaseNumber?: string;
+    installmentPlan?: SettlementInstallment[];
+    totalInstallmentsPaidAmount?: number;
+    notes?: string;
+    createdAt: string;
+    updatedAt?: string;
 }
 
 // --- PROPERTY MAINTENANCE ---
@@ -997,34 +1213,6 @@ export interface MaintenanceRequest {
     updatedAt?: string;
 }
 
-// --- PROPERTY DOCUMENTS ---
-export enum PropertyDocumentType {
-    DEED = "وثيقة الملكية",
-    PACI_MAP = "مخطط PACI",
-    BUILDING_PERMIT = "رخصة البناء",
-    COMPLETION_CERTIFICATE = "شهادة إتمام البناء",
-    INSURANCE_POLICY = "وثيقة تأمين",
-    SERVICE_CONTRACT_ELEVATOR = "عقد صيانة مصاعد",
-    SERVICE_CONTRACT_GENERAL = "عقد صيانة عام",
-    PROPERTY_PHOTOS = "صور العقار",
-    OTHER = "مستند آخر",
-}
-export interface PropertyDocument {
-    id: string;
-    propertyId: string;
-    unitId?: string;
-    documentName: string;
-    documentType: PropertyDocumentType;
-    issueDate?: string;
-    expiryDate?: string;
-    referenceNumber?: string;
-    filePathOrLink: string;
-    description?: string;
-    tags?: string[];
-    uploadedBy: string;
-    uploadedAt: string;
-}
-
 // --- COMPANY AFFAIRS ---
 export enum CompanyLegalFormKuwait {
     SOLE_PROPRIETORSHIP = "مؤسسة فردية",
@@ -1038,6 +1226,15 @@ export enum CompanyLegalFormKuwait {
     PROFESSIONAL_COMPANY = "شركة مهنية",
     HOLDING_COMPANY = "شركة قابضة",
 }
+export interface CorporateCommittee {
+    id: string;
+    name: string;
+    description?: string;
+    membersIds: string[];
+    chairpersonId: string;
+    frequency: string;
+}
+
 export interface CompanyProfile {
     id: string;
     companyNameAr: string;
@@ -1056,6 +1253,7 @@ export interface CompanyProfile {
     shareholders?: ShareholderInfo[];
     boardMembers?: BoardMemberInfo[];
     authorizedSignatories?: AuthorizedSignatoryInfo[];
+    committees?: CorporateCommittee[];
 }
 export interface ShareholderInfo {
     id: string;
@@ -1064,7 +1262,8 @@ export interface ShareholderInfo {
     civilIdOrRegNumber: string;
     sharePercentage: number;
     numberOfShares: number;
-    shareType: string; // e.g., 'عادية', 'ممتازة'
+    shareClass: string; // e.g., 'عادية', 'ممتازة', 'فئة أ'
+    votingRights: boolean;
 }
 export enum BoardMemberPosition {
     CHAIRMAN = "رئيس مجلس الإدارة",
@@ -1079,12 +1278,16 @@ export interface BoardMemberInfo {
     position: BoardMemberPosition;
     appointmentDate: string;
     termEndDate: string;
+    isAuthorizedSignatory?: boolean;
 }
 export interface AuthorizedSignatoryInfo {
     id: string;
     name: string;
     title: string;
     signatureScope: string;
+    authorityLimit?: number;
+    jointSignatureRequired?: boolean;
+    authorizedUntil?: string;
 }
 export enum CompanyMeetingType {
     FOUNDERS_ASSEMBLY = "جمعية تأسيسية",
@@ -1190,6 +1393,17 @@ export enum AdminTaskPriority {
     HIGH = "عالية",
     CRITICAL = "حرجة",
 }
+export enum AdminTaskCategory {
+    FINANCE = "شؤون مالية",
+    HR = "موارد بشرية",
+    SECRETARIAL = "سكرتارية ومتابعة",
+    IT = "تقنية معلومات",
+    MARKETING = "تسويق وعلاقات عامة",
+    MAINTENANCE = "صيانة وخدمات",
+    STRATEGIC = "تطوير استراتيجي",
+    LEGAL_ADMIN = "إدارة قانونية",
+    OTHER = "أخرى"
+}
 export interface AdminTask {
     id: string;
     title: string;
@@ -1198,6 +1412,13 @@ export interface AdminTask {
     assignedTo: string;
     status: AdminTaskStatus;
     priority: AdminTaskPriority;
+    category: AdminTaskCategory;
+    progress?: number; // 0 to 100
+    recurring?: boolean;
+    recurrenceInterval?: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    tags?: string[];
+    attachments?: string[];
+    dependencyId?: string;
     relatedCaseId?: string;
     projectOrModule?: string;
     notes?: string;
@@ -1218,8 +1439,11 @@ export enum ContactType {
     GOVERNMENT_ENTITY = "جهة حكومية",
     SERVICE_PROVIDER = "مقدم خدمة/مورد",
     COLLEAGUE = "زميل عمل",
+    PROCESS_SERVER = "مندوب إعلان",
+    ADMIN_STAFF = "موظف إداري خارجي",
     OTHER = "أخرى",
 }
+
 export interface Contact {
     id: string;
     fullName: string;
@@ -1228,6 +1452,7 @@ export interface Contact {
     jobTitle?: string;
     phonePrimary?: string;
     phoneSecondary?: string;
+    whatsapp?: string; // Add WhatsApp
     emailPrimary?: string;
     emailSecondary?: string;
     address?: string;
@@ -1235,9 +1460,12 @@ export interface Contact {
     country?: string;
     notes?: string;
     relatedCaseIds?: string[];
+    tags?: string[]; // Add tags
+    isFavorite?: boolean; // Add favorite flag
     createdAt: string;
     updatedAt?: string;
-    idCardPhotoUrl?: string; // NEW
+    idCardPhotoUrl?: string;
+    profileColor?: string; // Hex color for avatar fallback
 }
 
 // --- SMART MIND MAPS ---
@@ -1469,6 +1697,42 @@ export interface KBAAlert {
     isRead: boolean;
 }
 
+export enum KBAProBonoStatus {
+    ACTIVE = "نشطة",
+    COMPLETED = "مكتملة",
+    CANCELLED = "ملغاة",
+    UNDER_REVIEW = "قيد المراجعة",
+}
+
+export interface KBAProBonoAssignment {
+    id: string;
+    lawyerId: string;
+    lawyerName: string;
+    caseNumber: string;
+    clientName: string;
+    courtName: string;
+    assignmentDate: string;
+    completionDate?: string;
+    status: KBAProBonoStatus;
+    notes?: string;
+    attachmentUrl?: string;
+    createdAt: string;
+}
+
+export interface KBAMembershipFee {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    year: number;
+    amount: number;
+    dueDate: string;
+    paymentDate?: string;
+    receiptNumber?: string;
+    isPaid: boolean;
+    notes?: string;
+    createdAt: string;
+}
+
 // --- LEGAL FORMS ---
 export enum LegalFormCategoryOptions {
     CONTRACTS = "عقود واتفاقيات",
@@ -1481,6 +1745,11 @@ export enum LegalFormCategoryOptions {
 }
 
 // --- LEGAL REPRESENTATION ---
+export enum RepresentationPriority {
+    NORMAL = "عادية",
+    HIGH = "عالية",
+    URGENT = "عاجلة",
+}
 export enum RepresentationRequestStatus {
     PENDING = "معلق",
     ACCEPTED = "مقبول",
@@ -1501,6 +1770,9 @@ export interface LegalRepresentationRequest {
     caseType?: CaseMainType;
     courtName: string;
     courtLevel?: CourtLevel;
+    hearingRoom?: string; // Added
+    judgeName?: string; // Added
+    priority: RepresentationPriority; // Added
     hearingDate: string;
     hearingTime?: string;
     sessionObjective: string;
@@ -1517,6 +1789,10 @@ export interface LegalRepresentationRequest {
     attachedFileNames?: string[];
     createdAt: string;
     updatedAt?: string;
+    // E-Signature additions
+    signatureUrl?: string;
+    signedBy?: string;
+    signedAt?: string;
 }
 
 // --- NOTIFICATIONS MANAGEMENT ---
@@ -1524,6 +1800,7 @@ export enum NotificationChannel {
     EMAIL = "بريد إلكتروني",
     WHATSAPP = "واتساب",
     SYSTEM = "إشعار بالنظام",
+    SMS = "رسالة نصية SMS",
 }
 export enum NotificationStatus {
     PENDING = "قيد الإرسال",
@@ -1574,14 +1851,25 @@ export interface NotificationSettingItem {
     description: string;
     emailEnabled: boolean;
     whatsappEnabled: boolean;
+    smsEnabled?: boolean; // New
     systemEnabled: boolean;
     managerAlertEnabled?: boolean; // If true, a copy is sent to the manager
+    priority?: 'low' | 'normal' | 'high' | 'urgent'; // New
 }
 export interface NotificationModuleSettings {
     senderEmail: string;
     managerEmailForAlerts: string;
     whatsappBusinessNumber: string;
+    smsGatewayKey?: string; // New
     notificationSettings: NotificationSettingItem[];
+    isPaused?: boolean; // New: System-wide master switch
+    quietHours?: { // New: DND mode
+        enabled: boolean;
+        start: string; // HH:mm
+        end: string; // HH:mm
+        timezone: string;
+    };
+    digestFrequency?: 'instant' | 'daily' | 'weekly'; // New
 }
 export interface NotificationLogEntry {
     id: string;
@@ -1615,6 +1903,15 @@ export enum TrackingStatus {
     DELAYED = "متأخر",
     UNABLE_TO_COMPLETE = "تعذر إنجاز المهمة",
 }
+export enum FieldTaskCategory {
+    JUDICIAL_NOTIFICATION = "إعلان قضائي",
+    DOCUMENT_FILING = "إيداع مستندات/صحف",
+    COURT_RESEARCH = "استعلام/بحوث قضائية",
+    DEBT_COLLECTION = "تحصيل مديونيات",
+    FIELD_VISIT = "زيارة ميدانية/معاينة",
+    ADMIN_FOLLOWUP = "متابعة إدارية",
+    OTHER = "أخرى",
+}
 export interface TrackingLocationDetails {
     courtOrDepartmentName: string;
     floor?: string;
@@ -1628,6 +1925,7 @@ export interface TrackingEntry {
     locationDetails?: TrackingLocationDetails;
     recordedBy: string; // User name or 'System'
     notes?: string;
+    attachmentUrls?: string[]; // Added: photos or document scans
 }
 export interface TrackableParty {
     id: string;
@@ -1647,6 +1945,7 @@ export interface PartyAssignment {
     trackablePartyName: string;
     caseId?: string;
     caseNumber?: string;
+    taskCategory: FieldTaskCategory; // Added
     taskDescription: string;
     destination: TrackingLocationDetails;
     assignedByLawyerId: string;
@@ -1659,6 +1958,11 @@ export interface PartyAssignment {
     lastUpdateTimestamp: string;
     createdAt: string;
     updatedAt?: string;
+    // E-Signature
+    signatureUrl?: string;
+    signedBy?: string;
+    signedAt?: string;
+    mainAttachmentUrl?: string; // Added: primary document scan
 }
 
 // --- INVESTIGATIONS ---
@@ -1699,6 +2003,7 @@ export interface Investigation {
     recommendation?: string;
     sessions: InvestigationSession[];
     relatedDisciplinaryActionId?: string;
+    relatedCaseIds?: string[];
     createdAt: string;
     updatedAt?: string;
 }
