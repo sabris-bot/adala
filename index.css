@@ -1,3 +1,36 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #00796B;
+  --color-primary-light: #4DB6AC;
+  --color-primary-dark: #004D40;
+  
+  --color-secondary: #607D8B;
+  --color-secondary-light: #B0BEC5;
+  --color-secondary-dark: #37474F;
+  
+  --color-accent: #FFC107;
+  --color-accent-dark: #FFA000;
+  
+  --color-success: #4CAF50;
+  --color-warning: #FF9800;
+  --color-danger: #F44336;
+  --color-info: #2196F3;
+  
+  --color-dm-background: #102A3A;
+  --color-dm-card: #1E3C50;
+  --color-dm-text: #E0E7EF;
+  
+  --color-neutral-bg: #F5F7FA;
+  --color-neutral-card: #FFFFFF;
+  --color-neutral-text: #37474F;
+
+  --font-sans: "Tajawal", ui-sans-serif, system-ui, sans-serif;
+  --font-marhey: "Marhey", "Tajawal", sans-serif;
+
+  --shadow-card: 0 2px 8px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+  --shadow-card-hover: 0 8px 16px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+}
 
 /* --- PRINT STYLING --- */
 @media print {
@@ -64,26 +97,6 @@
 .rtl-quill .ql-editor {
     text-align: right;
     direction: rtl;
-}
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer utilities {
-  .animate-fade-in-right {
-    animation: fade-in-right 0.5s ease-out forwards;
-  }
-  @keyframes fade-in-right {
-    from {
-      opacity: 0;
-      transform: translateX(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
-  }
 }
 
 html, body {

@@ -164,6 +164,54 @@ const App: React.FC = () => {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const sentNotificationsRef = useRef<Set<string>>(new Set());
 
+  // --- AUTOMATIC UPDATE SYSTEM ---
+  useEffect(() => {
+    const checkVersion = async () => {
+      try {
+        const response = await fetch('/api/version');
+        if (!response.ok) return;
+        const data = await response.json();
+        const serverVersion = data.version;
+        const lastSeenVersion = localStorage.getItem('app_version');
+        
+        if (lastSeenVersion && lastSeenVersion !== serverVersion) {
+          console.group('New System Version Detected');
+          console.log(`Current: ${lastSeenVersion}`);
+          console.log(`New: ${serverVersion}`);
+          console.log('Clearing local caches and reloading...');
+          console.groupEnd();
+          
+          // Clear all local storage and session storage to prevent data conflicts
+          localStorage.clear();
+          sessionStorage.clear();
+          
+          // Set the new version so we don't loop
+          localStorage.setItem('app_version', serverVersion);
+          
+          // Unregister any active service workers
+          if ('serviceWorker' in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            for (const registration of registrations) {
+              await registration.unregister();
+            }
+          }
+
+          // Hard reload from server
+          window.location.reload();
+        } else if (!lastSeenVersion) {
+          localStorage.setItem('app_version', serverVersion);
+        }
+      } catch (err) {
+        // Fail silently to not disturb user
+      }
+    };
+
+    checkVersion();
+    // Check for updates every 15 minutes
+    const interval = setInterval(checkVersion, 15 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const { hearings, tasks } = useCaseTask();
 
   useEffect(() => {

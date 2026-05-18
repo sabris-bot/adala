@@ -86,6 +86,10 @@ async function startServer() {
     }
   });
 
+  app.get('/api/version', (req, res) => {
+    res.json({ version: '3.0.0-final', buildTime: new Date().toISOString() });
+  });
+
   // --- Vite Middleware ---
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
@@ -95,8 +99,20 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(__dirname, 'dist');
-    app.use(express.static(distPath));
+    
+    // Serve static files with long-term caching (since they have hashes)
+    app.use(express.static(distPath, {
+      maxAge: '1y',
+      immutable: true,
+      index: false // we handle index separately
+    }));
+
+    // Handle index.html - NEVER cache this file to ensure users get the new hashed assets
     app.get('*', (req, res) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
       res.sendFile(path.join(distPath, 'index.html'));
     });
   }
