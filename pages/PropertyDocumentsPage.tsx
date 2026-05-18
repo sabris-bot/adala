@@ -189,7 +189,7 @@ const ViewPropertyDocumentModal: React.FC<ViewPropertyDocumentModalProps> = ({ d
         <p><strong>تاريخ الإصدار:</strong> {formatDate(doc.issueDate)}</p>
         <p><strong>تاريخ الانتهاء:</strong> {formatDate(doc.expiryDate)}</p>
         {doc.filePathOrLink && <p><strong>المسار/الرابط:</strong> <a href={doc.filePathOrLink} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline break-all">{doc.filePathOrLink}</a></p>}
-        {doc.description && <p><strong>الوصف:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-gray-100 border rounded">{doc.description}</pre></p>}
+        {doc.description && <div className="mb-2"><strong>الوصف:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-gray-100 border rounded mt-1">{doc.description}</pre></div>}
         {doc.tags && doc.tags.length > 0 && <p><strong>الكلمات المفتاحية:</strong> {doc.tags.map(tag => <Badge key={tag} text={tag} color="gray" size="xs" className="me-1"/>)}</p>}
         
         {relatedCases.length > 0 && (
@@ -246,6 +246,27 @@ const PropertyDocumentsPage: React.FC = () => {
     ).sort((a,b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime());
   }, [documents, searchTerm, filterDocumentType, filterPropertyId]);
 
+  const groupedDocuments = useMemo(() => {
+    const groups: Record<string, PropertyDocument[]> = {};
+    filteredDocuments.forEach(doc => {
+      if (!groups[doc.propertyId]) {
+        groups[doc.propertyId] = [];
+      }
+      groups[doc.propertyId].push(doc);
+    });
+    return groups;
+  }, [filteredDocuments]);
+
+  const propertyGroups = useMemo(() => {
+    return Object.entries(groupedDocuments).map(([propId, docs]) => {
+      const property = mockPropertiesForDocManagement.find(p => p.id === propId);
+      return {
+        property,
+        documents: docs
+      };
+    }).sort((a, b) => (a.property?.name || '').localeCompare(b.property?.name || ''));
+  }, [groupedDocuments]);
+
   const handleAddDocument = () => { setEditingDocument(null); setIsFormModalOpen(true); };
   const handleEditDocument = (doc: PropertyDocument) => { setEditingDocument(doc); setIsFormModalOpen(true); };
   const handleViewDocument = (doc: PropertyDocument) => setViewingDocument(doc);
@@ -285,62 +306,103 @@ const PropertyDocumentsPage: React.FC = () => {
         </div>
       </Card>
       <Card>
-        <div className="p-3 bg-gray-50 rounded-md mb-4">
+        <div className="p-3 bg-gray-50 rounded-md mb-6">
             <Input placeholder="ابحث بالاسم، الوصف، الرقم المرجعي، الكلمات المفتاحية، اسم العقار..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} containerClassName="mb-3"/>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 <Select label="نوع المستند" options={[{value:'', label:'الكل'}, ...propertyDocumentTypeOptions]} value={filterDocumentType} onChange={e => setFilterDocumentType(e.target.value as PropertyDocumentType | '')} containerClassName="mb-0"/>
-                <Select label="العقار" options={[{value:'', label:'الكل'}, ...mockPropertiesForDocManagement.map(p=>({value:p.id, label:p.name}))]} value={filterPropertyId} onChange={e => setFilterPropertyId(e.target.value)} containerClassName="mb-0"/>
+                <Select label="التصفية حسب العقار" options={[{value:'', label:'كافة العقارات'}, ...mockPropertiesForDocManagement.map(p=>({value:p.id, label:p.name}))]} value={filterPropertyId} onChange={e => setFilterPropertyId(e.target.value)} containerClassName="mb-0"/>
             </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 text-xs">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-2 py-2 text-right font-medium">اسم المستند</th>
-                <th className="px-2 py-2 text-right font-medium">النوع</th>
-                <th className="px-2 py-2 text-right font-medium">العقار/الوحدة</th>
-                <th className="px-2 py-2 text-right font-medium">القضايا المرتبطة</th>
-                <th className="px-2 py-2 text-right font-medium">تاريخ الإصدار</th>
-                <th className="px-2 py-2 text-right font-medium">تاريخ الانتهاء</th>
-                <th className="px-2 py-2 text-right font-medium">إجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredDocuments.map(doc => {
-                const prop = mockPropertiesForDocManagement.find(p => p.id === doc.propertyId);
-                const unit = prop?.units?.find(u => u.id === doc.unitId);
-                const linkedCaseCount = doc.relatedCaseIds?.length || 0;
-                return (
-                  <tr key={doc.id} className="hover:bg-gray-50">
-                    <td className="px-2 py-1.5 font-medium max-w-xs truncate" title={doc.documentName}>{doc.documentName}</td>
-                    <td className="px-2 py-1.5">{doc.documentType}</td>
-                    <td className="px-2 py-1.5">{prop?.name || '-'}{unit ? ` / ${unit.unitNumber}` : ''}</td>
-                    <td className="px-2 py-1.5">
-                      {linkedCaseCount > 0 ? (
-                        <div title={mockCases.filter(c => doc.relatedCaseIds?.includes(c.id)).map(c => c.caseNumber).join(', ')}>
-                          <Badge 
-                            text={`${linkedCaseCount} قضية`} 
-                            color="blue" 
-                            size="xs" 
-                            className="cursor-help"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-gray-300">-</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1.5">{formatDate(doc.issueDate)}</td>
-                    <td className="px-2 py-1.5">{formatDate(doc.expiryDate)}</td>
-                    <td className="px-2 py-1.5 space-x-1 space-x-reverse">
-                      <Button variant="ghost" size="sm" onClick={() => handleViewDocument(doc)} title="عرض"><EyeIcon className="w-3.5 text-blue-600"/></Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleEditDocument(doc)} title="تعديل"><PencilIcon className="w-3.5 text-yellow-600"/></Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(doc.id)} title="حذف" className="text-danger"><TrashIcon className="w-3.5"/></Button>
-                    </td>
-                  </tr>
-              );})}
-              {filteredDocuments.length === 0 && <tr><td colSpan={6} className="text-center py-5 text-gray-500"><FolderIcon className="w-10 h-10 mx-auto mb-1"/>لا توجد مستندات تطابق البحث.</td></tr>}
-            </tbody>
-          </table>
+
+        <div className="space-y-10">
+          {propertyGroups.length > 0 ? (
+            propertyGroups.map(group => (
+              <div key={group.property?.id || 'unknown'} className="group/property">
+                <div className="flex items-center justify-between mb-4 border-b pb-2 border-primary/10">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                      <BuildingLibraryIcon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-800 dark:text-white">{group.property?.name || 'مستندات عامة'}</h3>
+                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{group.documents.length} مستند مؤرشف</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-xs">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">اسم المستند</th>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">التصنيف</th>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">الوحدة الذاتية</th>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">قضايا (عدالة)</th>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">تاريخ الإصدار</th>
+                        <th className="px-4 py-3 text-right font-black uppercase tracking-wider text-slate-400">تاريخ الانتهاء</th>
+                        <th className="px-4 py-3 text-left font-black uppercase tracking-wider text-slate-400">إجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-dm-card/30 divide-y divide-gray-100 dark:divide-slate-800">
+                      {group.documents.map(doc => {
+                        const unit = group.property?.units?.find(u => u.id === doc.unitId);
+                        const linkedCaseCount = doc.relatedCaseIds?.length || 0;
+                        return (
+                          <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/10 transition-colors group">
+                            <td className="px-4 py-4 font-bold text-slate-700 dark:text-slate-200">
+                              <div className="flex items-center gap-2">
+                                <PaperClipIcon className="w-3.5 h-3.5 text-slate-400" />
+                                <span className="truncate max-w-xs">{doc.documentName}</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4">
+                              <Badge text={doc.documentType} color="gray" size="xs" className="font-bold"/>
+                            </td>
+                            <td className="px-4 py-4 font-medium text-slate-500">{unit ? `وحدة ${unit.unitNumber}` : 'عام'}</td>
+                            <td className="px-4 py-4">
+                              {linkedCaseCount > 0 ? (
+                                <div title={mockCases.filter(c => doc.relatedCaseIds?.includes(c.id)).map(c => c.caseNumber).join(', ')}>
+                                  <Badge 
+                                    text={`${linkedCaseCount} قضية`} 
+                                    color="blue" 
+                                    size="xs" 
+                                    className="cursor-help font-bold"
+                                  />
+                                </div>
+                              ) : (
+                                <span className="text-gray-300">-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 font-bold text-slate-500">{formatDate(doc.issueDate)}</td>
+                            <td className="px-4 py-4 font-bold text-slate-500">
+                                {doc.expiryDate ? (
+                                    <span className={new Date(doc.expiryDate) < new Date() ? 'text-red-500' : ''}>
+                                        {formatDate(doc.expiryDate)}
+                                    </span>
+                                ) : '-'}
+                            </td>
+                            <td className="px-4 py-4 text-left">
+                              <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="sm" onClick={() => handleViewDocument(doc)} title="عرض" className="rounded-lg w-8 h-8 p-0"><EyeIcon className="w-3.5 text-blue-600"/></Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleEditDocument(doc)} title="تعديل" className="rounded-lg w-8 h-8 p-0"><PencilIcon className="w-3.5 text-amber-600"/></Button>
+                                <Button variant="ghost" size="sm" onClick={() => handleDeleteDocument(doc.id)} title="حذف" className="rounded-lg w-8 h-8 p-0 text-rose-500 hover:bg-rose-50"><TrashIcon className="w-3.5"/></Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-20 text-gray-500 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-dashed border-slate-200 dark:border-slate-800">
+              <FolderIcon className="w-16 h-16 mx-auto mb-4 opacity-20"/>
+              <p className="text-lg font-bold">لا توجد مستندات تطابق البحث أو التصفية.</p>
+              <Button variant="outline" size="sm" className="mt-4" onClick={() => {setSearchTerm(''); setFilterDocumentType(''); setFilterPropertyId('');}}>إعادة تعيين المرشحات</Button>
+            </div>
+          )}
         </div>
       </Card>
       <PropertyDocumentFormModal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} onSubmit={handleFormSubmit} initialData={editingDocument} properties={mockPropertiesForDocManagement} cases={mockCases} />

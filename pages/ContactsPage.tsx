@@ -7,18 +7,22 @@ import {
     EnvelopeIcon, PhoneIcon, BuildingStorefrontIcon, UserTieIcon, BriefcaseIcon,
     UserCircleIcon, ScaleIcon, LightBulbIcon, BuildingLibraryIcon, BanknotesIcon, ListBulletIcon,
     DocumentDuplicateIcon, DocumentTextIcon, MapPinIcon, MagnifyingGlassIcon,
-    FunnelIcon, StarIcon, ShareIcon, SparklesIcon, ChatBubbleLeftRightIcon, ClockIcon
+    FunnelIcon, StarIcon, ShareIcon, SparklesIcon, ChatBubbleLeftRightIcon, ClockIcon,
+    ChevronRightIcon, ArrowPathIcon
 } from '../constants';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import PrintHeader from '../components/ui/PrintHeader';
 import { Contact, ContactType, Case, AdminTask } from '../types';
 import { contactTypeOptions } from '../constants';
 import { Badge } from '../components/ui/Badge';
 import { initialCases } from '../data/caseData';
 import { mockFinancialTransactions } from './FinancialManagementPage';
+import { geminiService } from '../services/geminiService';
+import ReactMarkdown from 'react-markdown';
 
 // Helper to get profile color based on name
 const getAvatarColor = (name: string) => {
@@ -30,14 +34,28 @@ const getAvatarColor = (name: string) => {
     return colors[Math.abs(hash) % colors.length];
 };
 
+const ContactStatCard: React.FC<{ title: string; count: number; colorClass: string; icon: React.ReactNode }> = ({ title, count, colorClass, icon }) => (
+  <div className={`bg-white dark:bg-dm-card p-6 rounded-3xl border-b-4 ${colorClass} shadow-sm flex items-center justify-between group hover:shadow-md transition-all`}>
+      <div>
+          <p className="text-[10px] uppercase font-black text-gray-400 mb-1 tracking-widest">{title}</p>
+          <p className="text-3xl font-black text-gray-900 dark:text-dm-text">{count}</p>
+      </div>
+      <div className="p-3 bg-gray-50 dark:bg-dm-background rounded-2xl text-gray-400 group-hover:scale-110 transition-transform">
+          {icon}
+      </div>
+  </div>
+);
+
 const initialMockContacts: Contact[] = [
-  { id: 'contact1', fullName: 'شركة الأمل للتجارة العامة', contactType: [ContactType.CLIENT], organization: 'شركة الأمل للتجارة العامة', emailPrimary: 'amal@example.com', phonePrimary: '22221111', whatsapp: '22221111', relatedCaseIds: ['1'], createdAt: '2023-01-10T10:00:00Z', city: 'مدينة الكويت', country: 'الكويت', notes: 'موكل رئيسي في قضايا تجارية متعددة.', jobTitle:'مدير عام', address: 'شرق، قطعة 1، شارع 2، مبنى 3', isFavorite: true, tags: ['كبار العملاء', 'عقد سنوي'] },
+  { id: 'contact1', fullName: 'شركة الأمل للتجارة العامة والمقاولات', contactType: [ContactType.CLIENT], organization: 'شركة الأمل للتجارة العامة', emailPrimary: 'amal@example.com', phonePrimary: '22221111', whatsapp: '22221111', relatedCaseIds: ['1'], createdAt: '2023-01-10T10:00:00Z', city: 'مدينة الكويت', country: 'الكويت', notes: 'موكل رئيسي في قضايا تجارية متعددة.', jobTitle:'مدير عام', address: 'شرق، قطعة 1، شارع 2، مبنى 3', isFavorite: true, tags: ['كبار العملاء', 'عقد سنوي'] },
   { id: 'contact2', fullName: 'سارة عبدالله أحمد', contactType: [ContactType.CLIENT, ContactType.FACT_WITNESS], emailPrimary: 'sara.a@example.com', phonePrimary: '55554444', relatedCaseIds: ['2'], createdAt: '2023-03-15T11:00:00Z', jobTitle: 'مديرة تسويق', organization: 'مؤسسة النور', phoneSecondary: '50505050', city: 'حولي', country: 'الكويت' },
-  { id: 'contact3', fullName: 'مؤسسة النور للمقاولات', contactType: [ContactType.OPPOSING_PARTY], organization: 'مؤسسة النور للمقاولات', emailPrimary: 'noor.corp@example.com', phonePrimary: '33336666', relatedCaseIds: ['5'], createdAt: '2023-05-01T12:00:00Z', address: 'الشويخ الصناعية، قطعة 3، قسيمة 100', city:'الشويخ', country:'الكويت' },
+  { id: 'contact3', fullName: 'مؤسسة النور الدولية للمقاولات', contactType: [ContactType.OPPOSING_PARTY], organization: 'مؤسسة النور الدولية', emailPrimary: 'noor.corp@example.com', phonePrimary: '33336666', relatedCaseIds: ['5'], createdAt: '2023-05-01T12:00:00Z', address: 'الشويخ الصناعية، قطعة 3، قسيمة 100', city:'الشويخ', country:'الكويت' },
   { id: 'contact4', fullName: 'د. علي حسين الخبير', contactType: [ContactType.EXPERT_WITNESS], emailPrimary: 'dr.ali.h@example.com', phonePrimary: '66667777', whatsapp: '66667777', jobTitle: 'خبير هندسي معتمد', organization: 'مكتب الخبرة الهندسية', createdAt: '2023-06-20T14:30:00Z', notes: 'خبير متخصص في تقييم الأضرار الإنشائية.', city: 'الفروانية' },
   { id: 'contact5', fullName: 'محمد جاسم الفضلي', contactType: [ContactType.FACT_WITNESS], phonePrimary: '99998888', relatedCaseIds: ['4'], createdAt: '2023-07-01T09:00:00Z', city: 'الجهراء' },
   { id: 'contact6', fullName: 'المحامي/ خالد ناصر السالم', contactType: [ContactType.OPPOSING_COUNSEL], organization: 'مكتب السالم للمحاماة', emailPrimary: 'khaled.salem@lawfirm.com', phonePrimary: '22445566', whatsapp: '22445566', createdAt: '2023-08-10T16:00:00Z', tags: ['قضايا تجارية'] },
-  { id: 'contact7', fullName: 'محكمة الاستئناف - قلم الكتاب', contactType: [ContactType.COURT_CLERK], organization: 'محكمة الاستئناف', phonePrimary: '22550011', createdAt: '2023-09-05T10:30:00Z', notes: 'للاستفسار عن مواعيد الجلسات في دائرة الاستئناف.', city: 'مجمع محاكم العاصمة' },
+  { id: 'contact7', fullName: 'محكمة الاستئناف - دائرة الإيجارات', contactType: [ContactType.COURT_CLERK], organization: 'مجمع المحاكم', phonePrimary: '22550011', createdAt: '2023-09-05T10:30:00Z', notes: 'للاستفسار عن مواعيد الجلسات في دائرة الاستئناف.', city: 'مجمع محاكم العاصمة' },
+  { id: 'contact8', fullName: 'البنك المركزي الكويتي', contactType: [ContactType.GOVERNMENT_ENTITY], organization: 'البنك المركزي', emailPrimary: 'info@cbk.gov.kw', phonePrimary: '1814444', createdAt: '2023-10-12T08:00:00Z', city: 'العاصمة', isFavorite: true },
+  { id: 'contact9', fullName: 'م. فهد الساير', contactType: [ContactType.EXPERT_WITNESS], jobTitle: 'خبير حسابي', organization: 'مكتب الساير للاستشارات', phonePrimary: '55667788', createdAt: '2023-11-20T11:00:00Z', tags: ['خبير حسابي', 'انتداب'], city: 'شرق' },
 ];
 
 const getContactTypeIcon = (type: ContactType): React.ReactNode => {
@@ -460,7 +478,6 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
     );
 };
 
-
 const ContactsPage: React.FC = () => {
   const [contacts, setContacts] = React.useState<Contact[]>(initialMockContacts);
   const [searchTerm, setSearchTerm] = React.useState('');
@@ -468,6 +485,12 @@ const ContactsPage: React.FC = () => {
   const [selectedContacts, setSelectedContacts] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'card' | 'list'>('card');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState<'current' | 'ai'>('current');
+
+  // AI Section State
+  const [aiQuery, setAiQuery] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Partial<Contact> | null>(null);
@@ -553,6 +576,21 @@ const ContactsPage: React.FC = () => {
     alert(`تم إرسال ${type} إلى ${recipients.length} مستلم بنجاح!`);
     setSelectedContacts([]); 
     setIsNotificationModalOpen(false);
+  };
+
+  const handleAIInsight = async () => {
+    if (!aiQuery.trim()) return;
+    setAiLoading(true);
+    try {
+        const contactContext = contacts.map(c => `- ${c.fullName} (${c.contactType.join(', ')})`).join('\n');
+        const prompt = `أنت مساعد قانوني ذكي متخصص في إدارة العلاقات والاتصالات. بناءً على قائمة جهات الاتصال التالية:\n${contactContext}\n\nالإجراء المطلوب: "${aiQuery}".\nيرجى تقديم المشورة المهنية، أو اقتراح كيفية تنظيم التواصل، أو تحليل العلاقات بين الأطراف المقترحة. اتبع أسلوباً قانونياً احترافياً ومختصراً.`;
+        const response = await geminiService.getChatbotResponse(prompt);
+        setAiResponse(response);
+    } catch (e) {
+        setAiResponse("عذراً، فشل المساعد الذكي في معالجة الطلب حالياً.");
+    } finally {
+        setAiLoading(false);
+    }
   };
 
   const handleExport = () => {
@@ -731,76 +769,191 @@ const ContactsPage: React.FC = () => {
   );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20">
-      {/* Header Section */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div>
-            <div className="flex items-center gap-3">
-                <UserGroupIcon className="w-10 h-10 text-primary" />
-                <h1 className="text-4xl font-black text-gray-900 tracking-tighter">إدارة جهات الاتصال</h1>
+    <div className="max-w-7xl mx-auto space-y-8 pb-32">
+      <PrintHeader title="دليل جهات الاتصال والشركاء" subtitle="قاعدة بيانات الموكلين والخبراء والخصوم المعتمدة" />
+
+      {/* --- Premium Header --- */}
+      <div className="relative overflow-hidden bg-primary-dark rounded-[2.5rem] p-10 text-white shadow-2xl">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-primary-light/10 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full translate-y-1/2 -translate-x-1/4 blur-3xl" />
+        
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="flex items-center gap-6 text-center md:text-right">
+                <div className="p-5 bg-white/10 backdrop-blur-xl rounded-3xl shadow-inner border border-white/20">
+                    <UserGroupIcon className="w-12 h-12 text-white" />
+                </div>
+                <div>
+                    <h1 className="text-4xl font-black tracking-tighter mb-2">إدارة جهات الاتصال</h1>
+                    <p className="text-primary-light/80 text-sm font-medium">قاعدة البيانات المركزية لجميع الأطراف والخبراء والعملاء</p>
+                </div>
             </div>
-            <div className="flex items-center gap-4 mt-2">
-                <span className="text-xs bg-primary/5 text-primary-dark px-2 py-1 rounded-lg border border-primary/10">الإجمالي: <strong>{stats.total}</strong></span>
-                <span className="text-xs bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg border border-emerald-100">الموكلين: <strong>{stats.clients}</strong></span>
-                <span className="text-xs bg-amber-50 text-amber-600 px-2 py-1 rounded-lg border border-amber-100">الخبراء: <strong>{stats.experts}</strong></span>
+            <div className="flex gap-4">
+                <Button 
+                    variant="secondary" 
+                    size="lg" 
+                    className="rounded-2xl px-8 shadow-xl shadow-amber-900/40 transform hover:scale-105 transition-all"
+                    onClick={handleAddContact}
+                >
+                    <PlusCircleIcon className="w-6 h-6 me-2" />
+                    إضافة جهة اتصال
+                </Button>
+                <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="rounded-2xl px-6 bg-white/5 border-white/20 text-white hover:bg-white/10"
+                    onClick={handleExport}
+                >
+                    <ShareIcon className="w-5 h-5 me-2" />
+                    تصدير البيانات
+                </Button>
             </div>
-        </div>
-        <div className="flex gap-2">
-             <Button onClick={() => handleExport()} variant="outline" leftIcon={<ShareIcon className="w-5 h-5"/>}>تصدير البيانات</Button>
-             <Button onClick={() => handleSendNotificationFlow()} leftIcon={<EnvelopeIcon className="w-5 h-5"/>} disabled={selectedContacts.length === 0} variant="secondary">
-                مراسلة ({selectedContacts.length})
-            </Button>
-            <Button onClick={handleAddContact} leftIcon={<PlusCircleIcon className="w-5 h-5" />} className="shadow-lg shadow-primary/20">جهة اتصال جديدة</Button>
         </div>
       </div>
       
-      {/* Search & Filter Bar */}
-      <Card className="border-none shadow-xl shadow-gray-200/50 p-6 rounded-3xl">
-        <div className="flex flex-col md:flex-row gap-4 items-center">
-            <div className="relative flex-grow w-full">
-                <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/>
-                <input 
-                    placeholder="ابحث بالاسم، الهاتف، البريد أو المنطقة..." 
-                    value={searchTerm} 
-                    onChange={e => setSearchTerm(e.target.value)}
-                    className="w-full pr-12 pl-4 py-4 bg-gray-50 dark:bg-dm-card/50 rounded-2xl border-2 border-transparent focus:border-primary focus:bg-white dark:focus:bg-dm-card transition-all outline-none text-sm font-bold"
-                />
-            </div>
-            <div className="flex gap-4 w-full md:w-auto">
-                <Select 
-                    options={[{value: '', label: 'كل التصنيفات'}, ...contactTypeOptions]} 
-                    value={filterType} 
-                    onChange={e => setFilterType(e.target.value as ContactType | '')} 
-                    containerClassName="mb-0 w-full md:w-56"
-                />
-                <button 
-                    onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-                    className={`px-4 py-3 rounded-2xl border-2 transition-all flex items-center gap-2 whitespace-nowrap ${showFavoritesOnly ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-gray-50 border-transparent text-gray-400'}`}
-                >
-                    <StarIcon className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`}/>
-                    <span className="text-sm font-bold">المفضلة</span>
-                </button>
-            </div>
-            <div className="flex p-1.5 bg-gray-100 dark:bg-dm-card rounded-2xl shadow-inner shrink-0">
-                <button onClick={() => setViewMode('card')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'card' ? 'bg-white shadow-md text-primary scale-110' : 'text-gray-400 hover:text-gray-600'}`} title="عرض البطاقات"><UserGroupIcon className="w-5 h-5"/></button>
-                <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-primary scale-110' : 'text-gray-400 hover:text-gray-600'}`} title="عرض الجدول"><ListBulletIcon className="w-5 h-5"/></button>
-            </div>
-        </div>
-      </Card>
+      {/* Stats Summary */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <ContactStatCard title="إجمالي الجهات" count={stats.total} colorClass="border-blue-500" icon={<UserGroupIcon className="w-6 h-6"/>} />
+          <ContactStatCard title="العملاء / الموكلين" count={stats.clients} colorClass="border-emerald-500" icon={<UserTieIcon className="w-6 h-6"/>} />
+          <ContactStatCard title="المحاكم / القضاة" count={stats.judges} colorClass="border-indigo-500" icon={<ScaleIcon className="w-6 h-6"/>} />
+          <ContactStatCard title="الخبراء المستقلين" count={stats.experts} colorClass="border-amber-500" icon={<LightBulbIcon className="w-6 h-6"/>} />
+      </div>
 
-      {/* Content Section */}
-      {filteredContacts.length > 0 ? (
-          viewMode === 'card' ? renderCardView() : renderListView()
-      ) : (
-          <div className="text-center py-24 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
-              <SparklesIcon className="w-20 h-20 mx-auto text-gray-200 mb-4"/>
-              <p className="text-xl font-black text-gray-400 tracking-tight">لا توجد نتائج مطابقة</p>
-              <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-black">جرب تغيير معايير البحث أو إضافة جهة اتصال جديدة</p>
-          </div>
-      )}
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-1 bg-white dark:bg-dm-card p-1.5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 w-fit">
+          {[
+              { id: 'current', label: 'دليل الاتصال', icon: ListBulletIcon },
+              { id: 'ai', label: 'المساعد الذكي للاتصال', icon: SparklesIcon },
+          ].map(tab => (
+              <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-xl text-xs font-black transition-all duration-300 ${activeTab === tab.id ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+              >
+                  <tab.icon className={`w-4 h-4 ${activeTab === tab.id ? 'text-white' : 'text-gray-300'}`} />
+                  {tab.label}
+              </button>
+          ))}
+      </div>
+
+      <AnimatePresence mode="wait">
+        {activeTab === 'current' ? (
+          <motion.div key="current" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-6">
+            {/* Search & Filter Bar */}
+            <Card className="border-none shadow-xl shadow-gray-200/50 p-6 rounded-3xl">
+              <div className="flex flex-col md:flex-row gap-4 items-center">
+                  <div className="relative flex-grow w-full">
+                      <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/>
+                      <input 
+                          placeholder="ابحث بالاسم، الهاتف، البريد أو المنطقة..." 
+                          value={searchTerm} 
+                          onChange={e => setSearchTerm(e.target.value)}
+                          className="w-full pr-12 pl-4 py-4 bg-gray-50 dark:bg-dm-card/50 rounded-2xl border-2 border-transparent focus:border-primary focus:bg-white dark:focus:bg-dm-card transition-all outline-none text-sm font-bold shadow-inner"
+                      />
+                  </div>
+                  <div className="flex gap-4 w-full md:w-auto">
+                      <Select 
+                          options={[{value: '', label: 'كل التصنيفات'}, ...contactTypeOptions]} 
+                          value={filterType} 
+                          onChange={e => setFilterType(e.target.value as ContactType | '')} 
+                          containerClassName="mb-0 w-full md:w-56"
+                          className="h-[52px] rounded-2xl border-gray-100"
+                      />
+                      <button 
+                          onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
+                          className={`px-4 py-3 rounded-2xl border-2 transition-all flex items-center gap-2 whitespace-nowrap ${showFavoritesOnly ? 'bg-amber-100 border-amber-200 text-amber-600' : 'bg-gray-50 border-transparent text-gray-400'}`}
+                      >
+                          <StarIcon className={`w-4 h-4 ${showFavoritesOnly ? 'fill-current' : ''}`}/>
+                          <span className="text-sm font-bold">المفضلة</span>
+                      </button>
+                  </div>
+                  <div className="flex p-1.5 bg-gray-100 dark:bg-dm-card rounded-2xl shadow-inner shrink-0 gap-1">
+                      <button onClick={() => setViewMode('card')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'card' ? 'bg-white shadow-md text-primary scale-105' : 'text-gray-400 hover:text-gray-600'}`} title="عرض البطاقات"><UserGroupIcon className="w-5 h-5"/></button>
+                      <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-xl transition-all ${viewMode === 'list' ? 'bg-white shadow-md text-primary scale-105' : 'text-gray-400 hover:text-gray-600'}`} title="عرض الجدول"><ListBulletIcon className="w-5 h-5"/></button>
+                  </div>
+              </div>
+            </Card>
+
+            {/* Bulk Actions Bar */}
+            {selectedContacts.length > 0 && (
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-primary/5 border border-primary/10 p-4 rounded-3xl flex justify-between items-center px-8 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <span className="text-primary font-black text-sm">تم تحديد {selectedContacts.length} من جهات الاتصال</span>
+                        <div className="w-px h-6 bg-primary/20"/>
+                        <button onClick={() => setSelectedContacts([])} className="text-xs font-bold text-gray-400 hover:text-primary transition-colors">إلغاء التحديد</button>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button size="sm" variant="primary" className="rounded-xl px-6" onClick={() => handleSendNotificationFlow()} leftIcon={<EnvelopeIcon className="w-4"/>}>مراسلة المجموعة</Button>
+                        <Button size="sm" variant="outline" className="rounded-xl bg-white text-rose-500 border-rose-100 hover:bg-rose-50" onClick={() => { if(confirm(`هل أنت متأكد من حذف ${selectedContacts.length} جهة اتصال؟`)) { setContacts(prev => prev.filter(c => !selectedContacts.includes(c.id))); setSelectedContacts([]); } }}>حذف المحدد</Button>
+                    </div>
+                </motion.div>
+            )}
+
+            {/* Content Section */}
+            {filteredContacts.length > 0 ? (
+                viewMode === 'card' ? renderCardView() : renderListView()
+            ) : (
+                <div className="text-center py-24 bg-gray-50 rounded-[2.5rem] border-3 border-dashed border-gray-200">
+                    <div className="bg-white w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
+                         <FunnelIcon className="w-10 h-10 text-gray-200"/>
+                    </div>
+                    <p className="text-xl font-black text-gray-400 tracking-tight">لا توجد نتائج مطابقة لبحثك</p>
+                    <p className="text-xs text-gray-400 mt-1 uppercase tracking-widest font-black">جرب تغيير معايير البحث أو إضافة جهة اتصال جديدة</p>
+                    <Button variant="ghost" className="mt-6 text-primary font-black" onClick={() => {setSearchTerm(''); setFilterType(''); setShowFavoritesOnly(false);}}>إعادة ضبط البحث</Button>
+                </div>
+            )}
+          </motion.div>
+        ) : (
+          <motion.div key="ai" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+              <Card className="p-10 rounded-[2.5rem] border-none shadow-2xl bg-gradient-to-br from-indigo-50/50 via-white to-white dark:from-dm-card dark:to-dm-card">
+                  <div className="flex items-center gap-4 mb-8">
+                      <div className="p-4 bg-indigo-600 rounded-3xl shadow-lg shadow-indigo-600/20">
+                          <SparklesIcon className="w-8 h-8 text-white" />
+                      </div>
+                      <div>
+                          <h3 className="text-2xl font-black text-indigo-900 dark:text-indigo-400 tracking-tighter">محلل التواصل الذكي</h3>
+                          <p className="text-sm text-indigo-700/60 font-medium">اطلب مشورة قانونية حول كيفية التواصل مع الخصوم أو تنظيم علاقاتك المهنية</p>
+                      </div>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-4 mb-10">
+                      <TextArea 
+                          placeholder="مثال: كيف يمكنني صياغة إشعار مهني لشركة الأمل حول تأخر الدفع؟ أو اقترح خطة لمقابلة الخبراء في قضية معينة..."
+                          value={aiQuery}
+                          onChange={(e) => setAiQuery(e.target.value)}
+                          containerClassName="flex-grow"
+                          rows={3}
+                          className="p-5 text-base border-2 border-indigo-100 focus:border-indigo-400 rounded-3xl bg-white/50 backdrop-blur-sm"
+                      />
+                      <Button 
+                          className="h-auto px-10 rounded-3xl text-lg font-black bg-indigo-600 hover:bg-indigo-700 shadow-xl shadow-indigo-600/30 w-full md:w-auto"
+                          onClick={handleAIInsight}
+                          isLoading={aiLoading}
+                      >
+                          تحليل واقتراح
+                      </Button>
+                  </div>
+
+                  {aiResponse && (
+                      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="p-8 bg-indigo-50/30 dark:bg-dm-background rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
+                          <div className="flex justify-between items-center mb-6">
+                              <span className="flex items-center gap-2 text-indigo-900 dark:text-indigo-400 font-black text-sm uppercase tracking-widest">
+                                  <div className="w-2 h-2 bg-indigo-400 rounded-full animate-ping" />
+                                  الرؤية الذكية المقترحة
+                              </span>
+                              <Button variant="ghost" size="sm" onClick={() => setAiResponse(null)} className="text-gray-400 hover:text-rose-500">مسح النتائج</Button>
+                          </div>
+                          <div className="markdown-body text-indigo-950 dark:text-gray-300 leading-relaxed max-w-none">
+                              <ReactMarkdown>{aiResponse}</ReactMarkdown>
+                          </div>
+                      </motion.div>
+                  )}
+              </Card>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Footer Info */}
-      <div className="flex justify-center flex-wrap gap-x-8 gap-y-2 opacity-50 text-[10px] font-black uppercase tracking-widest">
+      <div className="flex justify-center flex-wrap gap-x-8 gap-y-2 opacity-30 text-[9px] font-black uppercase tracking-[0.2em] pt-8">
           <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500 rounded-full"></div> موكلين</span>
           <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500 rounded-full"></div> خصوم</span>
           <span className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-500 rounded-full"></div> خبراء</span>

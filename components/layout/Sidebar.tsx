@@ -48,7 +48,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isSubmenuOpen, to
         >
           <div className="flex items-center">
             <item.icon className="w-5 h-5 me-3 flex-shrink-0" aria-hidden="true" />
-            <span className="truncate font-medium">{item.translationKey ? t(item.translationKey) : item.name}</span>
+            <span className="truncate font-medium">{item.translationKey ? t(item.translationKey, item.name) : item.name}</span>
           </div>
           <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isSubmenuOpen ? 'rotate-180' : ''}`} aria-hidden="true"/>
         </button>
@@ -68,7 +68,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isSubmenuOpen, to
                   }
                 >
                   <child.icon className="w-3.5 h-3.5 me-2 flex-shrink-0" aria-hidden="true"/>
-                  <span className="truncate font-normal">{child.translationKey ? t(child.translationKey) : child.name}</span>
+                  <span className="truncate font-normal">{child.translationKey ? t(child.translationKey, child.name) : child.name}</span>
                 </NavLink>
               </li>
             ))}
@@ -91,7 +91,7 @@ const SidebarNavItem: React.FC<SidebarNavItemProps> = ({ item, isSubmenuOpen, to
       }
     >
       <item.icon className="w-5 h-5 me-3 flex-shrink-0" aria-hidden="true"/>
-      <span className="truncate font-medium">{item.translationKey ? t(item.translationKey) : item.name}</span>
+      <span className="truncate font-medium">{item.translationKey ? t(item.translationKey, item.name) : item.name}</span>
     </NavLink>
   );
 };
@@ -148,7 +148,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, toggleSidebar }) => {
             <React.Fragment key={item.name}>
                 {item.sectionHeader && (
                     <div className="px-3 mt-4 mb-2 text-xs font-semibold text-primary-light/70 dark:text-gray-400 uppercase tracking-wider border-b border-primary-light/20 dark:border-gray-700/50 pb-1">
-                        {item.sectionTranslationKey ? t(item.sectionTranslationKey) : item.sectionHeader}
+                        {item.sectionTranslationKey ? t(item.sectionTranslationKey, item.sectionHeader) : item.sectionHeader}
                     </div>
                 )}
                 <SidebarNavItem 

@@ -1,12 +1,24 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { 
+    format, 
+    startOfMonth, 
+    endOfMonth, 
+    startOfWeek, 
+    endOfWeek, 
+    eachDayOfInterval, 
+    isSameMonth, 
+    isSameDay, 
+} from 'date-fns';
+import { ar } from 'date-fns/locale';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select'; 
 import TextArea from '../components/ui/TextArea'; 
 import Modal from '../components/ui/Modal'; 
 import { Hearing, Case, ExpertField, ExpertActionStatus, CourtLevel } from '../types';
+import { useCaseTask } from '../components/CaseTaskContext';
 import { initialCases } from '../data/caseData';
 import { 
     ListBulletIcon, 
@@ -218,14 +230,9 @@ const ViewEventModal: React.FC<{ event: ScheduleEvent | null; onClose: () => voi
     const relatedCase = isHearing ? initialCases.find(c => c.id === (event.rawSource as Hearing).caseId) : null;
 
     const handlePrint = () => {
-        const printContent = document.getElementById('printable-event-details');
-        if (printContent) {
-            const originalContents = document.body.innerHTML;
-            document.body.innerHTML = printContent.innerHTML;
+        setTimeout(() => {
             window.print();
-            document.body.innerHTML = originalContents;
-            window.location.reload(); 
-        }
+        }, 300);
     };
 
     return (
@@ -278,12 +285,172 @@ const ViewEventModal: React.FC<{ event: ScheduleEvent | null; onClose: () => voi
     );
 };
 
+// --- Calendar Components ---
+
+const MonthView: React.FC<{
+    currentDate: Date;
+    events: ScheduleEvent[];
+    onEventClick: (event: ScheduleEvent) => void;
+}> = ({ currentDate, events, onEventClick }) => {
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(monthStart);
+    const startDate = startOfWeek(monthStart, { weekStartsOn: 0 });
+    const endDate = endOfWeek(monthEnd, { weekStartsOn: 0 });
+
+    const calendarDays = eachDayOfInterval({
+        start: startDate,
+        end: endDate,
+    });
+
+    const weekDays = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+
+    return (
+        <div className="bg-white dark:bg-dm-card rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm animate-in fade-in zoom-in-95 duration-300">
+            <div className="grid grid-cols-7 border-b border-gray-50 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/30">
+                {weekDays.map(day => (
+                    <div key={day} className="py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest border-l last:border-l-0 dark:border-gray-800">
+                        {day}
+                    </div>
+                ))}
+            </div>
+            <div className="grid grid-cols-7 grid-rows-5 auto-rows-fr h-[650px]">
+                {calendarDays.map((day, idx) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const dayEvents = events.filter(e => e.date === dateStr);
+                    const isToday = isSameDay(day, new Date());
+                    const isCurrentMonth = isSameMonth(day, monthStart);
+
+                    return (
+                        <div 
+                            key={idx} 
+                            className={`min-h-[110px] p-2 border-l border-b last:border-l-0 dark:border-gray-800 transition-all group relative ${
+                                !isCurrentMonth ? 'bg-gray-50/30 dark:bg-gray-900/10 opacity-30 pointer-events-none' : 'bg-white dark:bg-dm-card hover:bg-gray-50/50 dark:hover:bg-gray-800/20'
+                            } ${isToday ? 'z-10' : ''}`}
+                        >
+                            <div className="flex justify-between items-start mb-2">
+                                <span className={`text-xs font-black w-7 h-7 flex items-center justify-center rounded-lg transition-all ${
+                                    isToday 
+                                        ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-110' 
+                                        : 'text-gray-400 group-hover:text-primary'
+                                }`}>
+                                    {format(day, 'd')}
+                                </span>
+                                {dayEvents.length > 0 && isCurrentMonth && (
+                                    <div className="flex -space-x-1 space-x-reverse opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="space-y-1 overflow-y-auto max-h-[85px] scrollbar-hide">
+                                {dayEvents.map(event => (
+                                    <div 
+                                        key={event.id}
+                                        onClick={() => onEventClick(event)}
+                                        className={`px-2 py-1 rounded-lg text-[9px] font-bold truncate cursor-pointer transition-all hover:translate-y-[-1px] shadow-sm hover:shadow-md border ${
+                                            event.type === 'Hearing' 
+                                                ? 'bg-blue-50 text-blue-700 border-blue-100 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800/50' 
+                                                : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800/50'
+                                        }`}
+                                    >
+                                        <span className="opacity-60 tabular-nums font-mono me-1">{event.time}</span>
+                                        {event.title}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+const WeekView: React.FC<{
+    currentDate: Date;
+    events: ScheduleEvent[];
+    onEventClick: (event: ScheduleEvent) => void;
+}> = ({ currentDate, events, onEventClick }) => {
+    const startDate = startOfWeek(currentDate, { weekStartsOn: 0 });
+    const weekDays = eachDayOfInterval({
+        start: startDate,
+        end: endOfWeek(startDate, { weekStartsOn: 0 }),
+    });
+
+    return (
+        <div className="bg-white dark:bg-dm-card rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm animate-in fade-in slide-in-from-right-4 duration-500">
+            <div className="grid grid-cols-7 h-[650px] divide-x divide-x-reverse divide-gray-100 dark:divide-gray-800">
+                {weekDays.map((day, idx) => {
+                    const dateStr = format(day, 'yyyy-MM-dd');
+                    const dayEvents = events.filter(e => e.date === dateStr);
+                    const isToday = isSameDay(day, new Date());
+
+                    return (
+                        <div key={idx} className={`flex flex-col transition-colors ${isToday ? 'bg-primary/[0.02] dark:bg-primary/[0.05]' : 'bg-white dark:bg-dm-card'}`}>
+                            <div className={`p-5 border-b dark:border-gray-800 text-center relative ${isToday ? 'bg-primary/[0.03]' : 'bg-gray-50/30'}`}>
+                                {isToday && <div className="absolute top-0 left-0 right-0 h-1 bg-primary" />}
+                                <div className={`text-[10px] font-black uppercase tracking-widest mb-1 ${isToday ? 'text-primary' : 'text-gray-400'}`}>
+                                    {format(day, 'EEEE', { locale: ar })}
+                                </div>
+                                <div className={`text-2xl font-black mx-auto w-12 h-12 flex items-center justify-center rounded-2xl transition-all ${
+                                    isToday 
+                                        ? 'bg-primary text-white shadow-xl shadow-primary/30 scale-105' 
+                                        : 'text-gray-800 dark:text-white group-hover:scale-110'
+                                }`}>
+                                    {format(day, 'd')}
+                                </div>
+                                <div className="mt-2 text-[9px] font-bold text-gray-300 tracking-tighter">
+                                    {format(day, 'MMM yyyy', { locale: ar })}
+                                </div>
+                            </div>
+                            <div className="flex-1 p-3 space-y-3 overflow-y-auto scrollbar-hide">
+                                {dayEvents.length === 0 ? (
+                                    <div className="h-full flex items-center justify-center opacity-10">
+                                        <div className="text-center">
+                                            <CalendarDaysIcon className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                                            <p className="text-[10px] text-gray-300 font-bold uppercase tracking-widest">فارغ</p>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    dayEvents.map(event => (
+                                        <div 
+                                            key={event.id}
+                                            onClick={() => onEventClick(event)}
+                                            className={`p-3.5 rounded-2xl border-r-4 shadow-sm cursor-pointer transition-all hover:translate-x-1 hover:shadow-md active:scale-95 group ${
+                                                event.type === 'Hearing' 
+                                                    ? 'bg-blue-50/50 border-blue-500 text-blue-900 hover:bg-blue-100/70 dark:bg-blue-900/10 dark:text-blue-100 dark:border-blue-800' 
+                                                    : 'bg-emerald-50/50 border-emerald-500 text-emerald-900 hover:bg-emerald-100/70 dark:bg-emerald-900/10 dark:text-emerald-100 dark:border-emerald-800'
+                                            }`}
+                                        >
+                                            <div className="text-[10px] font-black opacity-60 uppercase mb-2 flex items-center justify-between">
+                                                <span className="font-mono tabular-nums">{event.time}</span>
+                                                <div className={`p-1 rounded-md ${event.type === 'Hearing' ? 'bg-blue-100 dark:bg-blue-800' : 'bg-emerald-100 dark:bg-emerald-800'}`}>
+                                                    {event.type === 'Hearing' ? <GavelIcon className="w-3 h-3"/> : <UsersIcon className="w-3 h-3"/>}
+                                                </div>
+                                            </div>
+                                            <h5 className="text-[11px] font-black leading-tight line-clamp-3 mb-2 group-hover:text-primary transition-colors">{event.title}</h5>
+                                            <div className="flex items-center gap-1.5 text-[9px] opacity-70 font-bold">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-current opacity-30" />
+                                                <span className="truncate">{event.location}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
 // --- Main Page ---
 type ViewMode = 'day' | 'week' | 'month';
 type TabType = 'roll' | 'experts' | 'deadlines';
 
 const AutomatedDocketPage: React.FC = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
+    const { hearings, updateHearingStatus } = useCaseTask();
     const [activeTab, setActiveTab] = useState<TabType>('roll');
     const [viewMode, setViewMode] = useState<ViewMode>('day');
     const [filterType, setFilterType] = useState<'all' | 'hearings' | 'appointments'>('all');
@@ -293,7 +460,6 @@ const AutomatedDocketPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     
     // Data State
-    const [hearings, setHearings] = useState<Hearing[]>(allMockHearings);
     const [appointments, setAppointments] = useState<Appointment[]>(mockInitialAppointments);
     
     // Modals State
@@ -386,40 +552,14 @@ const AutomatedDocketPage: React.FC = () => {
     };
 
     // --- Filtering Logic ---
-    const filteredEvents = useMemo(() => {
+    const searchFilteredEvents = useMemo(() => {
         let filtered = allEvents;
-
+        
         // 0. Event Type Filter
         if (filterType === 'hearings') filtered = filtered.filter(e => e.type === 'Hearing');
         if (filterType === 'appointments') filtered = filtered.filter(e => e.type === 'Appointment');
 
-        // 1. Time Range Filter
-        if (viewMode === 'day') {
-            const dateStr = currentDate.toISOString().split('T')[0];
-            filtered = filtered.filter(e => e.date === dateStr);
-        } else if (viewMode === 'week') {
-            const startOfWeek = new Date(currentDate);
-            startOfWeek.setHours(0,0,0,0);
-            startOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
-            
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setHours(23,59,59,999);
-            endOfWeek.setDate(startOfWeek.getDate() + 6);
-
-            filtered = filtered.filter(e => {
-                const eDate = new Date(e.date);
-                return eDate >= startOfWeek && eDate <= endOfWeek;
-            });
-        } else if (viewMode === 'month') {
-            const month = currentDate.getMonth();
-            const year = currentDate.getFullYear();
-            filtered = filtered.filter(e => {
-                const eDate = new Date(e.date);
-                return eDate.getMonth() === month && eDate.getFullYear() === year;
-            });
-        }
-
-        // 2. Text Search
+        // 1. Text Search
         if (searchQuery.trim()) {
             const query = searchQuery.toLowerCase();
             filtered = filtered.filter(e => 
@@ -428,9 +568,19 @@ const AutomatedDocketPage: React.FC = () => {
                 e.location.toLowerCase().includes(query)
             );
         }
-
         return filtered;
-    }, [allEvents, viewMode, currentDate, searchQuery, filterType]);
+    }, [allEvents, searchQuery, filterType]);
+
+    const filteredEvents = useMemo(() => {
+        let filtered = searchFilteredEvents;
+
+        // 1. Time Range Filter (Only for List View / Day View)
+        if (viewMode === 'day') {
+            const dateStr = currentDate.toISOString().split('T')[0];
+            filtered = filtered.filter(e => e.date === dateStr);
+        }
+        return filtered;
+    }, [searchFilteredEvents, viewMode, currentDate]);
 
     // --- Grouping for Week/Month Views ---
     const groupedEvents = useMemo(() => {
@@ -520,15 +670,25 @@ const AutomatedDocketPage: React.FC = () => {
                 </div>
             </td>
             <td className="px-3 py-3 align-top">
-                <Badge 
-                    text={event.status} 
-                    variant={
-                        event.status === 'منتهية' || event.status === 'تم' ? 'success' : 
-                        event.status === 'مؤجلة' ? 'warning' : 
-                        event.status === 'ملغاة' || event.status === 'ملغي' ? 'danger' : 'primary'
-                    } 
-                    size="sm"
-                />
+                <div className="flex flex-col gap-1">
+                    <Badge 
+                        text={event.status} 
+                        variant={
+                            event.status === 'منتهية' || event.status === 'تم' || event.status === 'Completed' ? 'success' : 
+                            event.status === 'مؤجلة' || event.status === 'Postponed' ? 'warning' : 
+                            event.status === 'ملغاة' || event.status === 'ملغي' || event.status === 'Cancelled' ? 'danger' : 'primary'
+                        } 
+                        size="sm"
+                    />
+                    {event.type === 'Hearing' && event.status !== 'Completed' && event.status !== 'منتهية' && (
+                        <button 
+                            onClick={() => updateHearingStatus(event.id, 'Completed')}
+                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 underline text-right transition-colors"
+                        >
+                            تم الحضور (أتمتة المهام)
+                        </button>
+                    )}
+                </div>
             </td>
             <td className="px-3 py-3 text-[11px] text-gray-500 max-w-xs truncate print:max-w-none print:whitespace-normal align-top" title={event.notes}>
                 {event.notes || '---'}
@@ -677,7 +837,7 @@ const AutomatedDocketPage: React.FC = () => {
                             {t('add_new_appointment', { defaultValue: 'إضافة موعد جديد' })}
                         </Button>
                         <div className="flex border rounded-xl overflow-hidden bg-white dark:bg-dm-card">
-                            <button onClick={() => window.print()} className="p-2 hover:bg-gray-100 text-gray-600 border-l" title={t('print', { defaultValue: 'طباعة' })}><PrinterIcon className="w-5 h-5"/></button>
+                            <button onClick={() => setTimeout(() => window.print(), 350)} className="p-2 hover:bg-gray-100 text-gray-600 border-l" title={t('print', { defaultValue: 'طباعة' })}><PrinterIcon className="w-5 h-5"/></button>
                             <button onClick={handleExportCSV} className="p-2 hover:bg-gray-100 text-gray-600" title={t('export_excel', { defaultValue: 'تصدير Excel' })}><DocumentDuplicateIcon className="w-5 h-5"/></button>
                         </div>
                     </div>
@@ -745,74 +905,80 @@ const AutomatedDocketPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* List View */}
-                        <div className="bg-white dark:bg-dm-card rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
-                            {/* Filter Sub-Tabs */}
-                            <div className="px-6 py-4 border-b border-gray-50 flex flex-wrap gap-4 items-center justify-between print:hidden">
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => setFilterType('all')}
-                                        className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'all' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
-                                    >{t('all', { defaultValue: 'الكل' })}</button>
-                                    <button 
-                                        onClick={() => setFilterType('hearings')}
-                                        className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'hearings' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
-                                    >{t('hearings_only', { defaultValue: 'الجلسات فقط' })}</button>
-                                    <button 
-                                        onClick={() => setFilterType('appointments')}
-                                        className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'appointments' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
-                                    >{t('appointments_only', { defaultValue: 'المواعيد فقط' })}</button>
+                        {/* List / Calendar View Content */}
+                        {viewMode === 'day' ? (
+                            <div className="bg-white dark:bg-dm-card rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 overflow-hidden">
+                                {/* Filter Sub-Tabs */}
+                                <div className="px-6 py-4 border-b border-gray-50 flex flex-wrap gap-4 items-center justify-between print:hidden">
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => setFilterType('all')}
+                                            className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'all' ? 'bg-slate-800 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                                        >{t('all', { defaultValue: 'الكل' })}</button>
+                                        <button 
+                                            onClick={() => setFilterType('hearings')}
+                                            className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'hearings' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                                        >{t('hearings_only', { defaultValue: 'الجلسات فقط' })}</button>
+                                        <button 
+                                            onClick={() => setFilterType('appointments')}
+                                            className={`px-4 py-1.5 rounded-lg text-[11px] font-black transition-all ${filterType === 'appointments' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                                        >{t('appointments_only', { defaultValue: 'المواعيد فقط' })}</button>
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-bold">{t('showing_x_results', { count: filteredEvents.length, defaultValue: `عرض ${filteredEvents.length} نتيجة مختارة` })}</div>
                                 </div>
-                                <div className="text-[10px] text-gray-400 font-bold">{t('showing_x_results', { count: filteredEvents.length, defaultValue: `عرض ${filteredEvents.length} نتيجة مختارة` })}</div>
-                            </div>
 
-                            {/* Print Header Visible ONLY in Print */}
-                            <div className="hidden print:block p-8 border-b-2 border-black">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="text-right">
-                                        <h2 className="text-2xl font-black mb-1">{t('report_for', { type: filterType === 'hearings' ? t('hearings_count', { defaultValue: 'الجلسات' }) : filterType === 'appointments' ? t('appointments_count', { defaultValue: 'المواعيد' }) : t('general_roll', { defaultValue: 'الرول العام' }), defaultValue: `كشف ${filterType === 'hearings' ? 'الجلسات' : filterType === 'appointments' ? 'المواعيد' : 'الرول العام'}` })}</h2>
-                                        <p className="text-sm font-bold text-gray-600">{t('period', { defaultValue: 'الفترة' })}: {getRangeLabel()}</p>
+                                {/* Print Header */}
+                                <div className="hidden print:block p-8 border-b-2 border-black">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="text-right">
+                                            <h2 className="text-2xl font-black mb-1">{t('report_for', { type: filterType === 'hearings' ? t('hearings_count', { defaultValue: 'الجلسات' }) : filterType === 'appointments' ? t('appointments_count', { defaultValue: 'المواعيد' }) : t('general_roll', { defaultValue: 'الرول العام' }), defaultValue: `كشف ${filterType === 'hearings' ? 'الجلسات' : filterType === 'appointments' ? 'المواعيد' : 'الرول العام'}` })}</h2>
+                                            <p className="text-sm font-bold text-gray-600">{t('period', { defaultValue: 'الفترة' })}: {getRangeLabel()}</p>
+                                        </div>
+                                        <div className="p-4 border-2 border-black rounded-xl">
+                                            <div className="text-center font-black text-xl mb-1">{t('justice', { defaultValue: 'عدالة' })}</div>
+                                            <div className="text-[8px] uppercase tracking-widest font-bold">Kuwait Legal Management</div>
+                                        </div>
                                     </div>
-                                    <div className="p-4 border-2 border-black rounded-xl">
-                                        <div className="text-center font-black text-xl mb-1">{t('justice', { defaultValue: 'عدالة' })}</div>
-                                        <div className="text-[8px] uppercase tracking-widest font-bold">Kuwait Legal Management</div>
+                                    <div className="grid grid-cols-3 gap-8 text-[10px] font-bold text-gray-500">
+                                        <div>{t('print_date', { defaultValue: 'تاريخ الطباعة' })}: {new Date().toLocaleDateString('ar-EG')}</div>
+                                        <div className="text-center">{t('by', { defaultValue: 'بواسطة' })}: {window.location.hostname}</div>
+                                        <div className="text-left">{t('records_count', { defaultValue: 'عدد السجلات' })}: {filteredEvents.length}</div>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-3 gap-8 text-[10px] font-bold text-gray-500">
-                                    <div>{t('print_date', { defaultValue: 'تاريخ الطباعة' })}: {new Date().toLocaleDateString('ar-EG')}</div>
-                                    <div className="text-center">{t('by', { defaultValue: 'بواسطة' })}: {window.location.hostname}</div>
-                                    <div className="text-left">{t('records_count', { defaultValue: 'عدد السجلات' })}: {filteredEvents.length}</div>
-                                </div>
-                            </div>
 
-                            {filteredEvents.length === 0 ? (
-                                <div className="text-center py-20">
-                                    <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <ClockIcon className="w-10 h-10 text-gray-300" />
+                                {filteredEvents.length === 0 ? (
+                                    <div className="text-center py-20">
+                                        <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                                            <ClockIcon className="w-10 h-10 text-gray-300" />
+                                        </div>
+                                        <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('no_current_records', { defaultValue: 'لا توجد سجلات حالية' })}</h3>
+                                        <p className="text-sm text-gray-500">{t('try_changing_filters', { defaultValue: 'جرب تغيير التاريخ أو معايير البحث' })}</p>
                                     </div>
-                                    <h3 className="text-lg font-bold text-gray-800 dark:text-white">{t('no_current_records', { defaultValue: 'لا توجد سجلات حالية' })}</h3>
-                                    <p className="text-sm text-gray-500">{t('try_changing_filters', { defaultValue: 'جرب تغيير التاريخ أو معايير البحث' })}</p>
-                                </div>
-                            ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="min-w-full text-sm text-right">
-                                        <thead className="bg-gray-50 dark:bg-dm-card border-b text-gray-500 dark:text-gray-400">
-                                            <tr>
-                                                <th className="px-4 py-4 font-black">{t('time', { defaultValue: 'الوقت' })}</th>
-                                                <th className="px-4 py-4 font-black">{t('event_case_details', { defaultValue: 'تفاصيل الحدث / القضية' })}</th>
-                                                <th className="px-4 py-4 font-black">{t('location_court', { defaultValue: 'المكان / المحكمة' })}</th>
-                                                <th className="px-4 py-4 font-black">{t('admin_status', { defaultValue: 'الحالة الإدارية' })}</th>
-                                                <th className="px-4 py-4 font-black">{t('member_notes', { defaultValue: 'ملاحظات العضو' })}</th>
-                                                <th className="px-4 py-4 font-black text-left print:hidden">{t('actions', { defaultValue: 'إجراءات' })}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                            {filteredEvents.map(event => <EventRow key={event.id} event={event} />)}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full text-sm text-right">
+                                            <thead className="bg-gray-50 dark:bg-dm-card border-b text-gray-500 dark:text-gray-400">
+                                                <tr>
+                                                    <th className="px-4 py-4 font-black">{t('time', { defaultValue: 'الوقت' })}</th>
+                                                    <th className="px-4 py-4 font-black">{t('event_case_details', { defaultValue: 'تفاصيل الحدث / القضية' })}</th>
+                                                    <th className="px-4 py-4 font-black">{t('location_court', { defaultValue: 'المكان / المحكمة' })}</th>
+                                                    <th className="px-4 py-4 font-black">{t('admin_status', { defaultValue: 'الحالة الإدارية' })}</th>
+                                                    <th className="px-4 py-4 font-black">{t('member_notes', { defaultValue: 'ملاحظات العضو' })}</th>
+                                                    <th className="px-4 py-4 font-black text-left print:hidden">{t('actions', { defaultValue: 'إجراءات' })}</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
+                                                {filteredEvents.map(event => <EventRow key={event.id} event={event} />)}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </div>
+                        ) : viewMode === 'week' ? (
+                            <WeekView currentDate={currentDate} events={searchFilteredEvents} onEventClick={setViewEvent} />
+                        ) : (
+                            <MonthView currentDate={currentDate} events={searchFilteredEvents} onEventClick={setViewEvent} />
+                        )}
                     </motion.div>
                 )}
 

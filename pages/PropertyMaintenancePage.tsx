@@ -184,13 +184,13 @@ const ViewMaintenanceRequestModal: React.FC<{ request: MaintenanceRequest | null
                 <p><strong>العقار/الوحدة:</strong> {request.propertyName} {request.propertyUnitName ? `/ ${request.propertyUnitName}` : ''}</p>
                 <p><strong>المُبلِّغ:</strong> {request.reportedBy} ({request.reporterContact || 'لا يوجد اتصال'})</p>
                 <p><strong>تاريخ الطلب:</strong> {formatDate(request.requestDate)}</p>
-                <p><strong>الوصف:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-gray-100 border rounded">{request.description}</pre></p>
+                <div className="mb-2"><strong>الوصف:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-gray-100 border rounded mt-1">{request.description}</pre></div>
                 <p><strong>الفئة:</strong> {request.category} | <strong>الأولوية:</strong> {request.priority} | <strong>الحالة:</strong> <MaintenanceStatusBadge status={request.status} size="sm"/></p>
                 <p><strong>المقاول/الفني:</strong> {request.assignedToVendorName || '-'}</p>
                 <p><strong>تاريخ الجدولة:</strong> {formatDate(request.scheduledDate)} | <strong>تاريخ الإنجاز:</strong> {formatDate(request.completionDate)}</p>
                 <p><strong>التكلفة التقديرية:</strong> {formatCurrency(request.estimatedCost)} | <strong>التكلفة الفعلية:</strong> {formatCurrency(request.cost)} {request.invoiceNumber && `(فاتورة: ${request.invoiceNumber})`}</p>
-                {request.notes && <p><strong>ملاحظات:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-yellow-50 border rounded">{request.notes}</pre></p>}
-                {request.completionNotes && <p><strong>ملاحظات الإنجاز:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-green-50 border rounded">{request.completionNotes}</pre></p>}
+                {request.notes && <div className="mb-2"><strong>ملاحظات:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-yellow-50 border rounded mt-1">{request.notes}</pre></div>}
+                {request.completionNotes && <div className="mb-2"><strong>ملاحظات الإنجاز:</strong> <pre className="whitespace-pre-wrap font-sans text-xs p-1 bg-green-50 border rounded mt-1">{request.completionNotes}</pre></div>}
                 {request.attachments && request.attachments.length > 0 && <div><strong>المرفقات:</strong> {request.attachments.map(att => att.name).join(', ')}</div>}
             </div>
         </Modal>

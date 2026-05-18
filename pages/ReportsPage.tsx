@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { motion } from 'motion/react';
+import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useTranslation } from 'react-i18next';
+import ReactMarkdown from 'react-markdown';
 import Card from '../components/ui/Card';
 import {
     PresentationChartLineIcon,
@@ -38,34 +39,38 @@ import {
     LightBulbIcon,
     ArrowsRightLeftIcon,
     ChartBarIcon,
-    ChartPieIcon
+    ChartPieIcon,
+    PlusCircleIcon,
+    TrashIcon,
+    PencilIcon,
+    EyeIcon,
+    DocumentDuplicateIcon,
+    ListBulletIcon,
+    ChevronDownIcon,
+    PaperAirplaneIcon
 } from '../constants';
-import { format, subMonths, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
-import { arSA } from 'date-fns/locale/ar-SA';
+import PrintHeader from '../components/ui/PrintHeader';
+import { format } from 'date-fns';
 import { 
     PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, 
-    ResponsiveContainer, Cell, LabelList, LineChart, Line, AreaChart, Area,
-    ComposedChart
+    ResponsiveContainer, Cell, AreaChart, Area
 } from 'recharts';
 import { 
-    Case, CaseStatus, ComplianceRequirement, ComplianceStatus as ComplianceStatusEnum, 
-    RiskLevel, AdminTask, AdminTaskStatus, AdminTaskPriority, FinancialTransaction, 
-    FinancialTransactionType, LegalRepresentationRequest, RepresentationRequestStatus, 
-    CourtLevel, CompliancePriority, PropertyUnitStatus, JudgmentOutcome
+    CaseStatus, AdminTaskStatus, JudgmentOutcome
 } from '../types';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import Select from '../components/ui/Select';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { PriorityBadge, CaseStatusBadge, RiskLevelBadge, ComplianceStatusBadge, RepresentationRequestStatusBadge, AdminTaskStatusBadge, CompliancePriorityBadge, Badge } from '../components/ui/Badge';
+import { geminiService } from '../services/geminiService';
+import { Badge } from '../components/ui/Badge';
+import { useCaseTask } from '../components/CaseTaskContext';
 
 // Import constants and data
 import { initialCases as mockCasesDataFromList } from '../data/caseData';
-import initialMockTasks from './TaskManagementPage';
-import { initialComplianceData } from './CompliancePage';
+import { initialMockTasks } from '../data/taskData';
 import { mockFinancialTransactions } from './FinancialManagementPage';
-import { mockLegalRepresentationRequests } from './LegalRepresentationPage'; 
-import { mockProperties, mockRentPayments, mockLeaseAgreements } from '../data/propertyData';
+import { mockProperties } from '../data/propertyData';
 
 const formatCurrency = (amount?: number, t?: any): string => {
     if (amount === undefined || isNaN(amount)) return '-';
@@ -82,33 +87,48 @@ const formatDateForReport = (dateString?: string): string => {
   } catch (e) { return dateString; } 
 };
 
-// --- Custom Components ---
+// --- MOCK DATA ---
+interface SavedReport {
+    id: string;
+    title: string;
+    category: string;
+    type: 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+    date: string;
+    description: string;
+    status: 'READY' | 'PROCESSING' | 'FAILED';
+    dataCount: number;
+}
+
+const INITIAL_SAVED_REPORTS: SavedReport[] = [
+    { id: 'rep-001', title: 'تقرير القضايا الأسبوعي - مايو 2024', category: 'cases', type: 'WEEKLY', date: '2024-05-12', description: 'ملخص شامل للقضايا المفتوحة والمغلقة خلال الأسبوع الثاني من مايو.', status: 'READY', dataCount: 45 },
+    { id: 'rep-002', title: 'تحليل الإيرادات الشهري - أبريل 2024', category: 'financial', type: 'MONTHLY', date: '2024-04-30', description: 'تقرير مالي مفصل للتدفقات النقدية والمصروفات لشهر أبريل.', status: 'READY', dataCount: 120 },
+    { id: 'rep-003', title: 'مؤشرات أداء المحامين - الربع الأول', category: 'staff', type: 'CUSTOM', date: '2024-03-31', description: 'تقييم كفاءة الفريق القانوني بناءً على زمن المعالجة ومعدل النجاح.', status: 'READY', dataCount: 12 },
+    { id: 'rep-004', title: 'تقرير الامتثال الضريبي والقانوني', category: 'compliance', type: 'MONTHLY', date: '2024-05-01', description: 'مراجعة دورية للمتطلبات التنظيمية والمواعيد النهائية.', status: 'READY', dataCount: 28 },
+];
 
 const StatCard = ({ label, value, icon, trend, trendValue, color, bg }: any) => (
     <motion.div 
         whileHover={{ scale: 1.02, y: -5 }}
-        className={`${bg} p-6 rounded-[32px] border border-transparent hover:border-black/5 transition-all shadow-sm relative overflow-hidden group`}
+        className="bg-white dark:bg-dm-card p-6 rounded-[32px] border border-gray-100 dark:border-gray-800 transition-all shadow-xl shadow-gray-200/20 relative overflow-hidden group"
     >
-        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity transform translate-x-4 -translate-y-4">
-            {React.cloneElement(icon, { size: 120, className: "w-32 h-32" })}
+        <div className={`absolute -right-4 -bottom-4 opacity-5 group-hover:opacity-10 transition-opacity transform rotate-12 ${color}`}>
+            {React.cloneElement(icon, { className: "w-32 h-32" })}
         </div>
         <div className="relative z-10">
-            <div className="flex justify-between items-start mb-6">
-                <div className={`p-4 rounded-2xl bg-white shadow-xl shadow-${color}/5 ${color}`}>{icon}</div>
+            <div className="flex justify-between items-start mb-4">
+                <div className={`p-4 rounded-2xl bg-gradient-to-br ${bg} shadow-lg text-white`}>{icon}</div>
                 {trend && (
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black ${trend === 'up' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                    <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black ${trend === 'up' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
                         {trend === 'up' ? <ArrowUpCircleIcon className="w-3 h-3"/> : <ArrowDownCircleIcon className="w-3 h-3"/>}
                         {trendValue}
                     </div>
                 )}
             </div>
-            <p className="text-3xl font-black text-gray-900 leading-none mb-2 tracking-tighter">{value}</p>
+            <p className="text-3xl font-black text-gray-900 dark:text-dm-text leading-none mb-2 tracking-tighter" dir="ltr">{value}</p>
             <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest">{label}</p>
         </div>
     </motion.div>
 );
-
-// --- Config ---
 
 const STATUS_COLORS_REPORTS: Record<string, string> = {
     ...CASE_STATUS_CHART_COLORS,
@@ -117,11 +137,6 @@ const STATUS_COLORS_REPORTS: Record<string, string> = {
     ...TASK_PRIORITY_COLORS,
     ...COMPLIANCE_STATUS_CHART_COLORS,
     ...RepresentationRequestStatusChartColors,
-    [AdminTaskStatus.TODO]: '#6366f1',
-    [AdminTaskStatus.IN_PROGRESS]: '#f59e0b',
-    [AdminTaskStatus.COMPLETED]: '#10b981',
-    [AdminTaskStatus.BLOCKED]: '#ef4444',
-    [AdminTaskStatus.CANCELLED]: '#9ca3af'
 };
 
 interface ReportCategoryDefinition {
@@ -133,56 +148,48 @@ interface ReportCategoryDefinition {
 
 const ReportsPage: React.FC = () => {
     const { t } = useTranslation();
+    const { cases: mockCasesDataFromList, tasks: initialMockTasks } = useCaseTask();
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'generator' | 'archive' | 'ai'>('dashboard');
+    const [savedReports, setSavedReports] = useState<SavedReport[]>(INITIAL_SAVED_REPORTS);
+    const [archiveSearchTerm, setArchiveSearchTerm] = useState('');
+    const [archiveFilterCategory, setArchiveFilterCategory] = useState('');
+
     const reportCategories: ReportCategoryDefinition[] = useMemo(() => [
         {
-            value: 'cases', label: t('case_statistics', { defaultValue: 'إحصائيات القضايا' }), icon: <BriefcaseIcon className="w-5 h-5" />,
+            value: 'cases', label: 'إحصائيات القضايا', icon: <BriefcaseIcon className="w-5 h-5" />,
             subReports: [
-                { value: 'caseStatusDistribution', label: t('case_status_distribution', { defaultValue: 'توزيع القضايا حسب الحالة' }), icon: <ChartPieIcon className="w-4 h-4" /> },
-                { value: 'lawyerWorkload', label: t('lawyer_workload', { defaultValue: 'كثافة العمل لكل محامي' }), icon: <UsersIcon className="w-4 h-4" /> },
-                { value: 'successRate', label: t('success_rate_judgments', { defaultValue: 'معدل النجاح في الأحكام' }), icon: <CheckBadgeIcon className="w-4 h-4" /> },
-                { value: 'caseRiskProfile', label: t('case_risk_profile', { defaultValue: 'ملف المخاطر للقضايا' }), icon: <ShieldCheckIcon className="w-4 h-4" /> },
-                { value: 'courtStagesInfo', label: t('court_stages_distribution', { defaultValue: 'توزيع مراحل التقاضي' }), icon: <BuildingOffice2Icon className="w-4 h-4" /> },
+                { value: 'caseStatusDistribution', label: 'توزيع القضايا حسب الحالة', icon: <ChartPieIcon className="w-4 h-4" /> },
+                { value: 'lawyerWorkload', label: 'كثافة العمل لكل محامي', icon: <UsersIcon className="w-4 h-4" /> },
+                { value: 'successRate', label: 'معدل النجاح في الأحكام', icon: <CheckBadgeIcon className="w-4 h-4" /> },
             ],
         },
         {
-            value: 'financial', label: t('financial_analysis', { defaultValue: 'التحليل المالي' }), icon: <BanknotesIcon className="w-5 h-5" />,
+            value: 'financial', label: 'التحليل المالي', icon: <BanknotesIcon className="w-5 h-5" />,
             subReports: [
-                { value: 'revenueAnalysis', label: t('monthly_revenue_analysis', { defaultValue: 'تحليل الإيرادات الشهرية' }), icon: <PresentationChartLineIcon className="w-4 h-4" /> },
-                { value: 'expenseStructure', label: t('operational_expense_structure', { defaultValue: 'هيكل المصروفات التشغيلية' }), icon: <ChartPieIcon className="w-4 h-4" /> },
-                { value: 'profitabilityByCaseType', label: t('profitability_by_case_type', { defaultValue: 'الربحية حسب النوع' }), icon: <BanknotesIcon className="w-4 h-4" /> },
-                { value: 'receivablesAgeing', label: t('receivables_ageing', { defaultValue: 'أعمار المستحقات المتأخرة' }), icon: <ClockIcon className="w-4 h-4" /> },
+                { value: 'revenueAnalysis', label: 'تحليل الإيرادات الشهرية', icon: <PresentationChartLineIcon className="w-4 h-4" /> },
+                { value: 'expenseStructure', label: 'هيكل المصروفات التشغيلية', icon: <ChartPieIcon className="w-4 h-4" /> },
             ],
         },
         {
-            value: 'staff', label: t('staff_efficiency', { defaultValue: 'كفاءة الموظفين' }), icon: <UsersIcon className="w-5 h-5" />,
+            value: 'staff', label: 'كفاءة الموظفين', icon: <UsersIcon className="w-5 h-5" />,
             subReports: [
-                { value: 'taskCompletionRatio', label: t('total_task_completion_rate', { defaultValue: 'معدل إنجاز المهام الكلي' }), icon: <ClipboardDocumentListIcon className="w-4 h-4" /> },
-                { value: 'staffWorkload', label: t('active_tasks_distribution', { defaultValue: 'توزيع المهام النشطة' }), icon: <FunnelIcon className="w-4 h-4" /> },
-                { value: 'avgResolutionTime', label: t('avg_request_resolution_time', { defaultValue: 'متوسط زمن معالجة الطلبات' }), icon: <ClockIcon className="w-4 h-4" /> },
+                { value: 'taskCompletionRatio', label: 'معدل إنجاز المهام الكلي', icon: <ClipboardDocumentListIcon className="w-4 h-4" /> },
             ],
         },
-        {
-            value: 'compliance', label: t('legal_compliance', { defaultValue: 'الامتثال القانوني' }), icon: <ShieldCheckIcon className="w-5 h-5" />,
-            subReports: [
-                { value: 'complianceOverview', label: t('general_compliance_map', { defaultValue: 'خارطة الامتثال العامة' }), icon: <DocumentTextIcon className="w-4 h-4" /> },
-                { value: 'regulatoryRisk', label: t('pending_regulatory_risks', { defaultValue: 'المخاطر التنظيمية المعلقة' }), icon: <AcademicCapIcon className="w-4 h-4" /> },
-            ],
-        },
-    ], [t]);
+    ], []);
 
     const timePeriodOptions = useMemo(() => [
-        { value: 'all', label: t('all_times', { defaultValue: 'كل الأوقات' }) },
-        { value: 'last7days', label: t('last_7_days', { defaultValue: 'آخر 7 أيام' }) },
-        { value: 'last30days', label: t('last_30_days', { defaultValue: 'آخر 30 يومًا' }) },
-        { value: 'currentMonth', label: t('current_month', { defaultValue: 'الشهر الحالي' }) },
-        { value: 'currentQuarter', label: t('current_quarter', { defaultValue: 'الربع الحالي' }) },
-        { value: 'currentYear', label: t('current_year', { defaultValue: 'السنة المالية الحالية' }) },
-        { value: 'customRange', label: t('custom_range', { defaultValue: 'نطاق مخصص' }) },
-    ], [t]);
+        { value: 'all', label: 'كل الأوقات' },
+        { value: 'last7days', label: 'آخر 7 أيام' },
+        { value: 'last30days', label: 'آخر 30 يومًا' },
+        { value: 'currentMonth', label: 'الشهر الحالي' },
+        { value: 'customRange', label: 'نطاق مخصص' },
+    ], []);
 
     const [selectedCategory, setSelectedCategory] = useState<string>('cases');
     const [selectedReport, setSelectedReport] = useState<string>('caseStatusDistribution');
     const [selectedTimePeriod, setSelectedTimePeriod] = useState<string>('all');
+    const [reportFrequency, setReportFrequency] = useState<string>('ONCE');
     const [customStartDate, setCustomStartDate] = useState<string>('');
     const [customEndDate, setCustomEndDate] = useState<string>('');
     
@@ -190,148 +197,124 @@ const ReportsPage: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [chartType, setChartType] = useState<'pie' | 'bar' | 'line' | 'area' | 'list'>('bar'); 
     const [reportTitle, setReportTitle] = useState<string>('');
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+
+    // AI Chat State
+    const [chatMessages, setChatMessages] = useState<{role: 'user' | 'model', content: string}[]>([
+        { role: 'model', content: 'أنا مساعدك التحليلي الذكي. كيف يمكنني مساعدتك في تحليل البيانات اليوم؟' }
+    ]);
+    const [chatInput, setChatInput] = useState('');
+    const [isAiThinking, setIsAiThinking] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
+    useEffect(() => { if (activeTab === 'ai') scrollToBottom(); }, [chatMessages, activeTab]);
+
+    const handleSendAiMessage = async () => {
+        if (!chatInput.trim() || isAiThinking) return;
+        const userMsg = chatInput;
+        setChatInput('');
+        setChatMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        setIsAiThinking(true);
+        try {
+            const context = `Context: Lawyer firm analytics. Total cases: ${mockCasesDataFromList.length}.`;
+            const response = await geminiService.getChatbotResponse(context + "\n" + userMsg, []);
+            setChatMessages(prev => [...prev, { role: 'model', content: response }]);
+        } catch (err) {
+            setChatMessages(prev => [...prev, { role: 'model', content: 'عذراً، واجهت مشكلة.' }]);
+        } finally { setIsAiThinking(false); }
+    };
 
     const currentSubReportOptions = useMemo(() => {
         return reportCategories.find(cat => cat.value === selectedCategory)?.subReports || [];
-    }, [selectedCategory]);
+    }, [selectedCategory, reportCategories]);
 
     const kpis = useMemo(() => ([
-        { label: t('open_cases', { defaultValue: 'القضايا المفتوحة' }), value: mockCasesDataFromList.filter(c => c.status !== CaseStatus.CLOSED).length, icon: <BriefcaseIcon className="w-6 h-6"/>, trend: 'up', trendValue: '12%', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: t('upcoming_hearings_week', { defaultValue: 'جلسات قادمة (أسبوع)' }), value: mockCasesDataFromList.filter(c => c.nextHearingDate && new Date(c.nextHearingDate) < new Date(Date.now() + 7 * 86400000)).length, icon: <CalendarDaysIcon className="w-6 h-6"/>, trend: 'down', trendValue: '4%', color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: t('success_rate_long', { defaultValue: 'نسبة النجاح' }), value: `${Math.round((mockCasesDataFromList.filter(c => c.judgmentOutcome === JudgmentOutcome.WON).length / (mockCasesDataFromList.filter(c => c.judgmentOutcome).length || 1)) * 100)}%`, icon: <CheckBadgeIcon className="w-6 h-6"/>, trend: 'up', trendValue: '1.2%', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: t('revenue_collection', { defaultValue: 'تحصيل الإيرادات' }), value: formatCurrency(mockFinancialTransactions.filter(f => f.amount > 0).reduce((sum, f) => sum + f.amount, 0), t).split(' ')[0], icon: <BanknotesIcon className="w-6 h-6"/>, trend: 'up', trendValue: '8%', color: 'text-blue-600', bg: 'bg-blue-50' },
-    ]), [t, formatCurrency]);
+        { label: 'القضايا المفتوحة', value: mockCasesDataFromList.filter(c => c.status !== CaseStatus.CLOSED).length, icon: <BriefcaseIcon className="w-6 h-6"/>, trend: 'up', trendValue: '12%', color: 'text-indigo-600', bg: 'from-indigo-600 to-indigo-700' },
+        { label: 'جلسات قادمة (أسبوع)', value: mockCasesDataFromList.filter(c => c.nextHearingDate && new Date(c.nextHearingDate) < new Date(Date.now() + 7 * 86400000)).length, icon: <CalendarDaysIcon className="w-6 h-6"/>, trend: 'down', trendValue: '4%', color: 'text-amber-600', bg: 'from-amber-500 to-amber-600' },
+        { label: 'نسبة النجاح', value: `${Math.round((mockCasesDataFromList.filter(c => c.judgmentOutcome === JudgmentOutcome.WON).length / (mockCasesDataFromList.filter(c => c.judgmentOutcome).length || 1)) * 100)}%`, icon: <CheckBadgeIcon className="w-6 h-6"/>, trend: 'up', trendValue: '1.2%', color: 'text-emerald-600', bg: 'from-emerald-500 to-emerald-600' },
+        { label: 'تحصيل الإيرادات', value: formatCurrency(mockFinancialTransactions.reduce((sum, f) => sum + f.amount, 0), t).split(' ')[0], icon: <BanknotesIcon className="w-6 h-6"/>, trendValue: '8%', color: 'text-blue-600', bg: 'from-blue-600 to-blue-700' },
+        { label: 'المهام المنجزة', value: initialMockTasks.filter(t => t.status === AdminTaskStatus.COMPLETED).length, icon: <ClipboardDocumentListIcon className="w-6 h-6"/>, color: 'text-violet-600', bg: 'from-violet-500 to-violet-600' },
+        { label: 'الأصول المدارة', value: mockProperties.length, icon: <BuildingOffice2Icon className="w-6 h-6"/>, color: 'text-slate-600', bg: 'from-slate-600 to-slate-700' },
+    ]), [t]);
 
     const generateReport = useCallback(async () => {
         setIsLoading(true);
         setReportData(null);
-        await new Promise(r => setTimeout(r, 800));
-
+        await new Promise(r => setTimeout(r, 600));
         let data: any = { chartData: [], listData: [] };
         let newChartType: any = 'bar';
         
-        // --- Filtering Logic ---
-        const filterByTime = (dateStr: string) => {
-            if (selectedTimePeriod === 'all') return true;
-            const date = new Date(dateStr);
-            const now = new Date();
-            if (selectedTimePeriod === 'last7days') return date >= new Date(now.setDate(now.getDate() - 7));
-            if (selectedTimePeriod === 'last30days') return date >= new Date(now.setDate(now.getDate() - 30));
-            if (selectedTimePeriod === 'currentMonth') return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-            if (selectedTimePeriod === 'currentYear') return date.getFullYear() === now.getFullYear();
-            if (selectedTimePeriod === 'customRange') return date >= new Date(customStartDate) && date <= new Date(customEndDate);
-            return true;
-        };
-
-        const relCases = mockCasesDataFromList.filter(c => filterByTime(c.createdDate));
-        const relTasks = initialMockTasks.filter(t => filterByTime(t.createdAt || '2024-01-01'));
-        const relFinancials = mockFinancialTransactions.filter(f => filterByTime(f.transactionDate));
-
-        // --- Report Logic ---
         switch (selectedReport) {
             case 'caseStatusDistribution':
-                const statuses = relCases.reduce((acc: any, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
+                const statuses = mockCasesDataFromList.reduce((acc: any, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; }, {});
                 data.chartData = Object.entries(statuses).map(([name, value]) => ({ name, value }));
-                data.listData = relCases;
+                data.listData = mockCasesDataFromList;
                 newChartType = 'pie';
                 break;
             case 'lawyerWorkload':
-                const workloads = relCases.reduce((acc: any, c) => { acc[c.assignedLawyer] = (acc[c.assignedLawyer] || 0) + 1; return acc; }, {});
+                const workloads = mockCasesDataFromList.reduce((acc: any, c) => { acc[c.assignedLawyer] = (acc[c.assignedLawyer] || 0) + 1; return acc; }, {});
                 data.chartData = Object.entries(workloads).map(([name, value]) => ({ name, value }));
                 break;
-            case 'successRate':
-                const won = relCases.filter(c => c.judgmentOutcome === JudgmentOutcome.WON).length;
-                const lost = relCases.filter(c => c.judgmentOutcome === JudgmentOutcome.LOST).length;
-                const settled = relCases.filter(c => c.judgmentOutcome === JudgmentOutcome.SETTLED).length;
-                data.chartData = [
-                    { name: t('won', { defaultValue: 'فوز' }), value: won },
-                    { name: t('lost', { defaultValue: 'خسارة' }), value: lost },
-                    { name: t('settled', { defaultValue: 'تسوية' }), value: settled }
-                ];
-                newChartType = 'pie';
-                break;
             case 'revenueAnalysis':
-                const months = [
-                    t('january', { defaultValue: 'يناير' }), 
-                    t('february', { defaultValue: 'فبراير' }), 
-                    t('march', { defaultValue: 'مارس' }), 
-                    t('april', { defaultValue: 'أبريل' }), 
-                    t('may', { defaultValue: 'مايو' }), 
-                    t('june', { defaultValue: 'يونيو' }), 
-                    t('july', { defaultValue: 'يوليو' }), 
-                    t('august', { defaultValue: 'أغسطس' }), 
-                    t('september', { defaultValue: 'سبتمبر' }), 
-                    t('october', { defaultValue: 'أكتوبر' }), 
-                    t('november', { defaultValue: 'نوفمبر' }), 
-                    t('december', { defaultValue: 'ديسمبر' })
-                ];
-                data.chartData = months.slice(0, 5).map((m, i) => ({
-                    name: m,
-                    [t('value', { defaultValue: 'قيمة' })]: relFinancials.filter(f => f.amount > 0 && new Date(f.transactionDate).getMonth() === i).reduce((s, f) => s + f.amount, 100 * (i+1))
-                }));
+                data.chartData = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو'].map((m, i) => ({ name: m, value: 5000 + Math.random() * 2000 }));
                 newChartType = 'area';
                 break;
-            case 'taskCompletionRatio':
-                const comp = relTasks.filter(t => t.status === AdminTaskStatus.COMPLETED).length;
-                const pending = relTasks.filter(t => t.status !== AdminTaskStatus.COMPLETED).length;
-                data.chartData = [{ name: t('completed', { defaultValue: 'مكتمل' }), value: comp }, { name: t('pending', { defaultValue: 'معلق' }), value: pending }];
-                newChartType = 'pie';
-                break;
-            default:
-                break;
+            default: break;
         }
 
         setReportData(data);
         setReportTitle(currentSubReportOptions.find(r => r.value === selectedReport)?.label || '');
         setChartType(newChartType);
         setIsLoading(false);
-    }, [selectedReport, selectedTimePeriod, customStartDate, customEndDate, currentSubReportOptions]);
+    }, [selectedReport, currentSubReportOptions]);
+
+    const saveToArchive = () => {
+        if (!reportData) return;
+        const newRep: SavedReport = {
+            id: `rep-${Date.now()}`,
+            title: reportTitle,
+            category: selectedCategory,
+            type: 'MONTHLY',
+            date: new Date().toISOString().split('T')[0],
+            description: `تقرير مستخرج آلياً يعرض بيانات ${reportTitle}.`,
+            status: 'READY',
+            dataCount: reportData.chartData.length
+        };
+        setSavedReports([newRep, ...savedReports]);
+        alert("تم الحفظ بنجاح!");
+    };
 
     const renderChart = () => {
         const data = reportData.chartData;
         if (!data || data.length === 0) return null;
-
         return (
-            <div className="h-[400px] w-full p-6 bg-white dark:bg-dm-card rounded-[40px] shadow-2xl shadow-gray-200/50">
+            <div className="h-[450px] w-full p-6 bg-white dark:bg-dm-card rounded-[32px] shadow-xl border border-gray-100 dark:border-gray-800">
                 <ResponsiveContainer width="100%" height="100%">
                     {chartType === 'pie' ? (
                         <PieChart>
-                            <Pie 
-                                data={data} 
-                                cx="50%" cy="50%" 
-                                innerRadius={80} outerRadius={130} 
-                                paddingAngle={8} 
-                                dataKey="value"
-                            >
+                            <Pie data={data} cx="50%" cy="50%" innerRadius={80} outerRadius={130} paddingAngle={5} dataKey="value">
                                 {data.map((entry: any, index: number) => (
-                                    <Cell key={`cell-${index}`} fill={STATUS_COLORS_REPORTS[entry.name] || CHART_COLORS[index % CHART_COLORS.length]} stroke="transparent" />
+                                    <Cell key={`cell-${index}`} fill={STATUS_COLORS_REPORTS[entry.name] || CHART_COLORS[index % CHART_COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                            <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                            <Tooltip />
+                            <Legend />
                         </PieChart>
                     ) : chartType === 'area' ? (
                         <AreaChart data={data}>
-                            <defs>
-                                <linearGradient id="colorVal" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
-                                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                            <Tooltip contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                            <Area type="monotone" dataKey={t('value', { defaultValue: 'قيمة' })} stroke="#6366f1" strokeWidth={4} fillOpacity={1} fill="url(#colorVal)" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Area type="monotone" dataKey="value" stroke="#6366f1" fill="#6366f1" fillOpacity={0.1} />
                         </AreaChart>
                     ) : (
                         <BarChart data={data}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} dy={10} />
-                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 12 }} />
-                            <Tooltip cursor={{ fill: '#f1f5f9', radius: 12 }} contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} />
-                            <Bar dataKey="value" fill="#6366f1" radius={[12, 12, 0, 0]} barSize={40} />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#6366f1" radius={[8, 8, 0, 0]} barSize={40} />
                         </BarChart>
                     )}
                 </ResponsiveContainer>
@@ -339,227 +322,150 @@ const ReportsPage: React.FC = () => {
         );
     };
 
+    const filteredArchive = useMemo(() => {
+        return savedReports.filter(r => r.title.toLowerCase().includes(archiveSearchTerm.toLowerCase()) && (!archiveFilterCategory || r.category === archiveFilterCategory));
+    }, [savedReports, archiveSearchTerm, archiveFilterCategory]);
+
     return (
-        <div className="max-w-7xl mx-auto space-y-12 pb-24">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-                <div>
-                    <div className="flex items-center gap-4 mb-2">
-                        <div className="p-3 bg-indigo-600 rounded-2xl text-white shadow-xl shadow-indigo-200">
-                            <PresentationChartLineIcon className="w-8 h-8" />
-                        </div>
-                        <h1 className="text-5xl font-black text-gray-900 tracking-tighter">{t('comprehensive_performance_analytics', { defaultValue: 'تحليلات الأداء الشاملة' })}</h1>
+        <div className="max-w-7xl mx-auto space-y-10 pb-20 font-sans text-right" dir="rtl">
+            <PrintHeader title="مركز التقارير والإحصائيات" subtitle="إدارة البيانات وتحليل الأداء القانوني والمالي" />
+            
+            {/* Main Header */}
+            <div className="bg-slate-900 text-white p-10 rounded-[40px] shadow-2xl relative overflow-hidden">
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div>
+                        <h1 className="text-4xl font-black mb-3 tracking-tight">مركز التقارير والتحليلات <span className="text-indigo-400">الذكية</span></h1>
+                        <p className="text-slate-400 max-w-xl font-medium">المنصة الشاملة لاستخراج مؤشرات الأداء، رصد الميزانية، وتوليد التقارير الدورية المدعومة بالذكاء الاصطناعي.</p>
                     </div>
-                    <p className="text-gray-400 font-bold uppercase text-[10px] tracking-[0.2em] flex items-center gap-2">
-                         <SparklesIcon className="w-4 h-4 text-indigo-500"/> {t('smart_reports_live_data', { defaultValue: 'تقارير ذكية مدعومة بالبيانات الحية' })}
-                    </p>
-                </div>
-                <div className="flex gap-3">
-                    <Button variant="outline" className="rounded-2xl border-2 h-12" leftIcon={<PrinterIcon className="w-5"/>}>{t('export_pdf', { defaultValue: 'تصدير PDF' })}</Button>
-                    <Button variant="primary" className="rounded-2xl h-12 shadow-xl shadow-indigo-100 px-8" leftIcon={<ArrowDownTrayIcon className="w-5"/>}>{t('export_data', { defaultValue: 'تصدير البيانات' })}</Button>
-                </div>
-            </div>
-
-            {/* KPI Section */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {kpis.map((kpi, idx) => (
-                    <StatCard key={idx} {...kpi} />
-                ))}
-            </div>
-
-            {/* AI Insights Banner */}
-            <div className="bg-gradient-to-r from-indigo-600 to-violet-700 rounded-[40px] p-8 text-white shadow-2xl relative overflow-hidden group">
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
-                <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-8">
-                    <div className="flex items-start gap-6 max-w-2xl">
-                        <div className="p-4 bg-white/20 rounded-[24px] backdrop-blur-xl shrink-0 group-hover:scale-110 transition-transform duration-500">
-                            <LightBulbIcon className="w-10 h-10 text-amber-300" />
-                        </div>
-                        <div>
-                            <h3 className="text-2xl font-black mb-2 flex items-center gap-2 italic">{t('ai_insight', { defaultValue: 'Insight الذكاء الاصطناعي' })} <Badge text="PRO" variant="warning" size="xs" /></h3>
-                            <p className="text-indigo-100 text-sm leading-relaxed font-medium">
-                                {t('ai_insight_desc', { defaultValue: 'تم رصد زيادة في معدل ربحية القضايا العمالية بنسبة 15% خلال الربع الأخير. نقترح توجيه المزيد من الموارد البشرية لهذا القطاع لتحسين العوائد التشغيلية وتقليل زمن إنجاز المهام.' })}
-                            </p>
-                        </div>
+                    <div className="flex bg-white/10 backdrop-blur-md p-1.5 rounded-2xl">
+                        {(['dashboard', 'archive', 'ai'] as const).map(tab => (
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all ${activeTab === tab ? 'bg-white text-slate-900 shadow-xl' : 'text-slate-300 hover:text-white'}`}>
+                                {tab === 'dashboard' ? 'الرئيسية' : tab === 'archive' ? 'الأرشيف' : 'الذكاء الاصطناعي'}
+                            </button>
+                        ))}
                     </div>
-                    <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white hover:text-indigo-600 rounded-2xl h-14 px-8 font-black">
-                        {t('view_detailed_analysis', { defaultValue: 'عرض التحليل التفصيلي' })}
-                    </Button>
                 </div>
             </div>
 
-            {/* Report Generator Controls */}
-            <div className="bg-white dark:bg-dm-card p-10 rounded-[48px] shadow-2xl shadow-gray-200/50 border border-gray-100 dark:border-gray-800">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                    {/* Categories Column */}
-                    <div className="lg:col-span-4 space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-4 flex items-center gap-2">
-                            <Squares2X2Icon className="w-4 h-4"/> {t('select_main_category', { defaultValue: 'اختيار التصنيف الرئيسي' })}
-                        </label>
-                        <div className="grid grid-cols-1 gap-3">
-                            {reportCategories.map(cat => (
-                                <button 
-                                    key={cat.value}
-                                    onClick={() => { setSelectedCategory(cat.value); setSelectedReport(cat.subReports[0].value); }}
-                                    className={`flex items-center justify-between p-4 rounded-3xl border-2 transition-all group ${selectedCategory === cat.value ? 'bg-indigo-600 border-indigo-600 text-white shadow-xl shadow-indigo-100' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100 hover:text-gray-600'}`}
-                                >
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-2 rounded-xl ${selectedCategory === cat.value ? 'bg-white/20' : 'bg-white group-hover:bg-gray-200'}`}>{cat.icon}</div>
-                                        <span className="font-black text-sm">{cat.label}</span>
-                                    </div>
-                                    <ArrowsRightLeftIcon className={`w-4 h-4 transition-transform ${selectedCategory === cat.value ? 'rotate-180 opacity-100' : 'opacity-0'}`}/>
-                                </button>
-                            ))}
+            <AnimatePresence mode="wait">
+                {activeTab === 'dashboard' && (
+                    <motion.div key="dash" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-10">
+                        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+                            {kpis.map((kpi, idx) => <StatCard key={idx} {...kpi} />)}
                         </div>
-                    </div>
 
-                    {/* Options Column */}
-                    <div className="lg:col-span-8 flex flex-col justify-between gap-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">نوع التقرير الفرعي</label>
-                                    <div className="flex flex-col gap-2">
-                                        {currentSubReportOptions.map(sr => (
-                                            <button 
-                                                key={sr.value}
-                                                onClick={() => setSelectedReport(sr.value)}
-                                                className={`flex items-center gap-3 p-3.5 rounded-2xl text-xs font-bold transition-all border ${selectedReport === sr.value ? 'bg-white border-indigo-600 text-indigo-600 shadow-lg' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100'}`}
-                                            >
-                                                {sr.icon}
-                                                {sr.label}
-                                            </button>
-                                        ))}
-                                    </div>
+                        {/* Generator Controls */}
+                        <div className="bg-white dark:bg-dm-card p-8 rounded-[40px] shadow-xl border border-gray-100 dark:border-gray-800">
+                             <div className="flex justify-between items-center mb-8 border-b pb-6">
+                                <h2 className="text-2xl font-black flex items-center gap-3">
+                                    <PlusCircleIcon className="w-7 h-7 text-indigo-600"/> استخراج تقرير جديد
+                                </h2>
+                                <div className="flex gap-2">
+                                    {['ONCE', 'WEEKLY', 'MONTHLY'].map(f => (
+                                        <button key={f} onClick={() => setReportFrequency(f)} className={`px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${reportFrequency === f ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-gray-50 text-gray-400'}`}>
+                                            {f === 'ONCE' ? 'لمرة واحدة' : f === 'WEEKLY' ? 'أسبوعي' : 'شهري'}
+                                        </button>
+                                    ))}
                                 </div>
-                            </div>
-                            <div className="space-y-6">
-                                <div>
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3">النطاق الزمني</label>
-                                    <Select 
-                                        options={timePeriodOptions} 
-                                        value={selectedTimePeriod} 
-                                        onChange={(e) => setSelectedTimePeriod(e.target.value)}
-                                        className="h-14 rounded-2xl border-none bg-gray-50 text-sm font-black focus:ring-indigo-600/20"
-                                    />
-                                </div>
-                                {selectedTimePeriod === 'customRange' && (
-                                    <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-4 duration-300">
-                                        <Input type="date" label="من" value={customStartDate} onChange={e => setCustomStartDate(e.target.value)} containerClassName="mb-0" className="rounded-2xl border-none bg-gray-50 h-14"/>
-                                        <Input type="date" label="إلى" value={customEndDate} onChange={e => setCustomEndDate(e.target.value)} containerClassName="mb-0" className="rounded-2xl border-none bg-gray-50 h-14"/>
-                                    </div>
-                                )}
-                                <div className="p-6 bg-indigo-50/50 rounded-3xl border border-indigo-100">
-                                    <div className="flex items-start gap-4">
-                                        <InformationCircleIcon className="w-5 h-5 text-indigo-400 mt-1"/>
-                                        <p className="text-[10px] font-black text-indigo-600/60 leading-relaxed uppercase">{t('realtime_data_note', { defaultValue: 'سيتم تجميع البيانات فورياً من السجلات المالية والإدارية النشطة لضمان دقة الرسوم البيانية الناتجة.' })}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex gap-4">
-                            <Button 
-                                onClick={generateReport} 
-                                isLoading={isLoading} 
-                                className="flex-1 h-16 rounded-[24px] text-xl font-black shadow-2xl shadow-indigo-100" 
-                                leftIcon={<SparklesIcon className="w-8 h-8"/>}
-                            >
-                                {t('generate_analytical_report', { defaultValue: 'توليد التقرير التحليلي' })}
-                            </Button>
-                            <Button variant="outline" className="h-16 w-16 rounded-[24px] border-2 group">
-                                <ArrowPathIcon className="w-6 h-6 text-gray-400 group-hover:rotate-180 transition-transform duration-700"/>
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Result Area */}
-            {reportData && (
-                <div className="space-y-10 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-                    <div className="flex items-center justify-between border-b-2 border-dashed border-gray-100 pb-8 px-4">
-                        <div>
-                            <h2 className="text-4xl font-black text-gray-900 mb-1 tracking-tighter">{reportTitle}</h2>
-                            <div className="flex items-center gap-4">
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest"><CalendarDaysIcon className="w-4 h-4"/> {timePeriodOptions.find(o=>o.value === selectedTimePeriod)?.label}</span>
-                                <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
-                                <span className="flex items-center gap-1.5 text-[10px] font-black text-gray-400 uppercase tracking-widest"><ChartBarIcon className="w-4 h-4"/> {reportData.chartData.length} {t('data_points', { defaultValue: 'نقاط بيانات' })}</span>
-                            </div>
-                        </div>
-                        <div className="bg-gray-50 px-6 py-4 rounded-3xl flex items-center gap-4">
-                             <div className="text-right">
-                                 <p className="text-[10px] font-black text-gray-400 leading-none mb-1 uppercase tracking-widest">{t('export_date', { defaultValue: 'تاريخ الاستخراج' })}</p>
-                                 <p className="font-mono text-xs font-black text-gray-900">{format(new Date(), 'yyyy/MM/dd HH:mm')}</p>
                              </div>
-                             <div className="w-[1px] h-8 bg-gray-200"></div>
-                             <img src="https://ui-avatars.com/api/?name=Admin&background=6366f1&color=fff" className="w-10 h-10 rounded-2xl shadow-lg ring-4 ring-white" alt=""/>
+                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                                <div className="lg:col-span-4 space-y-3">
+                                    {reportCategories.map(cat => (
+                                        <button key={cat.value} onClick={() => { setSelectedCategory(cat.value); setSelectedReport(cat.subReports[0].value); }}
+                                            className={`w-full flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${selectedCategory === cat.value ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg' : 'bg-gray-50 border-transparent text-gray-400 hover:bg-gray-100'}`}>
+                                            <div className="flex items-center gap-4">
+                                                {cat.icon}
+                                                <span className="font-black text-sm">{cat.label}</span>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="lg:col-span-8 space-y-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Select label="نوع التقرير" options={currentSubReportOptions} value={selectedReport} onChange={e => setSelectedReport(e.target.value)} />
+                                        <Select label="الفترة الزمنية" options={timePeriodOptions} value={selectedTimePeriod} onChange={e => setSelectedTimePeriod(e.target.value)} />
+                                    </div>
+                                    <Button onClick={generateReport} isLoading={isLoading} className="w-full h-14 rounded-2xl text-lg font-black" leftIcon={<SparklesIcon className="w-6 h-6"/>}>توليد التقرير المباشر</Button>
+                                </div>
+                             </div>
                         </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 gap-10">
-                        {renderChart()}
-                        
-                        {reportData.listData && reportData.listData.length > 0 && (
-                            <Card title={t('review_reference_records', { defaultValue: 'مراجعة السجلات المرجعية' })} className="border-none shadow-2xl rounded-[40px] overflow-hidden p-0">
-                                <div className="p-8 border-b dark:border-gray-800 flex justify-between items-center bg-gray-50/50">
-                                    <div className="relative w-80">
-                                        <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"/>
-                                        <input placeholder={t('filter_results', { defaultValue: 'تصفية النتائج...' })} className="w-full pr-12 pl-4 py-3 bg-white rounded-2xl border-none text-xs font-bold focus:ring-2 focus:ring-indigo-600/10"/>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button variant="outline" size="sm" className="rounded-xl" leftIcon={<FunnelIcon className="w-4"/>}>{t('filter_options', { defaultValue: 'خيارات الفلترة' })}</Button>
-                                    </div>
+
+                        {reportData && (
+                            <div className="mt-8 animate-in slide-in-from-bottom-5">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-3xl font-black">{reportTitle}</h2>
+                                    <Button variant="outline" onClick={saveToArchive} leftIcon={<DocumentDuplicateIcon className="w-5"/>}>حفظ في الأرشيف</Button>
                                 </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-right text-sm">
-                                        <thead>
-                                            <tr className="bg-gray-50/20 dark:bg-dm-background/50 border-b dark:border-gray-800">
-                                                <th className="p-5 font-black text-[10px] text-gray-400 uppercase tracking-[0.2em]">{t('identifier', { defaultValue: 'المعرف' })}</th>
-                                                <th className="p-5 font-black text-[10px] text-gray-400 uppercase tracking-[0.2em]">{t('title_party', { defaultValue: 'العنوان / الطرف' })}</th>
-                                                <th className="p-5 font-black text-[10px] text-gray-400 uppercase tracking-[0.2em]">{t('date', { defaultValue: 'التاريخ' })}</th>
-                                                <th className="p-5 font-black text-[10px] text-gray-400 uppercase tracking-[0.2em]">{t('responsible', { defaultValue: 'المسؤول' })}</th>
-                                                <th className="p-5 font-black text-[10px] text-gray-400 uppercase tracking-[0.2em] text-center">{t('status', { defaultValue: 'الحالة' })}</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                            {reportData.listData.slice(0, 8).map((item: any, i: number) => (
-                                                <tr key={i} className="hover:bg-gray-50/50 transition-colors group">
-                                                    <td className="p-5 font-mono text-[10px] font-black text-gray-400">#{item.id || i + 100}</td>
-                                                    <td className="p-5">
-                                                        <p className="font-black text-gray-900 text-xs tracking-tight">{item.title || item.clientName || t('unknown_record', { defaultValue: 'سجل مجهول' })}</p>
-                                                        {item.category && <p className="text-[10px] font-black text-gray-300 uppercase mt-0.5">{item.category}</p>}
-                                                    </td>
-                                                    <td className="p-5 font-bold text-gray-500 text-xs italic">{formatDateForReport(item.createdDate || item.transactionDate || item.dueDate)}</td>
-                                                    <td className="p-5 flex items-center gap-2">
-                                                        <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[8px] font-black">
-                                                            {(item.assignedLawyer || item.assignedTo || 'U').charAt(0)}
-                                                        </div>
-                                                        <span className="text-xs font-black text-gray-600">{item.assignedLawyer || item.assignedTo || '-'}</span>
-                                                    </td>
-                                                    <td className="p-5 text-center">
-                                                        <Badge 
-                                                            text={item.status} 
-                                                            variant={item.status === 'مكسب' || item.status === 'مكتمل' ? 'success' : 'info'} 
-                                                            size="xs"
-                                                            className="rounded-xl px-4 py-1.5"
-                                                        />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {reportData.listData.length > 8 && (
-                                    <div className="p-6 bg-gray-50/50 border-t flex justify-center">
-                                        <Button variant="outline" size="sm" className="rounded-xl text-[10px] font-black uppercase tracking-widest text-indigo-600 border-indigo-100 hover:bg-indigo-50">{t('view_all_records', { defaultValue: 'عرض كافة السجلات' })} ({reportData.listData.length})</Button>
-                                    </div>
-                                )}
-                            </Card>
+                                {renderChart()}
+                            </div>
                         )}
-                    </div>
-                </div>
-            )}
+                    </motion.div>
+                )}
+
+                {activeTab === 'archive' && (
+                    <motion.div key="archive" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white dark:bg-dm-card p-6 rounded-3xl border border-gray-100">
+                             <div className="md:col-span-2 relative">
+                                 <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"/>
+                                 <input placeholder="ابحث في سجل التقارير..." className="w-full pr-12 pl-4 py-3 rounded-2xl bg-gray-50 border-none font-bold text-sm" value={archiveSearchTerm} onChange={e => setArchiveSearchTerm(e.target.value)} />
+                             </div>
+                             <Select options={[{value: '', label: 'كل التصنيفات'}]} value={archiveFilterCategory} onChange={e => setArchiveFilterCategory(e.target.value)} className="border-none bg-gray-50"/>
+                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                             {filteredArchive.map(rep => (
+                                 <Card key={rep.id} className="p-6 rounded-[32px] border-none shadow-xl hover:shadow-2xl transition-all group">
+                                     <div className="flex justify-between mb-4">
+                                         <Badge text={rep.type} size="xs" variant="info" className="font-black" />
+                                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                             <button className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400"><PencilIcon className="w-4 h-4"/></button>
+                                             <button className="p-1.5 hover:bg-red-50 rounded-lg text-red-400"><TrashIcon className="w-4 h-4"/></button>
+                                         </div>
+                                     </div>
+                                     <h3 className="text-lg font-black mb-2 line-clamp-1">{rep.title}</h3>
+                                     <p className="text-xs text-gray-500 mb-4 line-clamp-2">{rep.description}</p>
+                                     <div className="flex justify-between items-center pt-4 border-t border-gray-50">
+                                         <span className="text-[10px] font-mono text-gray-400">{rep.date}</span>
+                                         <Button variant="ghost" size="sm" className="text-indigo-600 font-black" leftIcon={<EyeIcon className="w-4"/>}>عرض</Button>
+                                     </div>
+                                 </Card>
+                             ))}
+                         </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'ai' && (
+                    <motion.div key="ai" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-4xl mx-auto h-[650px] flex flex-col bg-white dark:bg-dm-card rounded-[40px] shadow-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+                        <div className="bg-indigo-600 p-8 text-white flex justify-between items-center">
+                            <h3 className="text-2xl font-black flex items-center gap-3"><SparklesIcon className="w-8 h-8"/> المحلل القانوني الذكي</h3>
+                            <div className="flex gap-2">
+                                <span className="w-3 h-3 bg-white/30 rounded-full animate-pulse" />
+                                <span className="w-3 h-3 bg-white/30 rounded-full animate-pulse [animation-delay:0.2s]" />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-slate-50/30">
+                            {chatMessages.map((msg, i) => (
+                                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                                    <div className={`max-w-[80%] p-5 rounded-[2rem] ${msg.role === 'user' ? 'bg-white border text-gray-800 rounded-tr-none font-bold' : 'bg-indigo-600 text-white shadow-xl rounded-tl-none font-medium'}`}>
+                                        <div className="text-sm md:text-base leading-relaxed">
+                                            <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                            {isAiThinking && <LoadingSpinner size="sm" color="text-indigo-600" />}
+                            <div ref={chatEndRef} />
+                        </div>
+                        <div className="p-8 border-t bg-white">
+                            <div className="flex gap-4 p-2 bg-gray-50 rounded-[2rem] border border-gray-100 shadow-inner">
+                                <input type="text" className="flex-1 bg-transparent px-6 py-4 focus:outline-none text-sm font-bold" placeholder="اطلب تحليلاً للأداء أو الاتجاهات المالية..." value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendAiMessage()} />
+                                <button onClick={handleSendAiMessage} className="bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:bg-indigo-700 transition-all active:scale-95">
+                                    <PaperAirplaneIcon className="w-6 h-6 rotate-180" />
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 };

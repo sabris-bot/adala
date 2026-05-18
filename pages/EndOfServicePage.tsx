@@ -1,901 +1,1144 @@
 
-import React, { useState, useEffect } from 'react';
-import Card from '../components/ui/Card';
-import Input from '../components/ui/Input';
+import React, { useState, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import Button from '../components/ui/Button';
-import Select from '../components/ui/Select';
 import Modal from '../components/ui/Modal';
-import { CalculatorIcon, PlusCircleIcon, TrashIcon, UsersIcon, PrinterIcon, ArrowPathIcon, ExclamationTriangleIcon, InformationCircleIcon, OFFICE_NAME } from '../constants';
-import { ContractTypeKuwait, TerminationReasonKuwait, FinancialItem, Jurisdiction } from '../types';
-import { contractTypeKuwaitOptions, terminationReasonKuwaitOptions } from '../constants';
+import { Badge } from '../components/ui/Badge';
+import PrintHeader from '../components/ui/PrintHeader';
+import { 
+    PlusCircleIcon, PrinterIcon, ArrowPathIcon, InformationCircleIcon, 
+    ShieldCheckIcon, ScaleIcon, BanknotesIcon, CalendarDaysIcon, 
+    MagnifyingGlassIcon, CheckCircleIcon, XCircleIcon, 
+    GlobeAltIcon, ArrowLeftIcon, UserGroupIcon, BuildingLibraryIcon, ArchiveBoxIcon,
+    ClipboardDocumentCheckIcon, CalculatorIcon, DocumentTextIcon, UserCircleIcon,
+    BuildingOffice2Icon, ExclamationTriangleIcon, TrashIcon, EyeIcon, 
+    ChevronDownIcon, UserPlusIcon, HistoryIcon, ClockIcon
+} from '../constants';
+import { 
+    TerminationReasonKuwait, EOS_Settlement, 
+    EOS_SettlementStatus, ContractTypeKuwait
+} from '../types';
+import { 
+    terminationReasonKuwaitOptions, OFFICE_NAME 
+} from '../constants';
 import { initialEmployees } from './EmployeeProfilePage';
-import { useJurisdiction } from '../components/JurisdictionContext';
+import { format } from 'date-fns';
+import { calculateKuwaitEOS } from '../services/eosService';
 
-// Structure for detailed calculation results for printing
-interface ExtendedCalculationResult {
-  companyName: string;
-  employeeName: string;
-  employeeCivilId: string;
-  employeeJobTitle: string;
-  isKuwaiti: boolean;
-  joiningDate: string;
-  lastWorkDate: string;
-  basicSalary: number;
-  allowancesSubjectToIndemnity: number;
-  contractType: ContractTypeKuwait;
-  terminationReason: TerminationReasonKuwait;
-  
-  annualLeaveEntitlementPerYear: number;
-  totalAccruedLeaveDays: number;
-  leaveDaysAlreadyTaken: number;
-  manualLeaveAdjustment: number;
-  
-  noticePeriodDays: number;
-  noticePeriodValue: number;
-  paidNotice: boolean;
-
-  otherDues: FinancialItem[];
-  deductions: FinancialItem[];
-  
-  serviceYears: number;
-  serviceMonths: number;
-  serviceDays: number;
-  calculationSalary: number;
-  
-  indemnityForFirst5Years: number;
-  indemnityForSubsequentYears: number;
-  grossIndemnityBeforeCap: number;
-  appliedCapAmount?: number; 
-  grossIndemnityAfterCap: number;
-  terminationAdjustmentFactor: number;
-  adjustedIndemnity: number;
-  
-  netLeaveBalanceDays: number;
-  leaveDayValue: number;
-  leaveEncashmentValue: number;
-  
-  totalOtherDuesValue: number;
-  totalDeductionsValue: number;
-  
-  netPayableAmount: number;
-  
-  warnings: string[];
-  notesOnCalculation?: string[];
+// --- Local Styles & Constants ---
+const PRINT_STYLES = `
+@media print {
+  body { background: white !important; font-size: 10pt; color: #1e293b !important; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .page-break { page-break-before: always; }
+  .print-container { padding: 0 !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; border: none !important; box-shadow: none !important; }
+  .print-card { border: 1px solid #e2e8f0 !important; margin-bottom: 20px !important; break-inside: avoid; }
+  .doc-modern-table { width: 100% !important; border-collapse: collapse !important; margin: 15px 0 !important; }
+  .doc-modern-table th, .doc-modern-table td { border: 1px solid #cbd5e1 !important; padding: 12px 8px !important; font-size: 9pt !important; }
+  .doc-modern-table th { background-color: #f8fafc !important; color: #334155 !important; font-weight: bold; }
+  .print-signature-box { border: 1.5px solid #334155 !important; padding: 15px !important; min-height: 100px !important; border-radius: 8px !important; }
+  @page { margin: 1.5cm; size: A4; }
 }
+`;
 
-const tafqeet = (num: number, jurisdiction: Jurisdiction): string => {
-  if (isNaN(num)) return `صفر ${jurisdiction.currencyNameAr}`;
-  const numStr = num.toFixed(3);
-  const parts = numStr.split('.');
-  const integerPart = parseInt(parts[0], 10);
-  const decimalPart = parts[1] || "000";
-
-  const units = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة"];
-  const tens = ["", "عشرة", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
-  const hundreds = ["", "مائة", "مئتان", "ثلاثمائة", "أربعمائة", "خمسمائة", "ستمائة", "سبعمائة", "ثمانمائة", "تسعمائة"];
-  
-  const convertGroup = (n: number) => {
-      if (n === 0) return "";
-      if (n < 10) return units[n];
-      if (n < 20) {
-          if (n === 10) return "عشرة";
-          if (n === 11) return "أحد عشر";
-          if (n === 12) return "اثنا عشر";
-          return units[n % 10] + " " + tens[1];
-      }
-      if (n < 100) {
-          const unit = n % 10;
-          const ten = Math.floor(n / 10);
-          return (unit > 0 ? units[unit] + " و" : "") + tens[ten];
-      }
-      const hundred = Math.floor(n / 100);
-      const remainder = n % 100;
-      return (hundred > 0 ? hundreds[hundred] : "") + (remainder > 0 ? " و" + convertGroup(remainder) : "");
-  };
-
-  let integerWords = "";
-  if (integerPart === 0) integerWords = "صفر";
-  else if (integerPart < 1000) integerWords = convertGroup(integerPart);
-  else if (integerPart < 1000000) {
-      const thousand = Math.floor(integerPart / 1000);
-      const remainder = integerPart % 1000;
-      
-      let thousandStr = "";
-      if (thousand === 1) thousandStr = "ألف";
-      else if (thousand === 2) thousandStr = "ألفان";
-      else if (thousand >= 3 && thousand <= 10) thousandStr = units[thousand] + " آلاف";
-      else thousandStr = convertGroup(thousand) + " ألف";
-
-      integerWords = thousandStr + (remainder > 0 ? " و" + convertGroup(remainder) : "");
-  } else {
-      integerWords = `${integerPart}`; 
-  }
-  
-  const filsValue = parseInt(decimalPart);
-  const filsText = filsValue > 0 ? ` و ${filsValue} فكة` : "";
-  return `فقط ${integerWords} ${jurisdiction.currencyNameAr}${filsText} لا غير`;
-};
-
-const formatCurrency = (amount: number | undefined, jurisdiction: Jurisdiction): string => {
-    if (amount === undefined || isNaN(amount)) return '-';
-    return `${amount.toFixed(3)} ${jurisdiction.currencySymbol}`;
-};
-
-
-const PrintableStatementModal: React.FC<{
-  isOpen: boolean;
-  onClose: () => void;
-  result: ExtendedCalculationResult | null;
-}> = ({ isOpen, onClose, result }) => {
-  const { selectedJurisdiction } = useJurisdiction();
-  if (!isOpen || !result) return null;
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'غير محدد';
-    try {
-        return new Date(dateString).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
-    } catch (e) { return dateString; }
-  };
-
-  const _formatCurrency = (amount: number | undefined): string => {
-    if (amount === undefined || isNaN(amount)) return '-';
-    return `${amount.toFixed(3)} ${selectedJurisdiction.currencySymbol}`;
-  };
-
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} title="كشف حساب التسوية النهائية لمستحقات نهاية الخدمة" size="xl">
-      <div id="printable-statement-content-wrapper"> 
-        <div id="printable-statement-content" className="p-4 print-statement bg-white text-black">
-          <style>
-            {`
-              .print-statement h2 { font-size: 1.5rem; font-weight: bold; text-align: center; margin-bottom: 1rem; color: #0D47A1; border-bottom: 2px solid #0D47A1; padding-bottom: 10px; }
-              .print-statement h3 { font-size: 1.1rem; font-weight: bold; margin-top: 1rem; margin-bottom: 0.5rem; color: #333; background-color: #f0f0f0; padding: 5px 10px; border-right: 4px solid #0D47A1; }
-              .print-statement p, .print-statement li { margin-bottom: 0.3rem; font-size: 0.95rem; line-height: 1.6; }
-              .print-statement strong { font-weight: 700; color: #222; }
-              .print-statement .section-block { margin-bottom: 1rem; }
-              .print-statement .grid-display { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
-              .print-statement table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.9rem; }
-              .print-statement th, .print-statement td { border: 1px solid #ccc; padding: 8px; text-align: right; }
-              .print-statement th { background-color: #e0e0e0; font-weight: bold; }
-              .print-statement .total-payable { font-size: 1.2rem; font-weight: bold; text-align: center; padding: 1rem; border: 2px solid #4CAF50; background-color: #f1f8e9; margin-top: 1.5rem; }
-              .print-statement .legal-text { font-size: 0.85rem; line-height: 1.6; margin-top: 1.5rem; text-align: justify; padding: 10px; border: 1px dashed #999; }
-              .print-statement .signature-area { margin-top: 3rem; display: flex; justify-content: space-between; page-break-inside: avoid; }
-              .print-statement .signature-block { width: 45%; text-align: center; border-top: 1px solid #000; padding-top: 10px; }
-              @media print {
-                  .print-hide-in-modal { display: none !important; }
-                  body { background-color: white; color: black; }
-              }
-            `}
-          </style>
-          <h2>كشف تسوية مستحقات نهاية الخدمة</h2>
-          
-          <div className="section-block">
-              <h3>1. بيانات الموظف والخدمة</h3>
-              <div className="grid-display">
-                  <p><strong>اسم الشركة:</strong> {result.companyName}</p>
-                  <p><strong>اسم الموظف:</strong> {result.employeeName}</p>
-                  <p><strong>الرقم المدني:</strong> {result.employeeCivilId}</p>
-                  <p><strong>المسمى الوظيفي:</strong> {result.employeeJobTitle}</p>
-                  <p><strong>تاريخ الالتحاق:</strong> {formatDate(result.joiningDate)}</p>
-                  <p><strong>تاريخ انتهاء الخدمة:</strong> {formatDate(result.lastWorkDate)}</p>
-                  <p><strong>الجنسية:</strong> {result.isKuwaiti ? 'كويتي' : 'غير كويتي'}</p>
-                  <p className="col-span-2"><strong>مدة الخدمة الفعلية:</strong> {result.serviceYears} سنوات و {result.serviceMonths} أشهر و {result.serviceDays} أيام</p>
-              </div>
-          </div>
-
-          <div className="section-block">
-              <h3>2. أساس احتساب المستحقات</h3>
-              <div className="grid-display">
-                  <p><strong>الراتب الأساسي:</strong> {_formatCurrency(result.basicSalary)}</p>
-                  <p><strong>البدلات (الخاضعة):</strong> {_formatCurrency(result.allowancesSubjectToIndemnity)}</p>
-                  <p className="col-span-2"><strong>الراتب الشامل المعتمد للحساب:</strong> {_formatCurrency(result.calculationSalary)}</p>
-                  <p><strong>نوع العقد:</strong> {contractTypeKuwaitOptions.find(opt => opt.value === result.contractType)?.label}</p>
-                  <p><strong>سبب الإنهاء:</strong> {terminationReasonKuwaitOptions.find(opt => opt.value === result.terminationReason)?.label}</p>
-              </div>
-          </div>
-          
-          <div className="section-block">
-              <h3>3. تفاصيل المستحقات</h3>
-              <table>
-                  <thead>
-                      <tr>
-                          <th>البيان</th>
-                          <th>طريقة الحساب / الملاحظات</th>
-                          <th>المبلغ ({selectedJurisdiction.currencyNameAr})</th>
-                      </tr>
-                  </thead>
-                  <tbody>
-                      <tr>
-                          <td>مكافأة نهاية الخدمة (الإجمالي)</td>
-                          <td>
-                            {result.serviceYears > 0 && `${result.serviceYears} سنة `}
-                            {result.serviceMonths > 0 && `${result.serviceMonths} شهر `}
-                            {result.serviceDays > 0 && `${result.serviceDays} يوم`}
-                            <br/>
-                            ({selectedJurisdiction.laborLaw.indemnityRules.firstTierDays} يوم لأول {selectedJurisdiction.laborLaw.indemnityRules.firstTierYears} سنوات، {selectedJurisdiction.laborLaw.indemnityRules.secondTierDays} يوم لما بعد ذلك)
-                          </td>
-                          <td>{_formatCurrency(result.grossIndemnityBeforeCap)}</td>
-                      </tr>
-                      {result.appliedCapAmount && (
-                          <tr style={{color: '#d32f2f'}}>
-                              <td>تطبيق الحد الأقصى ({selectedJurisdiction.laborLaw.indemnityRules.maxIndemnityMonths} شهر)</td>
-                              <td>تم تخفيض المبلغ إلى سقف {selectedJurisdiction.laborLaw.indemnityRules.maxIndemnityMonths} راتب</td>
-                              <td>{_formatCurrency(result.grossIndemnityAfterCap)}</td>
-                          </tr>
-                      )}
-                      <tr>
-                          <td>مكافأة نهاية الخدمة (الصافي)</td>
-                          <td>نسبة الاستحقاق: {(result.terminationAdjustmentFactor * 100).toFixed(0)}%</td>
-                          <td><strong>{_formatCurrency(result.adjustedIndemnity)}</strong></td>
-                      </tr>
-                      <tr>
-                          <td>رصيد الإجازات</td>
-                          <td>
-                            {result.totalAccruedLeaveDays.toFixed(1)} تراكمي 
-                            {result.leaveDaysAlreadyTaken > 0 && ` - ${result.leaveDaysAlreadyTaken} مستهلك`}
-                            {result.manualLeaveAdjustment !== 0 && ` ${result.manualLeaveAdjustment > 0 ? '+' : ''}${result.manualLeaveAdjustment} تسوية`}
-                            <br/>
-                            ({result.netLeaveBalanceDays.toFixed(1)} يوم × {_formatCurrency(result.leaveDayValue)}/يوم)
-                          </td>
-                          <td><strong>{_formatCurrency(result.leaveEncashmentValue)}</strong></td>
-                      </tr>
-                      {result.otherDues.map(due => (
-                          <tr key={due.id}>
-                              <td>{due.name}</td>
-                              <td>مستحقات إضافية</td>
-                              <td>{due.amount.toFixed(3)} {selectedJurisdiction.currencySymbol}</td>
-                          </tr>
-                      ))}
-                      {result.deductions.map(ded => (
-                          <tr key={ded.id} style={{color: '#d32f2f'}}>
-                              <td>{ded.name} (خصم)</td>
-                              <td>مستحقات للشركة</td>
-                              <td>- {ded.amount.toFixed(3)} {selectedJurisdiction.currencySymbol}</td>
-                          </tr>
-                      ))}
-                  </tbody>
-              </table>
-          </div>
-          
-          <div className="total-payable">
-              <p>صافي المبلغ المستحق للدفع</p>
-              <p style={{fontSize: '1.5em', margin: '10px 0'}}>{_formatCurrency(result.netPayableAmount)}</p>
-              <p style={{fontSize: '0.9em', fontWeight: 'normal'}}>{tafqeet(result.netPayableAmount, selectedJurisdiction)}</p>
-          </div>
-
-          <div className="legal-text">
-              {result.isKuwaiti && (
-                <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
-                    * ملاحظة: الموظف كويتي الجنسية، مكافأة نهاية الخدمة تخضع لنظام مؤسسة التأمينات الاجتماعية (PIFSS). المبالغ المحتسبة أعلاه هي للمراجعة أو في حال وجود اتفاقات تعاقدية إضافية.
-                </div>
-              )}
-              <strong>إقرار المخالصة وإبراء الذمة:</strong>
-              <p>
-                  أقر أنا الموقع أدناه، <strong>{result.employeeName}</strong>، بأنني قد استلمت كافة مستحقاتي العمالية المبينة أعلاه من <strong>{result.companyName}</strong>، وذلك عن فترة عملي المذكورة. وبهذا الاستلام، أبرئ ذمة الشركة إبراءً تاماً وشاملاً ونهائياً من أي حقوق أو مطالبات عمالية ناشئة عن عقد العمل أو انتهائه، ولا يحق لي المطالبة بأي مبالغ أخرى مستقبلاً.
-              </p>
-          </div>
-
-          <div className="signature-area">
-              <div className="signature-block">
-                  <p><strong>توقيع الموظف المستلم</strong></p>
-                  <br/><br/>
-                  <p>الاسم: .......................................</p>
-              </div>
-              <div className="signature-block">
-                  <p><strong>اعتماد المدير المسؤول/الموارد البشرية</strong></p>
-                  <br/><br/>
-                  <p>التاريخ: ____ / ____ / ________</p>
-              </div>
-          </div>
-        </div>
-      </div>
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end print-hide-in-modal">
-        <Button variant="outline" onClick={onClose} className="me-2">إغلاق</Button>
-        <Button variant="primary" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة الكشف</Button>
-      </div>
-    </Modal>
-  );
-};
-
+const STEP_TABS = [
+    { id: 'employee', label: 'بيانات الموظف', icon: <UserCircleIcon className="w-5 h-5"/> },
+    { id: 'contract', label: 'العقد والخدمة', icon: <ScaleIcon className="w-5 h-5"/> },
+    { id: 'financial', label: 'المالية والإجازات', icon: <BanknotesIcon className="w-5 h-5"/> },
+    { id: 'result', label: 'النتيجة والمستندات', icon: <ClipboardDocumentCheckIcon className="w-5 h-5"/> },
+];
 
 const EndOfServicePage: React.FC = () => {
-  const { selectedJurisdiction } = useJurisdiction();
-  // State for Employee Selection
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
-
-  // Form State
-  const [companyName, setCompanyName] = useState(OFFICE_NAME);
-  const [employeeName, setEmployeeName] = useState('');
-  const [employeeCivilId, setEmployeeCivilId] = useState('');
-  const [employeeJobTitle, setEmployeeJobTitle] = useState('');
-  const [isKuwaiti, setIsKuwaiti] = useState<boolean>(false);
-  
-  const [joiningDate, setJoiningDate] = useState('');
-  const [lastWorkDate, setLastWorkDate] = useState('');
-  const [basicSalary, setBasicSalary] = useState('');
-  const [allowancesSubjectToIndemnity, setAllowancesSubjectToIndemnity] = useState('0');
-  const [contractType, setContractType] = useState<ContractTypeKuwait>(ContractTypeKuwait.UNLIMITED);
-  const [terminationReason, setTerminationReason] = useState<TerminationReasonKuwait>(TerminationReasonKuwait.DISMISSAL_WITH_NOTICE);
-  
-  const [noticePeriodAction, setNoticePeriodAction] = useState<'none' | 'pay_in_lieu' | 'waived'>('none');
-  const [noticeMonths, setNoticeMonths] = useState('3');
-  
-  const [annualLeaveEntitlementPerYear, setAnnualLeaveEntitlementPerYear] = useState('30');
-  const [totalAccruedLeaveDaysDisplay, setTotalAccruedLeaveDaysDisplay] = useState('0'); 
-  const [leaveDaysAlreadyTaken, setLeaveDaysAlreadyTaken] = useState('0');
-  const [manualLeaveAdjustment, setManualLeaveAdjustment] = useState('0');
-  const [netLeaveBalanceDisplay, setNetLeaveBalanceDisplay] = useState('0');
-
-  const [otherDues, setOtherDues] = useState<FinancialItem[]>([]);
-  const [currentDueName, setCurrentDueName] = useState('');
-  const [currentDueAmount, setCurrentDueAmount] = useState('');
-
-  const [deductions, setDeductions] = useState<FinancialItem[]>([]);
-  const [currentDeductionName, setCurrentDeductionName] = useState('');
-  const [currentDeductionAmount, setCurrentDeductionAmount] = useState('');
-
-  const [calculationResult, setCalculationResult] = useState<ExtendedCalculationResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [serviceDuration, setServiceDuration] = useState<{ years: number, months: number, days: number, totalYears: number } | null>(null);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-
-  // Auto-fill logic
-  const handleEmployeeSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const empId = e.target.value;
-      setSelectedEmployeeId(empId);
-      if (empId) {
-          const emp = initialEmployees.find(e => e.id === empId);
-          if (emp) {
-              setEmployeeName(emp.fullNameAr);
-              setEmployeeCivilId(emp.civilId);
-              setEmployeeJobTitle(emp.jobTitle);
-              setJoiningDate(emp.joiningDate);
-              setContractType(emp.contractType);
-              setBasicSalary(emp.basicSalary.toString());
-              
-              const indemnityAllowances = emp.allowances?.filter(a => a.subjectToIndemnity).reduce((sum, a) => sum + a.value, 0) || 0;
-              setAllowancesSubjectToIndemnity(indemnityAllowances.toString());
-              
-              setAnnualLeaveEntitlementPerYear(emp.annualLeaveEntitlement?.toString() || '30');
-              setLeaveDaysAlreadyTaken(emp.leaveTakenThisYear?.toString() || '0');
-          }
-      }
-  };
-
-  const handleReset = () => {
-      setSelectedEmployeeId('');
-      setEmployeeName('');
-      setEmployeeCivilId('');
-      setEmployeeJobTitle('');
-      setJoiningDate('');
-      setLastWorkDate('');
-      setBasicSalary('');
-      setAllowancesSubjectToIndemnity('0');
-      setOtherDues([]);
-      setDeductions([]);
-      setCalculationResult(null);
-      setError(null);
-  };
-
-  useEffect(() => {
-    if (joiningDate && lastWorkDate) {
-      const startDate = new Date(joiningDate);
-      const endDate = new Date(lastWorkDate);
-
-      if (startDate > endDate) {
-        setError("تاريخ نهاية الخدمة يجب أن يكون بعد تاريخ الالتحاق.");
-        setServiceDuration(null);
-        setTotalAccruedLeaveDaysDisplay('0');
-        return;
-      }
-      setError(null);
-
-      let years = endDate.getFullYear() - startDate.getFullYear();
-      let months = endDate.getMonth() - startDate.getMonth();
-      let days = endDate.getDate() - startDate.getDate();
-
-      if (days < 0) {
-        months--;
-        const prevMonthLastDay = new Date(endDate.getFullYear(), endDate.getMonth(), 0).getDate();
-        days += prevMonthLastDay;
-      }
-      if (months < 0) {
-        years--;
-        months += 12;
-      }
-      
-      days +=1; 
-      let currentMonthDays = new Date(startDate.getFullYear() + years, startDate.getMonth() + months +1, 0).getDate();
-      if (days >= currentMonthDays) {
-          days -= currentMonthDays;
-          months++;
-          if (months >= 12) {
-              months -= 12;
-              years++;
-          }
-      }
-
-      const totalDays = (endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24) + 1;
-      const totalYears = totalDays / 365.25; 
-
-      setServiceDuration({ years, months, days, totalYears });
-
-      const annualLeaveEntitlement = parseFloat(annualLeaveEntitlementPerYear) || 0;
-      if (annualLeaveEntitlement > 0 && totalYears > 0) {
-        setTotalAccruedLeaveDaysDisplay((totalYears * annualLeaveEntitlement).toFixed(1));
-      } else {
-        setTotalAccruedLeaveDaysDisplay('0');
-      }
-
-    } else {
-      setServiceDuration(null);
-      setTotalAccruedLeaveDaysDisplay('0');
-    }
-  }, [joiningDate, lastWorkDate, annualLeaveEntitlementPerYear]);
-
-  useEffect(() => {
-    const total = parseFloat(totalAccruedLeaveDaysDisplay) || 0;
-    const taken = parseFloat(leaveDaysAlreadyTaken) || 0;
-    const adjustment = parseFloat(manualLeaveAdjustment) || 0;
-    const net = Math.max(0, total - taken + adjustment);
-    setNetLeaveBalanceDisplay(net.toFixed(1)); 
-  }, [totalAccruedLeaveDaysDisplay, leaveDaysAlreadyTaken, manualLeaveAdjustment]);
-
-  const handleAddDue = () => {
-    if (currentDueName.trim() && parseFloat(currentDueAmount) > 0) {
-      setOtherDues([...otherDues, { id: Date.now().toString(), name: currentDueName.trim(), amount: parseFloat(currentDueAmount) }]);
-      setCurrentDueName('');
-      setCurrentDueAmount('');
-    }
-  };
-  const handleRemoveDue = (id: string) => setOtherDues(otherDues.filter(d => d.id !== id));
-
-  const handleAddDeduction = () => {
-    if (currentDeductionName.trim() && parseFloat(currentDeductionAmount) > 0) {
-      setDeductions([...deductions, { id: Date.now().toString(), name: currentDeductionName.trim(), amount: parseFloat(currentDeductionAmount) }]);
-      setCurrentDeductionName('');
-      setCurrentDeductionAmount('');
-    }
-  };
-  const handleRemoveDeduction = (id: string) => setDeductions(deductions.filter(d => d.id !== id));
-
-  const handleCalculate = () => {
-    setError(null);
-    setCalculationResult(null);
-    let currentErrors: string[] = [];
-
-    if (!companyName.trim()) { currentErrors.push("اسم الشركة/صاحب العمل مطلوب."); }
-    if (!employeeName.trim()) { currentErrors.push("اسم الموظف بالكامل مطلوب."); }
-    if (!employeeCivilId.trim()) { currentErrors.push("الرقم المدني للموظف مطلوب."); }
-    if (!joiningDate || !lastWorkDate) { currentErrors.push("تاريخ الالتحاق وتاريخ آخر يوم عمل مطلوبان."); }
+    const [currentStep, setCurrentStep] = useState(0);
+    const [isSelectionModalOpen, setIsSelectionModalOpen] = useState(false);
     
-    const numBasicSalary = parseFloat(basicSalary);
-    const numAllowances = parseFloat(allowancesSubjectToIndemnity);
-    const numAnnualLeaveEntitlementPerYear = parseFloat(annualLeaveEntitlementPerYear) || 0;
-    const numTotalAccruedLeave = parseFloat(totalAccruedLeaveDaysDisplay) || 0;
-    const numLeaveTaken = parseFloat(leaveDaysAlreadyTaken) || 0;
-
-    if (isNaN(numBasicSalary) || numBasicSalary <= 0) { currentErrors.push("الراتب الأساسي الشهري مطلوب وبقيمة صحيحة.");}
-    if (isNaN(numAllowances) || numAllowances < 0) { currentErrors.push("قيمة البدلات الخاضعة للمكافأة يجب أن تكون رقمًا صحيحًا (أو صفر).");}
-
-    if (currentErrors.length > 0) {
-      setError(currentErrors.join('\n'));
-      return;
-    }
-    
-    if (!serviceDuration || serviceDuration.totalYears < 0) {
-      setError("يرجى التأكد من صحة تواريخ الخدمة.");
-      return;
-    }
-
-    const { totalYears, years: sYears, months: sMonths, days: sDays } = serviceDuration;
-    const calculationSalary = numBasicSalary + numAllowances;
-    let warnings: string[] = [];
-    let notesOnCalculation: string[] = [];
-
-    if (isKuwaiti) {
-        notesOnCalculation.push("الموظف كويتي الجنسية: يخضع لنظام التأمينات الاجتماعية (PIFSS). مكافأة نهاية الخدمة تُصرف من التأمينات، إلا إذا وجد اتفاق تعاقدي أفضل.");
-    }
-
-    let indemnityForFirst5Years = 0;
-    let indemnityForSubsequentYears = 0;
-
-    const dailyRate = calculationSalary / (selectedJurisdiction.code === 'KW' ? 26 : 30);
-
-    // Detailed service breakdown
-    const rules = selectedJurisdiction.laborLaw.indemnityRules;
-    
-    if (totalYears <= rules.firstPeriodYears) {
-      indemnityForFirst5Years = dailyRate * rules.firstPeriodDaysPerYear * totalYears;
-    } else {
-      indemnityForFirst5Years = dailyRate * rules.firstPeriodDaysPerYear * rules.firstPeriodYears;
-      indemnityForSubsequentYears = dailyRate * rules.subsequentPeriodDaysPerYear * (totalYears - rules.firstPeriodYears);
-    }
-    
-    let grossIndemnityBeforeCap = indemnityForFirst5Years + indemnityForSubsequentYears;
-    
-    // Cap calculation (if applicable)
-    let appliedCapAmount: number | undefined = undefined;
-    let grossIndemnityAfterCap = grossIndemnityBeforeCap;
-
-    if (rules.maxIndemnityMonths) {
-        const maxIndemnity = calculationSalary * rules.maxIndemnityMonths;
-        if (grossIndemnityBeforeCap > maxIndemnity) {
-            grossIndemnityAfterCap = maxIndemnity;
-            appliedCapAmount = maxIndemnity;
-            notesOnCalculation.push(`تطبيق الحد الأقصى للنظام القانوني الحالي (${rules.maxIndemnityMonths} شهر).`);
-        }
-    }
-
-    let terminationAdjustmentFactor = 1; 
-    
-    switch (terminationReason) {
-        case TerminationReasonKuwait.DISMISSAL_WITHOUT_NOTICE_ART_41:
-            terminationAdjustmentFactor = 0;
-            warnings.push("فصل العامل لسبب تأديبي يترتب عليه الحرمان من مكافأة نهاية الخدمة بالكامل.");
-            break;
-        case TerminationReasonKuwait.RESIGNATION_UNDER_3_YEARS:
-            terminationAdjustmentFactor = rules.resignationAdjustment.under3Years;
-            if (terminationAdjustmentFactor < 1) notesOnCalculation.push(`استقالة - خدمة أقل من 3 سنوات: نسبة الاستحقاق ${(terminationAdjustmentFactor * 100).toFixed(0)}%.`);
-            break;
-        case TerminationReasonKuwait.RESIGNATION_3_TO_5_YEARS:
-            terminationAdjustmentFactor = rules.resignationAdjustment.threeToFiveYears;
-            if (terminationAdjustmentFactor < 1) notesOnCalculation.push(`استقالة - خدمة 3-5 سنوات: نسبة الاستحقاق ${(terminationAdjustmentFactor * 100).toFixed(0)}%.`);
-            break;
-        case TerminationReasonKuwait.RESIGNATION_5_TO_10_YEARS:
-            terminationAdjustmentFactor = rules.resignationAdjustment.fiveToTenYears;
-            if (terminationAdjustmentFactor < 1) notesOnCalculation.push(`استقالة - خدمة 5-10 سنوات: نسبة الاستحقاق ${(terminationAdjustmentFactor * 100).toFixed(0)}%.`);
-            break;
-        case TerminationReasonKuwait.RESIGNATION_OVER_10_YEARS:
-            terminationAdjustmentFactor = rules.resignationAdjustment.overTenYears;
-            if (terminationAdjustmentFactor < 1) notesOnCalculation.push(`استقالة - خدمة 10 سنوات فأكثر: نسبة الاستحقاق ${(terminationAdjustmentFactor * 100).toFixed(0)}%.`);
-            break;
-        case TerminationReasonKuwait.RESIGNATION_ART_48_EMPLOYER_FAULT:
-            terminationAdjustmentFactor = 1;
-            notesOnCalculation.push(`ترك العمل لخطأ صاحب العمل: يستحق العامل كامل المكافأة كما لو كان الإنهاء من قبل صاحب العمل.`);
-            break;
-        case TerminationReasonKuwait.RESIGNATION_WOMAN_MARRIAGE:
-            terminationAdjustmentFactor = 1;
-            notesOnCalculation.push(`استقالة العاملة بسبب الزواج: يستحق كامل المكافأة إذا كان خلال المدة القانونية.`);
-            break;
-        default:
-            terminationAdjustmentFactor = 1; 
-            notesOnCalculation.push(`إنهاء من قبل صاحب العمل أو بقوة القانون: يستحق العامل كامل المكافأة (100%).`);
-            break;
-    }
-
-    const adjustedIndemnity = isKuwaiti ? 0 : (grossIndemnityAfterCap * terminationAdjustmentFactor);
-
-    let noticePeriodDays = 0;
-    let noticePeriodValue = 0;
-    let paidNotice = false;
-
-    if (noticePeriodAction === 'pay_in_lieu') {
-        const months = parseFloat(noticeMonths) || 3;
-        noticePeriodValue = calculationSalary * months;
-        noticePeriodDays = Math.round(months * 30);
-        paidNotice = true;
-        notesOnCalculation.push(`بدل إنذار لمدة ${months} أشهر مدفوع نقداً (مادة 44).`);
-    } else if (noticePeriodAction === 'waived') {
-        notesOnCalculation.push("تم التنازل عن فترة الإنذار بالاتفاق.");
-    }
-
-    const netLeaveBalanceDays = parseFloat(netLeaveBalanceDisplay) || 0;
-    const leaveDayValue = dailyRate; 
-    const leaveEncashmentValue = leaveDayValue * netLeaveBalanceDays;
-    
-    const totalOtherDuesValue = otherDues.reduce((sum, item) => sum + item.amount, 0);
-    const totalDeductionsValue = deductions.reduce((sum, item) => sum + item.amount, 0);
-
-    const netPayableAmount = (adjustedIndemnity + leaveEncashmentValue + noticePeriodValue + totalOtherDuesValue) - totalDeductionsValue;
-
-    setCalculationResult({
-      companyName, employeeName, employeeCivilId, employeeJobTitle, isKuwaiti, joiningDate, lastWorkDate,
-      basicSalary: numBasicSalary, allowancesSubjectToIndemnity: numAllowances, contractType, terminationReason,
-      annualLeaveEntitlementPerYear: numAnnualLeaveEntitlementPerYear,
-      totalAccruedLeaveDays: numTotalAccruedLeave, 
-      leaveDaysAlreadyTaken: numLeaveTaken,
-      manualLeaveAdjustment: parseFloat(manualLeaveAdjustment) || 0,
-      noticePeriodDays, noticePeriodValue, paidNotice,
-      otherDues, deductions,
-      serviceYears: sYears, serviceMonths: sMonths, serviceDays: sDays,
-      calculationSalary,
-      indemnityForFirst5Years, indemnityForSubsequentYears, 
-      grossIndemnityBeforeCap, appliedCapAmount, grossIndemnityAfterCap,
-      terminationAdjustmentFactor, adjustedIndemnity,
-      netLeaveBalanceDays, leaveDayValue, leaveEncashmentValue,
-      totalOtherDuesValue, totalDeductionsValue,
-      netPayableAmount,
-      warnings,
-      notesOnCalculation,
+    const [formData, setFormData] = useState({
+        employeeId: '',
+        employeeName: '',
+        employeeCivilId: '',
+        jobTitle: '',
+        nationality: 'وافد / أجنبي',
+        joiningDate: format(new Date(), 'yyyy-MM-dd'),
+        lastWorkingDay: format(new Date(), 'yyyy-MM-dd'),
+        terminationReason: TerminationReasonKuwait.RESIGNATION,
+        paySystem: 'شهري' as 'شهري' | 'غير شهري',
+        basicSalary: 0,
+        allowances: 0,
+        leaveEntitlement: 30,
+        leaveTaken: 0,
+        leaveAdjustment: 0,
+        noticeAction: 'WorkDuringNotice' as 'WorkDuringNotice' | 'PayNoticePay' | 'Waived',
+        otherAdditions: 0,
+        deductions: 0,
+        absenceDays: 0,
+        socialInsuranceDeduction: 0,
+        contractType: ContractTypeKuwait.UNLIMITED,
+        notes: ''
     });
-  };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-center">
-        <div className="flex items-center mb-3 md:mb-0">
-            <CalculatorIcon className="w-8 h-8 text-primary me-3" />
-            <h1 className="text-3xl font-bold text-primary-dark">احتساب نهاية الخدمة - {selectedJurisdiction.name}</h1>
-        </div>
-        <Button variant="outline" onClick={handleReset} leftIcon={<ArrowPathIcon className="w-4 h-4"/>}>إعادة تعيين النموذج</Button>
-      </div>
-      
-      {/* Auto-fill Section */}
-      <Card className="bg-blue-50 border-blue-200">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-              <UsersIcon className="w-10 h-10 text-blue-500" />
-              <div className="flex-grow w-full">
-                  <h3 className="font-bold text-blue-800 mb-1">اختيار موظف من السجلات (اختياري)</h3>
-                  <p className="text-sm text-blue-600 mb-2">يمكنك اختيار موظف مسجل لتعبئة البيانات الأساسية والمالية تلقائياً.</p>
-                  <Select 
-                    options={[{value: '', label: '--- اختر موظفاً ---'}, ...initialEmployees.map(e => ({value: e.id, label: e.fullNameAr}))]}
-                    value={selectedEmployeeId}
-                    onChange={handleEmployeeSelect}
-                    containerClassName="mb-0 max-w-md bg-white"
-                  />
-              </div>
-          </div>
-      </Card>
+    const [savedSettlements, setSavedSettlements] = useState<EOS_Settlement[]>([]);
+    const [showSavedList, setShowSavedList] = useState(false);
 
-      <Card title="1. بيانات الموظف وفترة الخدمة">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-          <Input label="اسم الشركة/صاحب العمل" value={companyName} onChange={(e) => setCompanyName(e.target.value)} required placeholder="مثال: شركة الأمل للتجارة" />
-          <Input label="اسم الموظف بالكامل" value={employeeName} onChange={(e) => setEmployeeName(e.target.value)} required placeholder="مثال: أحمد عبدالله" />
-          <Input label="الرقم المدني" value={employeeCivilId} onChange={(e) => setEmployeeCivilId(e.target.value)} required placeholder="مثال: 285010112345" />
-          <Input label="المسمى الوظيفي" value={employeeJobTitle} onChange={(e) => setEmployeeJobTitle(e.target.value)} required />
-          
-          <div className="flex flex-col space-y-2">
-            <label className="text-sm font-medium text-gray-700">فئة الموظف</label>
-            <div className="flex gap-4 p-2 bg-white border border-gray-300 rounded-md">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={!isKuwaiti} onChange={() => setIsKuwaiti(false)} className="accent-primary" />
-                <span>وافد / أجنبي</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input type="radio" checked={isKuwaiti} onChange={() => setIsKuwaiti(true)} className="accent-primary" />
-                <span>مواطن ({selectedJurisdiction.name})</span>
-              </label>
+    // --- Calculation Hook ---
+    const calc = useMemo(() => {
+        return calculateKuwaitEOS({
+            ...formData,
+            terminationReason: formData.terminationReason as TerminationReasonKuwait,
+        });
+    }, [formData]);
+
+    // --- Actions ---
+    const handleEmployeeSelect = (emp: any) => {
+        setFormData({
+            ...formData,
+            employeeName: emp.fullNameAr,
+            employeeCivilId: emp.civilId,
+            jobTitle: emp.jobTitle,
+            joiningDate: emp.joiningDate,
+            basicSalary: emp.basicSalary,
+            allowances: (emp.allowances || []).reduce((acc: number, cur: any) => acc + cur.value, 0),
+            contractType: emp.contractType,
+            nationality: emp.nationality?.includes('كويت') ? 'مواطن (الكويت)' : 'وافد / أجنبي',
+            paySystem: 'شهري'
+        });
+        setIsSelectionModalOpen(false);
+    };
+
+    const handleSave = () => {
+        const newRecord: EOS_Settlement = {
+            id: `EOS-${Date.now()}`,
+            employeeId: formData.employeeCivilId,
+            employeeName: formData.employeeName,
+            settlementDate: format(new Date(), 'yyyy-MM-dd'),
+            lastWorkingDay: formData.lastWorkingDay,
+            terminationReason: formData.terminationReason,
+            status: 'UnderReview',
+            basicSalary: formData.basicSalary,
+            allowances: formData.allowances,
+            grossSalary: formData.basicSalary + formData.allowances,
+            serviceYears: calc.serviceYears,
+            serviceMonths: calc.serviceMonths,
+            serviceDays: calc.serviceDays,
+            indemnityAmount: calc.indemnityAmount,
+            leaveBalanceAmount: calc.leavePayAmount,
+            accruedSalaryAmount: 0, 
+            noticePeriodAmount: calc.noticePeriodPay,
+            otherBonuses: formData.otherAdditions,
+            loansDeduction: formData.deductions,
+            absenceDeduction: calc.deductionsTotal - formData.deductions - formData.socialInsuranceDeduction,
+            otherDeductions: 0,
+            netPayable: calc.netAmount,
+            legalArticles: calc.legalArticles.map(a => a.article),
+            preparedBy: "النظام الذكي",
+            notes: formData.notes
+        };
+        setSavedSettlements(prev => [newRecord, ...prev]);
+        setShowSavedList(true);
+    };
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, STEP_TABS.length - 1));
+    const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 0));
+
+    // --- Formal Document Template (Print Only) ---
+    const FormalDocument = () => (
+        <div className="print-only hidden p-10 bg-white text-slate-900 font-sans" dir="rtl" style={{ minHeight: '29.7cm' }}>
+            {/* Header */}
+            <div className="flex justify-between items-start border-b-2 border-slate-900 pb-6 mb-8">
+                <div className="text-right">
+                    <h2 className="text-2xl font-black">{OFFICE_NAME}</h2>
+                    <p className="text-sm font-bold">للمحاماة والاستشارات القانونية</p>
+                    <p className="text-xs">دولة الكويت - مجمع الوزارات</p>
+                </div>
+                <div className="text-center">
+                    <div className="w-16 h-16 bg-slate-900 rounded-xl mb-2 mx-auto flex items-center justify-center">
+                        <ScaleIcon className="text-white w-10 h-10" />
+                    </div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Official Document</p>
+                </div>
+                <div className="text-left text-xs space-y-1">
+                    <p>المرجع: <span className="font-bold">EOS/{new Date().getFullYear()}/{Math.floor(Math.random()*9000)+1000}</span></p>
+                    <p>التاريخ: <span className="font-bold">{format(new Date(), 'yyyy/MM/dd')}</span></p>
+                    <p>الصفحة: 1 من 1</p>
+                </div>
             </div>
-          </div>
-          
-          <div className="hidden md:block"></div> { /* spacer */ }
-          
-          <Input label="تاريخ الالتحاق بالعمل" type="date" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} required />
-          <Input label="تاريخ نهاية الخدمة" type="date" value={lastWorkDate} onChange={(e) => setLastWorkDate(e.target.value)} required />
-          
-          {serviceDuration && (
-            <div className="md:col-span-2 p-3 bg-gray-100 rounded-md text-sm border-s-4 border-primary">
-              <strong>مدة الخدمة المحسوبة:</strong> {serviceDuration.years} سنوات, {serviceDuration.months} أشهر, و {serviceDuration.days} أيام.
+
+            <div className="text-center mb-10">
+                <h1 className="text-2xl font-black underline underline-offset-8">كشف تسوية مستحقات نهاية الخدمة والوفاء النهائي</h1>
             </div>
-          )}
-        </div>
-      </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card title="2. تفاصيل الراتب والعقد">
-             <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                    <Input label={`الراتب الأساسي (${selectedJurisdiction.currencySymbol})`} type="number" value={basicSalary} onChange={(e) => setBasicSalary(e.target.value)} placeholder="مثال: 800" required />
-                    <Input label={`البدلات الخاضعة (${selectedJurisdiction.currencySymbol})`} type="number" value={allowancesSubjectToIndemnity} onChange={(e) => setAllowancesSubjectToIndemnity(e.target.value)} placeholder="مثال: 200" />
-                </div>
-                <div className="p-2 bg-green-50 rounded text-center font-bold text-green-800">
-                    الراتب الشامل للحساب: {(parseFloat(basicSalary) || 0) + (parseFloat(allowancesSubjectToIndemnity) || 0)} {selectedJurisdiction.currencySymbol}
-                </div>
-                <Select label="نوع العقد" options={contractTypeKuwaitOptions} value={contractType} onChange={(e) => setContractType(e.target.value as ContractTypeKuwait)} />
-                <Select label="سبب إنهاء الخدمة" options={terminationReasonKuwaitOptions} value={terminationReason} onChange={(e) => setTerminationReason(e.target.value as TerminationReasonKuwait)} />
-             </div>
-          </Card>
+            {/* Employee Data Table */}
+            <div className="mb-8">
+                <h3 className="bg-slate-100 p-2 font-black text-sm mb-4 border-r-4 border-slate-900">أولاً: البيانات الوظيفية</h3>
+                <table className="doc-modern-table w-full">
+                    <tbody>
+                        <tr>
+                            <td className="bg-slate-50 font-bold w-1/4">اسم الموظف:</td>
+                            <td className="w-1/4">{formData.employeeName}</td>
+                            <td className="bg-slate-50 font-bold w-1/4">الرقم المدني:</td>
+                            <td className="w-1/4 font-mono">{formData.employeeCivilId}</td>
+                        </tr>
+                        <tr>
+                            <td className="bg-slate-50 font-bold">المسمى الوظيفي:</td>
+                            <td>{formData.jobTitle}</td>
+                            <td className="bg-slate-50 font-bold">الجنسية:</td>
+                            <td>{formData.nationality}</td>
+                        </tr>
+                        <tr>
+                            <td className="bg-slate-50 font-bold">تاريخ التعيين:</td>
+                            <td>{format(new Date(formData.joiningDate), 'yyyy/MM/dd')}</td>
+                            <td className="bg-slate-50 font-bold">تاريخ انتهاء الخدمة:</td>
+                            <td>{format(new Date(formData.lastWorkingDay), 'yyyy/MM/dd')}</td>
+                        </tr>
+                        <tr>
+                            <td className="bg-slate-50 font-bold">مدة الخدمة:</td>
+                            <td colSpan={3} className="font-bold">{calc.serviceYears} سنة، {calc.serviceMonths} شهر، {calc.serviceDays} يوم</td>
+                        </tr>
+                        <tr>
+                            <td className="bg-slate-50 font-bold">سبب انتهاء الخدمة:</td>
+                            <td colSpan={3}>{terminationReasonKuwaitOptions.find(o => o.value === formData.terminationReason)?.label}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
 
-          <Card title="3. رصيد الإجازات">
-             <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <Input label="استحقاق الإجازة السنوية (أيام/سنة)" type="number" step="1" value={annualLeaveEntitlementPerYear} onChange={(e) => setAnnualLeaveEntitlementPerYear(e.target.value)} />
-                  <Input label="إجمالي الرصيد التراكمي (أيام)" type="number" value={totalAccruedLeaveDaysDisplay} readOnly disabled className="bg-gray-100" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <Input label="الإجازات المستهلكة/من الرصيد (أيام)" type="number" step="0.5" value={leaveDaysAlreadyTaken} onChange={(e) => setLeaveDaysAlreadyTaken(e.target.value)} placeholder="أدخل الأيام المستخدمة" />
-                    <Input label="تسوية يدوية (إضافة + / خصم -)" type="number" step="0.5" value={manualLeaveAdjustment} onChange={(e) => setManualLeaveAdjustment(e.target.value)} placeholder="رصيد مرحل أو تسوية" />
-                </div>
-                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200 flex justify-between items-center">
-                    <span className="text-yellow-800 font-medium">صافي الرصيد المستحق للصرف:</span>
-                    <span className="text-2xl font-bold text-yellow-900">{netLeaveBalanceDisplay} يوم</span>
-                </div>
-                <p className="text-[10px] text-gray-500 italic">
-                  * يتم احتساب الرصيد التراكمي بناءً على تاريخ الالتحاق وتاريخ ترك العمل (مدة الخدمة الفعلية).
+            {/* Financial Details */}
+            <div className="mb-8">
+                <h3 className="bg-slate-100 p-2 font-black text-sm mb-4 border-r-4 border-slate-900">ثانياً: المستحقات والخصومات المخصومة</h3>
+                <table className="doc-modern-table w-full">
+                    <thead>
+                        <tr className="bg-slate-100">
+                            <th>البند</th>
+                            <th>التفاصيل القانونية</th>
+                            <th>المبلغ (د.ك)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className="font-bold">مكافأة نهاية الخدمة</td>
+                            <td className="text-xs">المادة 51 - بواقع {(calc.indemnityBreakdown.adjustmentFactor * 100).toFixed(0)}% من المستحق</td>
+                            <td className="text-center font-bold">{calc.indemnityAmount.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td className="font-bold">بدل الإجازات المستحقة</td>
+                            <td className="text-xs">رصيد {calc.leaveBalanceDays} يوم (الراتب الشامل: {formData.basicSalary + formData.allowances})</td>
+                            <td className="text-center font-bold">{calc.leavePayAmount.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td className="font-bold">بدل مهلة الإخطار</td>
+                            <td className="text-xs">{formData.noticeAction === 'PayNoticePay' ? 'صرف نقدي' : 'تم العمل/التنازل'}</td>
+                            <td className="text-center font-bold">{calc.noticePeriodPay.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td className="font-bold">إضافات أخرى</td>
+                            <td className="text-xs">عمولات ومستحقات متفرقة</td>
+                            <td className="text-center font-bold">{formData.otherAdditions.toLocaleString()}</td>
+                        </tr>
+                        <tr className="bg-slate-50">
+                            <td colSpan={2} className="text-left font-black">إجمالي المستحقات:</td>
+                            <td className="text-center font-black">{calc.additionsTotal.toLocaleString()}</td>
+                        </tr>
+                        <tr>
+                            <td className="font-bold text-rose-700">الخصومات والسلف</td>
+                            <td className="text-xs">سلف موظفين، ديون، أو غرامات</td>
+                            <td className="text-center font-bold text-rose-700">({formData.deductions.toLocaleString()})</td>
+                        </tr>
+                        <tr>
+                            <td className="font-bold text-rose-700">غياب / تأمينات</td>
+                            <td className="text-xs">أيام غياب فعلية وحصة العامل في التأمينات</td>
+                            <td className="text-center font-bold text-rose-700">({(calc.deductionsTotal - formData.deductions).toLocaleString()})</td>
+                        </tr>
+                        <tr className="bg-slate-900 text-white font-black">
+                            <td colSpan={2} className="text-left py-4 px-4 text-lg">صافي المبلغ المسلم (فقط لا غير):</td>
+                            <td className="text-center text-lg">{calc.netAmount.toLocaleString()} د.ك</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            {/* Discharge Section */}
+            <div className="mb-12 p-6 border-2 border-slate-200 rounded-2xl bg-slate-50 italic">
+                <h4 className="font-black text-center mb-4 not-italic underline">إقرار استلام وبراءة ذمة نهائية</h4>
+                <p className="text-xs leading-relaxed text-justify">
+                    أنا الموقع أدناه {formData.employeeName}، أقر وأعترف بأنني قد استلمت كافة مستحقاتي المالية الموضحة أعلاه والناشئة عن علاقة عملي بالشركة، كما أقر باستلامي لكافة الوثائق والأوراق والعهد الخاصة بي، وأنه بموجب هذا التوقيع أبرئ ذمة الشركة إبراءً عاماً شاملاً ومانعاً من أي مطالبات حالية أو مستقبلية تتعلق بفترة عملي أو انتهائها، وذلك وفقاً لقانون العمل في القطاع الأهلي بدولة الكويت.
                 </p>
-             </div>
-          </Card>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card title="4. إضافات أخرى (مكافآت، عمولات)">
-            {otherDues.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-2 border-b bg-white">
-                    <span>{item.name}: <strong>{item.amount.toFixed(3)}</strong> {selectedJurisdiction.currencySymbol}</span>
-                    <Button variant="danger" size="sm" onClick={() => handleRemoveDue(item.id)} className="!p-1"><TrashIcon className="w-4 h-4"/></Button>
+                <div className="mt-8 flex justify-between px-10 items-center">
+                    <div className="text-center space-y-4">
+                        <p className="font-bold text-xs">توقيع الموظف</p>
+                        <div className="w-40 h-10 border-b border-slate-400"></div>
+                        <p className="text-[10px]">تاريخ التوقيع: ___/___/20__</p>
+                    </div>
+                    <div className="text-center space-y-4">
+                        <p className="font-bold text-xs">بصمة الإبهام (إن وجد)</p>
+                        <div className="w-20 h-20 border-2 border-slate-300 rounded-md"></div>
+                    </div>
                 </div>
-            ))}
-            <div className="flex items-end gap-2 mt-2">
-                <Input label="الوصف" value={currentDueName} onChange={e => setCurrentDueName(e.target.value)} containerClassName="flex-grow mb-0" placeholder="وصف البند..." />
-                <Input label={`المبلغ (${selectedJurisdiction.currencySymbol})`} type="number" value={currentDueAmount} onChange={e => setCurrentDueAmount(e.target.value)} containerClassName="w-32 mb-0" step="0.001" />
-                <Button onClick={handleAddDue} variant="outline" size="sm" leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة</Button>
             </div>
-        </Card>
-        <Card title="5. خصومات (سلف، قروض، أضرار)">
-             {deductions.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-2 border-b bg-white">
-                    <span className="text-red-600">{item.name}: <strong>- {item.amount.toFixed(3)}</strong> {selectedJurisdiction.currencySymbol}</span>
-                    <Button variant="danger" size="sm" onClick={() => handleRemoveDeduction(item.id)} className="!p-1"><TrashIcon className="w-4 h-4"/></Button>
-                </div>
-            ))}
-            <div className="flex items-end gap-2 mt-2">
-                <Input label="الوصف" value={currentDeductionName} onChange={e => setCurrentDeductionName(e.target.value)} containerClassName="flex-grow mb-0" placeholder="وصف الخصم..."/>
-                <Input label={`المبلغ (${selectedJurisdiction.currencySymbol})`} type="number" value={currentDeductionAmount} onChange={e => setCurrentDeductionAmount(e.target.value)} containerClassName="w-32 mb-0" step="0.001"/>
-                <Button onClick={handleAddDeduction} variant="outline" size="sm" leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة</Button>
-            </div>
-        </Card>
-      </div>
 
-      <Card title="6. فترة الإنذار (المادة 44)">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700 font-sans">الإجراء المتخذ بشأن فترة الإنذار</label>
-                <div className="grid grid-cols-3 gap-2">
-                    <button 
-                        onClick={() => setNoticePeriodAction('none')}
-                        className={`p-2 text-xs border rounded-md transition-colors ${noticePeriodAction === 'none' ? 'bg-primary text-white border-primary' : 'bg-white hover:bg-gray-50'}`}
-                    >
-                        العمل خلال الإنذار
-                    </button>
-                    <button 
-                        onClick={() => setNoticePeriodAction('pay_in_lieu')}
-                        className={`p-2 text-xs border rounded-md transition-colors ${noticePeriodAction === 'pay_in_lieu' ? 'bg-primary text-white border-primary' : 'bg-white hover:bg-gray-50'}`}
-                    >
-                        دفع بدل إنذار
-                    </button>
-                    <button 
-                        onClick={() => setNoticePeriodAction('waived')}
-                        className={`p-2 text-xs border rounded-md transition-colors ${noticePeriodAction === 'waived' ? 'bg-primary text-white border-primary' : 'bg-white hover:bg-gray-50'}`}
-                    >
-                        تم التنازل عنها
-                    </button>
+            {/* Approvals Grid */}
+            <div className="grid grid-cols-2 gap-4 mt-10">
+                <div className="print-signature-box flex flex-col justify-between">
+                    <p className="text-[10px] font-black text-slate-400 mb-2">اعتماد الإدارة القانونية</p>
+                    <div className="flex-1 border-b border-slate-200 border-dashed mb-2"></div>
+                    <p className="text-[10px] text-right font-bold">الاسم: ............................</p>
+                </div>
+                <div className="print-signature-box flex flex-col justify-between">
+                    <p className="text-[10px] font-black text-slate-400 mb-2">اعتماد الإدارة المالية</p>
+                    <div className="flex-1 border-b border-slate-200 border-dashed mb-2"></div>
+                    <p className="text-[10px] text-right font-bold">الاسم: ............................</p>
+                </div>
+                <div className="print-signature-box flex flex-col justify-between">
+                    <p className="text-[10px] font-black text-slate-400 mb-2">المدير العام / المفوض بالتوقيع</p>
+                    <div className="flex-1 border-b border-slate-200 border-dashed mb-2"></div>
+                    <p className="text-[10px] text-right font-bold">الختم:</p>
+                </div>
+                <div className="flex items-center justify-center p-4 border-2 border-double border-slate-200 rounded-2xl relative opacity-20">
+                     <div className="w-32 h-32 rounded-full border-4 border-slate-400 flex items-center justify-center">
+                        <span className="text-[8px] font-black uppercase tracking-tighter">COMPANY STAMP AREA</span>
+                     </div>
+                     <p className="absolute text-[8px] bottom-2">موضع ختم الشركة الرسمي</p>
                 </div>
             </div>
             
-            {noticePeriodAction === 'pay_in_lieu' && (
-                <div className="animate-fade-in">
-                    <label className="text-sm font-medium text-gray-700 mb-1 block">مدة بدل الإنذار (أشهر)</label>
-                    <div className="flex items-center gap-4">
-                        <input 
-                            type="range" min="1" max="6" step="1" 
-                            value={noticeMonths} 
-                            onChange={(e) => setNoticeMonths(e.target.value)}
-                            className="flex-grow accent-primary"
-                        />
-                        <span className="font-bold text-primary w-12 text-center">{noticeMonths} أشهر</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2 italic shadow-sm bg-blue-50 p-1 rounded">
-                        * المادة 44 تشترط 3 أشهر على الأقل للعقود غير محددة المدة لموظفي الأجر الشهري.
-                    </p>
-                </div>
-            )}
-            
-            {noticePeriodAction === 'none' && (
-                <div className="bg-gray-50 p-4 rounded-md border text-sm text-gray-600 flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                    يستمر الموظف بالعمل خلال فترة الإنذار ويتقاضى راتبه الشهري المعتاد حتى تاريخ تركه العمل.
-                </div>
-            )}
+            <footer className="mt-20 pt-4 border-t border-slate-100 text-[8px] text-slate-400 flex justify-between">
+                <p>صدر هذا المستند من منظومة "عدالة" الذكية - جميع الحقوق محفوظة لشركة الوجيان للاستشارات</p>
+                <p>رقم التحقق الإلكتروني: {Math.random().toString(36).substring(7).toUpperCase()}</p>
+            </footer>
         </div>
-      </Card>
-      
-      <div className="mt-4 flex justify-center">
-          <Button onClick={handleCalculate} variant="primary" size="lg" className="w-full md:w-1/2">
-              <CalculatorIcon className="w-6 h-6 me-2"/> عرض النتيجة التفصيلية
-          </Button>
-      </div>
+    );
 
-      {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow-sm" role="alert">
-          <p className="font-bold">تنبيه:</p>
-          <pre className="whitespace-pre-wrap text-sm font-sans">{error}</pre>
-        </div>
-      )}
-
-      {calculationResult && (
-        <div className="animate-fade-in-right">
-            <Card title="نتيجة الحساب النهائية" className="border-t-4 border-primary shadow-lg bg-gray-50">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center mb-6">
-                    <div className="p-4 bg-white rounded shadow-sm">
-                        <p className="text-gray-500 text-sm">مكافأة نهاية الخدمة (الصافي)</p>
-                        <p className="text-2xl font-bold text-primary">{formatCurrency(calculationResult.adjustedIndemnity)}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded shadow-sm">
-                        <p className="text-gray-500 text-sm">بدل رصيد الإجازات</p>
-                        <p className="text-2xl font-bold text-yellow-600">{formatCurrency(calculationResult.leaveEncashmentValue)}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded shadow-sm">
-                        <p className="text-gray-500 text-sm">بدل الإنذار</p>
-                        <p className="text-2xl font-bold text-purple-600">{formatCurrency(calculationResult.noticePeriodValue, selectedJurisdiction)}</p>
-                    </div>
-                    <div className="p-4 bg-white rounded shadow-sm border-2 border-green-500">
-                        <p className="text-gray-500 text-sm font-bold">صافي المبلغ المستحق للدفع</p>
-                        <p className="text-3xl font-bold text-green-600">{formatCurrency(calculationResult.netPayableAmount)}</p>
-                    </div>
-                </div>
-
-                <div className="bg-white p-4 rounded border shadow-inner">
-                    <h4 className="font-bold text-gray-700 mb-3 border-b pb-2 flex items-center">
-                      <InformationCircleIcon className="w-5 h-5 me-2 text-primary"/>
-                      تفاصيل وملاحظات الحساب:
-                    </h4>
-                    <div className="space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                            <div className="flex justify-between p-2 bg-gray-50 rounded">
-                                <span className="text-gray-500">مدة الخدمة:</span>
-                                <span className="font-bold">{calculationResult.serviceYears} سنة، {calculationResult.serviceMonths} شهر، {calculationResult.serviceDays} يوم</span>
+    // --- Sections ---
+    const renderStepContent = () => {
+        switch (STEP_TABS[currentStep].id) {
+            case 'employee':
+                return (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+                    >
+                        <div className="space-y-6 bg-white dark:bg-slate-900 p-8 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <UserCircleIcon className="w-6 h-6 text-indigo-500" />
+                                    الهوية الوظيفية
+                                </h4>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="rounded-xl font-bold"
+                                    onClick={() => setIsSelectionModalOpen(true)}
+                                    leftIcon={<UserGroupIcon className="w-4 h-4"/>}
+                                >
+                                    اختيار من السجل
+                                </Button>
                             </div>
-                            <div className="flex justify-between p-2 bg-gray-50 rounded">
-                                <span className="text-gray-500">أجر اليوم (للحساب):</span>
-                                <span className="font-bold">{formatCurrency(calculationResult.leaveDayValue)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-gray-50 rounded">
-                                <span className="text-gray-500">مكافأة الـ 5 سنوات الأولى:</span>
-                                <span className="font-bold">{formatCurrency(calculationResult.indemnityForFirst5Years)}</span>
-                            </div>
-                            <div className="flex justify-between p-2 bg-gray-50 rounded">
-                                <span className="text-gray-500">مكافأة ما بعد الـ 5 سنوات:</span>
-                                <span className="font-bold">{formatCurrency(calculationResult.indemnityForSubsequentYears)}</span>
+                            
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 dark:text-slate-400 block pr-1">الاسم الكامل (حسب البطاقة المدنية)</label>
+                                    <input 
+                                        type="text" 
+                                        className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all text-right text-lg font-bold"
+                                        placeholder="أدخل اسم الموظف الرباعي..."
+                                        value={formData.employeeName}
+                                        onChange={e => setFormData({...formData, employeeName: e.target.value})}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-600 dark:text-slate-400 block pr-1">الرقم المدني</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all text-right font-mono tracking-wider"
+                                            value={formData.employeeCivilId}
+                                            onChange={e => setFormData({...formData, employeeCivilId: e.target.value})}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-bold text-slate-600 dark:text-slate-400 block pr-1">المسمى الوظيفي</label>
+                                        <input 
+                                            type="text" 
+                                            className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500 transition-all text-right"
+                                            value={formData.jobTitle}
+                                            onChange={e => setFormData({...formData, jobTitle: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 dark:text-slate-400 block pr-1">الفئة / الجنسية</label>
+                                    <div className="grid grid-cols-2 gap-2 bg-slate-50 dark:bg-slate-800 p-1 rounded-xl">
+                                        <button 
+                                            onClick={() => setFormData({...formData, nationality: 'وافد / أجنبي'})}
+                                            className={`py-3 rounded-lg text-sm font-black transition-all ${formData.nationality === 'وافد / أجنبي' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                                        >
+                                            وافد / أجنبي
+                                        </button>
+                                        <button 
+                                            onClick={() => setFormData({...formData, nationality: 'مواطن (الكويت)'})}
+                                            className={`py-3 rounded-lg text-sm font-black transition-all ${formData.nationality !== 'وافد / أجنبي' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600' : 'text-slate-400'}`}
+                                        >
+                                            مواطن كويتي
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
-                        <ul className="space-y-1 text-sm text-gray-600 bg-blue-50 p-3 rounded-md border border-blue-100">
-                            <li>إجمالي الإضافات الأخرى: <span className="text-green-600 font-bold">+{formatCurrency(calculationResult.totalOtherDuesValue, selectedJurisdiction)}</span></li>
-                            <li>إجمالي الخصومات: <span className="text-red-600 font-bold">-{formatCurrency(calculationResult.totalDeductionsValue, selectedJurisdiction)}</span></li>
-                            {calculationResult.appliedCapAmount && <li className="text-red-600 font-bold flex items-center"><ExclamationTriangleIcon className="w-4 h-4 me-1"/> تم تطبيق سقف المكافأة ({selectedJurisdiction.laborLaw.indemnityRules.maxIndemnityMonths} شهر) وفقاً للنظام القانوني.</li>}
-                            {calculationResult.terminationAdjustmentFactor < 1 && <li>نسبة استحقاق المكافأة: <strong className="text-orange-600">{(calculationResult.terminationAdjustmentFactor * 100).toFixed(1)}%</strong> (بسبب: {terminationReasonKuwaitOptions.find(o=>o.value === calculationResult.terminationReason)?.label})</li>}
-                        </ul>
+                        <div className="bg-gradient-to-br from-indigo-700 to-indigo-900 p-10 rounded-2xl shadow-xl text-white relative overflow-hidden flex flex-col justify-center">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32 blur-3xl"></div>
+                            <div className="absolute bottom-0 left-0 w-48 h-48 bg-indigo-500/10 rounded-full -ml-24 -mb-24 blur-2xl"></div>
+                            <div className="relative z-10 space-y-6">
+                                <div className="bg-indigo-500/20 w-16 h-16 rounded-2xl flex items-center justify-center mb-2">
+                                    <ShieldCheckIcon className="w-10 h-10 text-indigo-200" />
+                                </div>
+                                <h3 className="text-3xl font-black leading-tight">محرك الاحتساب القانوني الذكي (نهاية الخدمة)</h3>
+                                <p className="text-indigo-100/90 leading-relaxed font-medium text-lg">
+                                    يتم احتساب المستحقات وفقاً لأحكام قانون العمل الكويتي رقم 6 لسنة 2010 في القطاع الأهلي، مع دمج كافة التعديلات القانونية المتعلقة بحساب الأجر الشامل والمواد 51، 53، 70 و79.
+                                </p>
+                                <div className="flex gap-4 pt-4">
+                                    <div className="bg-white/10 px-5 py-4 rounded-2xl backdrop-blur-md border border-white/5">
+                                        <p className="text-[10px] uppercase font-black tracking-[0.2em] text-indigo-300 opacity-60 mb-1">Jurisdiction</p>
+                                        <p className="font-bold flex items-center gap-2"><GlobeAltIcon className="w-4 h-4"/> دولة الكويت</p>
+                                    </div>
+                                    <div className="bg-white/10 px-5 py-4 rounded-2xl backdrop-blur-md border border-white/5">
+                                        <p className="text-[10px] uppercase font-black tracking-[0.2em] text-indigo-300 opacity-60 mb-1">Authority</p>
+                                        <p className="font-bold flex items-center gap-2"><BuildingLibraryIcon className="w-4 h-4 text-emerald-400"/> وزارة الشؤون</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                );
+            case 'contract':
+                return (
+                    <motion.div 
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+                    >
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-6 shadow-sm">
+                            <h4 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                    <CalendarDaysIcon className="w-6 h-6 text-indigo-600" />
+                                </div>
+                                فترة الخدمة الفعلية
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block pr-1">تاريخ مباشرة العمل</label>
+                                    <input type="date" value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-bold"/>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block pr-1">تاريخ ترك العمل</label>
+                                    <input type="date" value={formData.lastWorkingDay} onChange={e => setFormData({...formData, lastWorkingDay: e.target.value})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-bold"/>
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between p-6 bg-indigo-600 rounded-2xl shadow-lg shadow-indigo-600/20 text-white group overflow-hidden relative">
+                                <div className="relative z-10">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200 mb-1">إجمالي مدة الخدمة</p>
+                                    <p className="text-3xl font-black tabular-nums">{calc.serviceYears} سنة ، {calc.serviceMonths} شهر</p>
+                                    <p className="text-xs font-bold text-indigo-100 mt-1 opacity-80">{calc.serviceDays} يوم خدمة متبقية</p>
+                                </div>
+                                <ClockIcon className="w-16 h-16 text-white/10 absolute -right-2 transform -rotate-12 group-hover:scale-110 transition-transform" />
+                            </div>
+                        </div>
 
-                        {(calculationResult.notesOnCalculation?.length || 0) > 0 && (
-                            <div className="mt-2">
-                                <p className="text-xs font-bold text-gray-500 mb-1">ملاحظات قانونية:</p>
-                                <ul className="list-disc list-inside text-xs text-gray-500 space-y-1 ps-2">
-                                    {calculationResult.notesOnCalculation?.map((note, idx) => (
-                                        <li key={idx}>{note}</li>
+                        <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-6 shadow-sm">
+                            <h4 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center">
+                                    <ScaleIcon className="w-6 h-6 text-amber-600" />
+                                </div>
+                                السند القانوني للإنهاء
+                            </h4>
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block pr-1">نوع عقد العمل</label>
+                                    <select value={formData.contractType} onChange={e => setFormData({...formData, contractType: e.target.value as any})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-bold text-sm">
+                                        <option value={ContractTypeKuwait.UNLIMITED}>عقد غير محدد المدة (مستمر)</option>
+                                        <option value={ContractTypeKuwait.LIMITED}>عقد محدد المدة (مؤقت)</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-bold text-slate-600 block pr-1">سبب انتهاء علاقة العمل</label>
+                                    <select 
+                                        className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right font-bold text-sm"
+                                        value={formData.terminationReason}
+                                        onChange={e => setFormData({...formData, terminationReason: e.target.value as any})}
+                                    >
+                                        {terminationReasonKuwaitOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                    </select>
+                                </div>
+                                {formData.terminationReason.includes("المادة 41") && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                                        className="p-5 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-800 rounded-2xl flex gap-4 text-rose-700 dark:text-rose-400"
+                                    >
+                                        <ExclamationTriangleIcon className="w-10 h-10 shrink-0" />
+                                        <div className="space-y-1">
+                                            <p className="font-black text-sm">فصل تأديبي (المادة 41)</p>
+                                            <p className="text-xs font-medium leading-relaxed">تنبيه: الفصل الجسيم يحرم العامل من المكافأة والإنذار. تأكد من استيفاء إجراءات التحقيق الإداري والمواعيد القانونية (7 أيام من العلم).</p>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </div>
+                        </div>
+                    </motion.div>
+                );
+            case 'financial':
+                return (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="grid grid-cols-1 lg:grid-cols-3 gap-8"
+                    >
+                        <div className="lg:col-span-2 space-y-8">
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-100 dark:border-slate-800 grid grid-cols-1 md:grid-cols-2 gap-8 shadow-sm">
+                                <div className="space-y-6">
+                                    <h4 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center">
+                                            <BanknotesIcon className="w-5 h-5 text-emerald-600" />
+                                        </div>
+                                        عناصر الأجر الشامل
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase pr-1 block">الراتب الأساسي</label>
+                                            <input type="number" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-black text-lg"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase pr-1 block">البدلات الخاضعة</label>
+                                            <input type="number" value={formData.allowances} onChange={e => setFormData({...formData, allowances: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-black text-lg"/>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase pr-1 block">متوسط العمولات / المكافآت</label>
+                                        <input type="number" value={formData.otherAdditions} onChange={e => setFormData({...formData, otherAdditions: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-bold"/>
+                                    </div>
+                                    <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-center border border-emerald-100 dark:border-emerald-800">
+                                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">وعاء الاحتساب (الأجر الشامل)</p>
+                                        <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">{(formData.basicSalary + formData.allowances).toLocaleString()} د.ك / شهر</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-6">
+                                    <h4 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center">
+                                            <CalendarDaysIcon className="w-5 h-5 text-indigo-600" />
+                                        </div>
+                                        تصفية الأرصدة
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase pr-1 block">الاستحقاق القانوني</label>
+                                            <input type="number" value={formData.leaveEntitlement} onChange={e => setFormData({...formData, leaveEntitlement: Number(e.target.value)})} className="w-full h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-bold"/>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-black text-slate-400 uppercase pr-1 block">إجازات مستهلكة</label>
+                                            <input type="number" value={formData.leaveTaken} onChange={e => setFormData({...formData, leaveTaken: Number(e.target.value)})} className="w-full h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-bold"/>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase pr-1 block">وضعية مهلة الإخطار (3 أشهر)</label>
+                                        <select value={formData.noticeAction} onChange={e => setFormData({...formData, noticeAction: e.target.value as any})} className="w-full h-10 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-right text-sm font-bold">
+                                            <option value="WorkDuringNotice">عمل خلال المهلة (لا بدل)</option>
+                                            <option value="PayNoticePay">صرف بدل نقدي كامل</option>
+                                            <option value="Waived">تنازل طرفين</option>
+                                        </select>
+                                    </div>
+                                    <div className="p-5 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl text-center border border-indigo-100 dark:border-indigo-800">
+                                        <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">صافي الرصيد المستحق</p>
+                                        <p className="text-2xl font-black text-indigo-700 dark:text-indigo-300">{calc.leaveBalanceDays} يوم إجازة</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                <h4 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6 text-rose-600">
+                                    <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 flex items-center justify-center">
+                                        <XCircleIcon className="w-5 h-5 text-rose-600" />
+                                    </div>
+                                    جدول الاستقطاعات والديون
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase pr-1 block">سلف عمالية</label>
+                                        <input type="number" value={formData.deductions} onChange={e => setFormData({...formData, deductions: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-black text-rose-600 text-lg"/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase pr-1 block">أيام غياب تخصم</label>
+                                        <input type="number" value={formData.absenceDays} onChange={e => setFormData({...formData, absenceDays: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-black text-rose-600 text-lg"/>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-xs font-black text-slate-400 uppercase pr-1 block">تأمينات اجتماعية</label>
+                                        <input type="number" value={formData.socialInsuranceDeduction} onChange={e => setFormData({...formData, socialInsuranceDeduction: Number(e.target.value)})} className="w-full h-12 bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 text-center font-black text-rose-600 text-lg"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-8">
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-xl border border-slate-100 dark:border-slate-800 sticky top-24">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8 text-center">أمر صرف المستحقات المبدئي</h4>
+                                <div className="space-y-6">
+                                    <div className="flex justify-between items-center text-sm font-bold">
+                                        <span className="text-slate-500">مكافأة الخدمة</span>
+                                        <span className="text-slate-800 dark:text-white tabular-nums font-black">{calc.indemnityAmount.toLocaleString()} د.ك</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-bold">
+                                        <span className="text-slate-500">بدل الإجازات</span>
+                                        <span className="text-slate-800 dark:text-white tabular-nums font-black">{calc.leavePayAmount.toLocaleString()} د.ك</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-bold">
+                                        <span className="text-slate-500">بدل الإنذار</span>
+                                        <span className="text-slate-800 dark:text-white tabular-nums font-black">{calc.noticePeriodPay.toLocaleString()} د.ك</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-sm font-black border-t dark:border-slate-800 pt-6">
+                                        <span className="text-rose-500">إجمالي الخصم</span>
+                                        <span className="text-rose-600 tabular-nums">({calc.deductionsTotal.toLocaleString()}) د.ك</span>
+                                    </div>
+                                    <div className="p-8 bg-slate-900 rounded-[2.5rem] text-center mt-8 group relative overflow-hidden shadow-2xl">
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-150 transition-transform duration-700"></div>
+                                        <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-2 relative z-10">الصافي المسلم للعامل</p>
+                                        <p className="text-4xl font-black text-amber-400 tabular-nums relative z-10">{calc.netAmount.toLocaleString()} <span className="text-sm font-bold">د.ك</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </motion.div>
+                );
+            case 'result':
+                return (
+                    <motion.div 
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="space-y-10"
+                    >
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <SummaryCard icon={<CalculatorIcon/>} label="المكافأة" value={calc.indemnityAmount} color="indigo" />
+                            <SummaryCard icon={<CalendarDaysIcon/>} label="تصفية الإجازة" value={calc.leavePayAmount} color="emerald" />
+                            <SummaryCard icon={<BanknotesIcon/>} label="بدل الإخطار" value={calc.noticePeriodPay} color="amber" />
+                            <SummaryCard icon={<CheckCircleIcon/>} label="صافي المستحق" value={calc.netAmount} color="rose" isNet />
+                        </div>
+
+                        <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+                            <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
+                                <div>
+                                    <h4 className="font-black text-xl text-slate-800 dark:text-white">تفسير الحسبة وسند المواد</h4>
+                                    <p className="text-xs font-bold text-slate-400 mt-1">توضيح المعايير المعتمدة في الحساب النهائي</p>
+                                </div>
+                                <Badge text="نظام كويتي معتمد" className="bg-indigo-600 text-white font-black py-2 px-5 rounded-xl" />
+                            </div>
+                            <div className="p-10 space-y-12">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                                    <div className="space-y-6">
+                                        <h5 className="font-black text-lg text-slate-800 dark:text-white border-r-4 border-indigo-600 pr-4 flex items-center gap-2">
+                                            <ScaleIcon className="w-5 h-5 text-indigo-600" />
+                                            مكافأة المادة 51
+                                        </h5>
+                                        <ul className="space-y-4">
+                                            <CalculationStep label="أول 5 سنوات (15 يوم/سنة)" value={calc.indemnityBreakdown.firstFiveYearsAmount} />
+                                            <CalculationStep label="ما زاد عن 5 سنوات (شهر/سنة)" value={calc.indemnityBreakdown.subsequentYearsAmount} />
+                                            <CalculationStep label="سقف المادة (18 شهر)" value={calc.indemnityBreakdown.capAmount} secondary />
+                                            <CalculationStep label="نسبة الاستحقاق حسب المادة 53" value={`${(calc.indemnityBreakdown.adjustmentFactor * 100).toFixed(0)}%`} isFactor />
+                                        </ul>
+                                    </div>
+                                    <div className="space-y-6">
+                                        <h5 className="font-black text-lg text-slate-800 dark:text-white border-r-4 border-emerald-600 pr-4 flex items-center gap-2">
+                                            <BanknotesIcon className="w-5 h-5 text-emerald-600" />
+                                            تصفية الإجازات والمستحقات
+                                        </h5>
+                                        <ul className="space-y-4">
+                                            <CalculationStep label="أجر اليوم الواحد (أجر شامل / 26)" value={(formData.basicSalary + formData.allowances) / 26} isRate />
+                                            <CalculationStep label="إجمالي الأيام المتبقية" value={calc.leaveBalanceDays} isDays />
+                                            <CalculationStep label="التعويض النقدي المستحق" value={calc.leavePayAmount} />
+                                            <CalculationStep label="إضافات / حوافز أخرى" value={formData.otherAdditions} />
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div className="pt-10 border-t dark:border-slate-800 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {calc.legalArticles.map((art, idx) => (
+                                        <div key={idx} className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl space-y-3 border-r-4 border-indigo-500 shadow-sm hover:shadow-md transition-shadow">
+                                            <span className="text-xs font-black bg-indigo-600 text-white px-3 py-1 rounded-full uppercase">مادة {art.article}</span>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold">{art.text}</p>
+                                        </div>
                                     ))}
-                                </ul>
+                                </div>
                             </div>
-                        )}
-                        
-                        {calculationResult.warnings.length > 0 && (
-                            <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded text-red-700 text-xs">
-                                <strong>تنبيهات هامة:</strong>
-                                <ul className="list-disc list-inside mt-1">
-                                    {calculationResult.warnings.map((w, idx) => <li key={idx}>{w}</li>)}
-                                </ul>
+                        </div>
+
+                        <div className="flex flex-col lg:flex-row gap-8 items-stretch pb-10">
+                           <div className="flex-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-8 shadow-sm">
+                                <label className="text-sm font-black text-slate-400 uppercase tracking-widest block mb-4">مرئيات إضافية وبنود خاصة</label>
+                                <textarea 
+                                    className="w-full h-40 bg-slate-50 dark:bg-slate-800 border-none rounded-[2rem] p-6 text-sm text-right resize-none font-medium focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="أدخل أية ملاحظات قانونية، تفاصيل خصم جزائي، أو بنود اتفاق خاص لتضمينها في المستند الرسمي..."
+                                    value={formData.notes}
+                                    onChange={e => setFormData({...formData, notes: e.target.value})}
+                                />
+                           </div>
+                           <div className="w-full lg:w-96 flex flex-col gap-4">
+                                <Button 
+                                    className="w-full h-20 rounded-[2rem] bg-[#487B75] hover:bg-[#3d6964] text-white font-black text-xl shadow-2xl shadow-[#487B75]/30 transform active:scale-95 transition-all"
+                                    leftIcon={<PrinterIcon className="w-7 h-7"/>}
+                                    onClick={handlePrint}
+                                >
+                                    إصدار وطباعة المستند
+                                </Button>
+                                <div className="grid grid-cols-1 gap-3">
+                                    <Button 
+                                        variant="outline"
+                                        className="h-14 rounded-2xl border-indigo-200 text-indigo-700 font-black text-sm bg-white hover:bg-indigo-50"
+                                        leftIcon={<ArrowPathIcon className="w-5 h-5"/>}
+                                        onClick={handleSave}
+                                    >
+                                        حفظ في الأرشيف
+                                    </Button>
+                                    <Button 
+                                        variant="ghost"
+                                        className="h-14 rounded-2xl text-slate-400 hover:text-rose-600 font-bold text-sm"
+                                        leftIcon={<TrashIcon className="w-5 h-5"/>}
+                                        onClick={() => window.location.reload()}
+                                    >
+                                        إلغاء وتفريغ البيانات
+                                    </Button>
+                                </div>
+                           </div>
+                        </div>
+                    </motion.div>
+                );
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-slate-950 pb-32 transition-colors duration-500" dir="rtl">
+            <style>{PRINT_STYLES}</style>
+            
+            <FormalDocument />
+           
+            <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-800 px-8 py-6 sticky top-0 z-30 shadow-sm no-print">
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                    <div className="flex items-center gap-5">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white shadow-xl shadow-indigo-600/20 rotate-3">
+                            <CalculatorIcon className="w-8 h-8" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">إدارة تسويات الخدمة</h1>
+                            <div className="flex items-center gap-2 mt-1">
+                                <Badge text="Kuwait Legal Engine v5.0" className="bg-slate-100 text-slate-500 text-[9px] font-black tracking-widest uppercase" />
+                                <div className="w-1 h-1 rounded-full bg-emerald-500" />
+                                <span className="text-[10px] font-bold text-emerald-500">محدث وفقاً لقانون 2010</span>
                             </div>
-                        )}
+                        </div>
+                    </div>
+                    <div className="flex gap-4">
+                        <button 
+                            onClick={() => setShowSavedList(!showSavedList)}
+                            className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-6 py-3 rounded-2xl text-sm font-black border border-indigo-100 dark:border-indigo-800 hover:shadow-lg transition-all flex items-center gap-3 group"
+                        >
+                            <HistoryIcon className="w-5 h-5 group-hover:rotate-[-45deg] transition-transform" /> 
+                            السجل ({savedSettlements.length})
+                        </button>
+                        <button 
+                            onClick={() => {
+                                window.location.reload();
+                            }}
+                            className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-sm font-black shadow-xl shadow-slate-900/30 hover:bg-slate-800 transition-all flex items-center gap-3 active:scale-95"
+                        >
+                            <PlusCircleIcon className="w-5 h-5"/> تسوية جديدة
+                        </button>
                     </div>
                 </div>
+            </header>
 
-                <div className="mt-6 flex justify-center">
-                    <Button onClick={() => setIsPrintModalOpen(true)} variant="secondary" size="lg" leftIcon={<PrinterIcon className="w-5"/>}>
-                        طباعة كشف التسوية الرسمي
-                    </Button>
+            <nav className="max-w-7xl mx-auto px-8 mt-12 no-print">
+                <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex justify-between items-center gap-4">
+                    {STEP_TABS.map((step, idx) => (
+                        <button 
+                            key={step.id} 
+                            disabled={idx > currentStep && !formData.employeeName}
+                            onClick={() => idx <= currentStep && setCurrentStep(idx)}
+                            className={`flex-1 group relative transition-all duration-500 ${idx <= currentStep ? 'opacity-100' : 'opacity-30 cursor-not-allowed'}`}
+                        >
+                            <div className="flex flex-col items-center gap-2 px-2 py-3 rounded-[1.5rem] transition-all hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-700 ${idx === currentStep ? 'bg-indigo-600 text-white scale-110 shadow-xl shadow-indigo-600/30' : idx < currentStep ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                    {idx < currentStep ? <CheckCircleIcon className="w-6 h-6"/> : step.icon}
+                                </div>
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${idx === currentStep ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{step.label}</span>
+                            </div>
+                            {idx < STEP_TABS.length - 1 && (
+                                <div className="absolute top-1/2 -left-1/2 w-full h-[1.5px] bg-slate-100 dark:bg-slate-800 -z-10 hidden lg:block">
+                                    <div className={`h-full transition-all duration-1000 bg-emerald-500 ${idx < currentStep ? 'w-full' : 'w-0'}`} />
+                                </div>
+                            )}
+                        </button>
+                    ))}
                 </div>
-            </Card>
+            </nav>
+
+            <main className="max-w-7xl mx-auto px-8 mt-12 no-print">
+                <AnimatePresence mode="wait">
+                    <div key={currentStep}>
+                        {renderStepContent()}
+                    </div>
+                </AnimatePresence>
+
+                <div className="mt-16 flex justify-between items-center py-10 border-t dark:border-slate-900">
+                    <Button 
+                        variant="ghost" 
+                        disabled={currentStep === 0} 
+                        onClick={prevStep}
+                        leftIcon={<ArrowLeftIcon className="w-5 h-5 rotate-180"/>}
+                        className="rounded-[1.5rem] h-14 px-10 font-black text-slate-600 bg-slate-100 hover:bg-slate-200"
+                    >
+                        العودة للخلف
+                    </Button>
+                    <div className="hidden md:flex flex-col items-center">
+                        <div className="flex gap-1.5 mb-2">
+                            {STEP_TABS.map((_, i) => (
+                                <div key={i} className={`h-1.5 rounded-full transition-all duration-500 ${i === currentStep ? 'w-8 bg-indigo-500' : 'w-1.5 bg-slate-200 dark:bg-slate-800'}`} />
+                            ))}
+                        </div>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Phase {currentStep + 1} System Ready</span>
+                    </div>
+                    {currentStep < STEP_TABS.length - 1 ? (
+                        <Button 
+                            onClick={nextStep}
+                            className="rounded-[1.5rem] h-14 px-12 font-black bg-indigo-600 hover:bg-indigo-700 text-white transition-all shadow-2xl shadow-indigo-600/30 hover:scale-105 active:scale-95"
+                            rightIcon={<ArrowLeftIcon className="w-5 h-5 transform rotate-180"/>}
+                        >
+                            استمرار للمرحلة التالية
+                        </Button>
+                    ) : (
+                         <Button 
+                            onClick={handlePrint}
+                            className="rounded-[1.5rem] h-14 px-12 font-black bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-2xl shadow-emerald-600/30 hover:scale-105 active:scale-95"
+                            leftIcon={<PrinterIcon className="w-5 h-5"/>}
+                        >
+                            أمر الطباعة النهائي
+                        </Button>
+                    )}
+                </div>
+            </main>
+
+            <Modal
+                isOpen={isSelectionModalOpen}
+                onClose={() => setIsSelectionModalOpen(false)}
+                title="اختيار موظف من السجل النشط"
+                size="lg"
+            >
+                <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-3 custom-scrollbar">
+                    {initialEmployees.map(emp => (
+                        <div 
+                            key={emp.id} 
+                            onClick={() => handleEmployeeSelect(emp)}
+                            className="bg-white dark:bg-slate-800 p-5 rounded-[2rem] border-2 border-slate-50 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 hover:shadow-xl cursor-pointer transition-all flex items-center justify-between group"
+                        >
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-100 relative shadow-inner">
+                                    <img src={emp.photoUrl || `https://ui-avatars.com/api/?name=${emp.fullNameAr}&background=random`} alt={emp.fullNameAr} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 ring-1 ring-inset ring-black/5 rounded-2xl"></div>
+                                </div>
+                                <div>
+                                    <h5 className="font-black text-slate-800 dark:text-white text-lg tracking-tight group-hover:text-indigo-600 transition-colors">{emp.fullNameAr}</h5>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{emp.jobTitle}</p>
+                                        <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                        <p className="text-[10px] font-bold text-indigo-500">{emp.department}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-300 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-all transform group-hover:rotate-180">
+                                <PlusCircleIcon className="w-5 h-5" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </Modal>
+
+            <Modal
+                isOpen={showSavedList}
+                onClose={() => setShowSavedList(false)}
+                title="الأرشيف الأخير لتسويات الخدمة"
+                size="xl"
+            >
+                <div className="p-2">
+                    {savedSettlements.length === 0 ? (
+                        <div className="py-24 text-center text-slate-400 space-y-6">
+                             <div className="w-24 h-24 bg-slate-50 dark:bg-slate-800 mx-auto rounded-full flex items-center justify-center animate-pulse">
+                                <ArchiveBoxIcon className="w-12 h-12 opacity-20" />
+                             </div>
+                             <div>
+                                <p className="text-xs font-black uppercase tracking-[0.3em] opacity-40">Database Empty</p>
+                                <p className="text-sm font-bold mt-2">لا توجد سجلات محفوظة مؤخراً في هذا النظام.</p>
+                             </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-6">
+                            {savedSettlements.map(s => (
+                                <div key={s.id} className="bg-white dark:bg-slate-800 border-2 border-slate-50 dark:border-slate-700 p-8 rounded-[2.5rem] shadow-sm hover:shadow-2xl transition-all relative group overflow-hidden">
+                                     <div className="absolute top-0 right-0 w-16 h-16 bg-emerald-500/5 rounded-full -mr-8 -mt-8 group-hover:scale-150 transition-transform"></div>
+                                     <div className="flex justify-between items-start mb-6">
+                                         <div>
+                                            <h6 className="font-black text-slate-800 dark:text-white text-xl tracking-tight">{s.employeeName}</h6>
+                                            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase tracking-widest">{s.employeeId}</p>
+                                         </div>
+                                         <span className="w-3 h-3 rounded-full bg-emerald-500 shadow-lg shadow-emerald-500/50" />
+                                     </div>
+                                     <div className="grid grid-cols-2 gap-4 text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-6 pb-6 border-b border-dashed dark:border-slate-700">
+                                         <div className="flex flex-col gap-1">
+                                            <span className="text-slate-300">تاريخ الاعتماد</span>
+                                            <span className="font-mono text-slate-800 dark:text-slate-300">{s.settlementDate}</span>
+                                         </div>
+                                         <div className="flex flex-col gap-1">
+                                            <span className="text-slate-300">فترة الخدمة</span>
+                                            <span className="font-black text-indigo-600">{s.serviceYears}Y {s.serviceMonths}M</span>
+                                         </div>
+                                     </div>
+                                     <div className="flex justify-between items-center">
+                                         <div>
+                                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">صافي الصرف</p>
+                                            <p className="text-2xl font-black text-slate-900 dark:text-white tabular-nums">{s.netPayable.toLocaleString()} <span className="text-[10px]">د.ك</span></p>
+                                         </div>
+                                         <div className="flex gap-2">
+                                             <button className="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-xl text-slate-400 hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center"><EyeIcon className="w-5 h-5" /></button>
+                                             <button className="w-10 h-10 bg-slate-50 dark:bg-slate-700 rounded-xl text-slate-400 hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center"><PrinterIcon className="w-5 h-5" /></button>
+                                         </div>
+                                     </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            </Modal>
+
+            {/* --- ACTUAL PRINTABLE DOCUMENT --- */}
+            <div id="printable-eos" className="print-only hidden p-10 bg-white min-h-screen text-slate-900 font-sans" dir="rtl">
+                <PrintHeader 
+                    title="كشف تسوية مستحقات نهاية الخدمة" 
+                    subtitle="محرر وفقاً للقانون رقم 6 لسنة 2010 بشأن العمل بالقطاع الأهلي" 
+                />
+                
+                <div className="grid grid-cols-2 gap-x-12 gap-y-6 mb-10 border-[1.5px] border-slate-400 p-8 rounded-2xl bg-slate-50/20">
+                    <PrintInfo label="اسم الموظف" value={formData.employeeName} />
+                    <PrintInfo label="الرقم المدني" value={formData.employeeCivilId} />
+                    <PrintInfo label="المسمى الوظيفي" value={formData.jobTitle} />
+                    <PrintInfo label="الجنسية" value={formData.nationality} />
+                    <PrintInfo label="تاريخ التعيين" value={formData.joiningDate} />
+                    <PrintInfo label="تاريخ ترك العمل" value={formData.lastWorkingDay} />
+                    <PrintInfo label="إجمالي مدة الخدمة" value={`${calc.serviceYears} سنة ، ${calc.serviceMonths} شهر ، ${calc.serviceDays} يوم`} />
+                    <PrintInfo label="سبب انتهاء الخدمة" value={terminationReasonKuwaitOptions.find(p => p.value === formData.terminationReason)?.label} />
+                </div>
+
+                <div className="space-y-8">
+                    <div>
+                        <h3 className="text-xl font-black border-r-8 border-slate-900 pr-4 mb-6">أولاً: بنود الاستحقاق المالي (Credits)</h3>
+                        <table className="doc-modern-table shadow-sm">
+                            <thead>
+                                <tr>
+                                    <th className="w-[30%]">بند الاستحقاق</th>
+                                    <th>طريقة الاحتساب / السند القانوني</th>
+                                    <th className="w-[20%]">المبلغ (د.ك)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td className="font-bold">مكافأة نهاية الخدمة المنصوص عليها</td>
+                                    <td>احتساب المادة 51 (15 يوم/سنة لـ 5 سنوات ، شهر للمتبقي) بنسبة {Math.round(calc.indemnityBreakdown.adjustmentFactor * 100)}%</td>
+                                    <td className="text-center font-black tracking-tight">{calc.indemnityAmount.toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td className="font-bold">تصفية رصيد الإجازات السنوية</td>
+                                    <td>رصيد متراكم ({calc.leaveBalanceDays} يوم) - المواد 70 و79 من القانون</td>
+                                    <td className="text-center font-black tracking-tight">{calc.leavePayAmount.toLocaleString()}</td>
+                                </tr>
+                                {calc.noticePeriodPay > 0 && (
+                                    <tr>
+                                        <td className="font-bold">بدل مهلة الإخطار (الإنذار)</td>
+                                        <td>تعويض المادة 44 عن عدم منح مهلة الإخطار (3 أشهر)</td>
+                                        <td className="text-center font-black tracking-tight">{calc.noticePeriodPay.toLocaleString()}</td>
+                                    </tr>
+                                )}
+                                {formData.otherAdditions > 0 && (
+                                    <tr>
+                                        <td className="font-bold">إضافات أخرى / مكافآت معتمدة</td>
+                                        <td>عمولات، حوافز، أو أجور متأخرة</td>
+                                        <td className="text-center font-black tracking-tight">{formData.otherAdditions.toLocaleString()}</td>
+                                    </tr>
+                                )}
+                                <tr className="bg-slate-100 font-black text-lg">
+                                    <td colSpan={2} className="text-left font-black">إجمالي المستحقات (A)</td>
+                                    <td className="text-center underline underline-offset-4 decoration-2">{calc.additionsTotal.toLocaleString()}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div>
+                        <h3 className="text-xl font-black border-r-8 border-slate-900 pr-4 mb-6">ثانياً: بنود الاستقطاع والمديونية (Debits)</h3>
+                        <table className="doc-modern-table shadow-sm">
+                            <thead>
+                                <tr>
+                                    <th className="w-[30%]">بند الاستقطاع</th>
+                                    <th>سبب الخصم / السند</th>
+                                    <th className="w-[20%]">المبلغ (د.ك)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td className="font-bold">سلف وقروض عمالية شخصية</td>
+                                    <td>مبالغ تم استلامها مقدماً ولم تسدد</td>
+                                    <td className="text-center font-bold">{formData.deductions.toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td className="font-bold">خصم أيام الغياب والجزاءات</td>
+                                    <td>غياب بدون عذر ({formData.absenceDays} يوم) - المادة 35</td>
+                                    <td className="text-center font-bold">{(calc.deductionsTotal - formData.deductions - formData.socialInsuranceDeduction).toLocaleString()}</td>
+                                </tr>
+                                <tr>
+                                    <td className="font-bold">اشتراكات التأمينات الاجتماعية</td>
+                                    <td>حصة المؤمن عليه المحصلة لصالح المؤسسة العامة للتأمينات</td>
+                                    <td className="text-center font-bold">{formData.socialInsuranceDeduction.toLocaleString()}</td>
+                                </tr>
+                                <tr className="bg-slate-100 font-black text-lg">
+                                    <td colSpan={2} className="text-left font-black">إجمالي المستقطعات (B)</td>
+                                    <td className="text-center text-rose-800">({calc.deductionsTotal.toLocaleString()})</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="my-10 p-10 border-[6px] border-double border-slate-900 text-center bg-slate-50/30 rounded-3xl">
+                        <p className="text-2xl font-black mb-4 tracking-tight">صافي المبلغ المستحق النهائي (A - B)</p>
+                        <p className="text-6xl font-black text-slate-900 tracking-tighter">
+                            {calc.netAmount.toLocaleString()} <span className="text-2xl">دينار كويتي فقط لا غير</span>
+                        </p>
+                        <p className="text-sm font-bold text-slate-500 mt-6 italic">هذا المبلغ يمثل كامل التصفية النهائية لعلاقة العمل حتى تاريخ ترك الموظف لعمله.</p>
+                    </div>
+
+                    <div className="page-break"></div>
+
+                    <div className="mt-20 p-12 border-[1.5px] border-slate-400 rounded-3xl bg-white shadow-sm relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-full h-3 bg-slate-900"></div>
+                        <h2 className="text-4xl font-black text-center mb-12 text-slate-900 tracking-tighter">إقرار استلام نهائي وبراءة ذمة شاملة</h2>
+                        <div className="space-y-10">
+                            <p className="text-xl leading-[2.4] font-bold text-slate-900 text-justify">
+                                أقر أنا الموظف/ <strong>{formData.employeeName}</strong>، حامل البطاقة المدنية رقم: <strong>{formData.employeeCivilId}</strong>، وبكامل إرادتي ومسؤوليتي القانونية، بأنني قد تسلمت من <strong>{OFFICE_NAME}</strong> كافة مستحقاتي العمالية المتعلقة بفترة خدمتي الموضحة أعلاه، وذلك بالسداد (نقداً / شيك رقم: ........... / تحويل بنكي)، ويشمل ذلك مكافأة نهاية الخدمة، تصفية الإجازات، مهلة الإخطار، وكافة الأجور والبدلات.
+                                <br/><br/>
+                                وبناءً عليه وبموجب هذا الإقرار، أبرئ ذمة <strong>{OFFICE_NAME}</strong> وأصحابها براءة ذمة شاملة كاملة وعامة من أي حقوق أو مطالبات مالية أو عمالية من أي نوع كان، حالية أو مستقبيلة، ناتجة عن علاقة العمل والخدمة أو إنهائها، بما في ذلك أي تعويضات قانونية أو قضائية، مسقطاً لكافة أوجه الطعن والمطالبة أمام القضاء الكويتي بكافة درجاته.
+                            </p>
+
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-8 mt-16 no-print-grid">
+                                <div className="space-y-4">
+                                    <p className="font-black text-center text-[13px] bg-slate-900 text-white py-2 rounded-lg">توقيع الموظف (المقر بما فيه)</p>
+                                    <div className="print-signature-box flex flex-col justify-between h-[120px] bg-white border-2 border-slate-900">
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-[10px] text-slate-400 font-bold">التوقيع / البصمة:</p>
+                                        </div>
+                                        <div className="flex justify-between items-center text-[10px] font-black border-t pt-2">
+                                            <span>الاسم: {formData.employeeName}</span>
+                                            <span>التاريخ: {format(new Date(), 'yyyy/MM/dd')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p className="font-black text-center text-[13px] bg-slate-100 text-slate-900 py-2 rounded-lg border border-slate-900">اعتماد الإدارة المالية</p>
+                                    <div className="print-signature-box flex flex-col justify-between h-[120px] bg-white border-2 border-slate-900">
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-[10px] text-slate-400 font-bold">مراجعة الحسابات:</p>
+                                        </div>
+                                        <div className="h-px bg-slate-100 mt-auto w-full"></div>
+                                        <div className="text-[10px] font-black text-center pb-2">سند صرف معتمد</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p className="font-black text-center text-[13px] bg-slate-100 text-slate-900 py-2 rounded-lg border border-slate-900">اعتماد الشؤون القانونية</p>
+                                    <div className="print-signature-box flex flex-col justify-between h-[120px] bg-white border-2 border-slate-900">
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-[10px] text-slate-400 font-bold">المراجعة القانونية:</p>
+                                        </div>
+                                        <div className="h-px bg-slate-100 mt-auto w-full"></div>
+                                        <div className="text-[10px] font-black text-center pb-2">مطابق لقانون العمل</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 lg:col-span-2">
+                                    <p className="font-black text-center text-[13px] bg-slate-100 text-slate-900 py-2 rounded-lg border border-slate-900">المدير العام / المفوض بالتوقيع</p>
+                                    <div className="print-signature-box flex flex-col justify-between h-[120px] bg-white border-2 border-slate-900">
+                                        <div className="flex justify-between items-start">
+                                            <p className="text-[10px] text-slate-400 font-bold">الاعتماد النهائي:</p>
+                                        </div>
+                                        <div className="h-px bg-slate-100 mt-auto w-full"></div>
+                                        <div className="text-[10px] font-black text-center pb-2">يعتمد الصرف والمخالصة</div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <p className="font-black text-center text-[13px] bg-slate-100 text-slate-900 py-2 rounded-lg border border-slate-900">الختم الرسمي</p>
+                                    <div className="print-signature-box flex flex-col items-center justify-center border-dashed opacity-40 h-[120px]">
+                                        <BuildingOffice2Icon className="w-12 h-12 text-slate-300" />
+                                        <p className="text-[7px] font-black uppercase mt-2 tracking-[0.4em]">Official Company Seal</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-24 pt-10 border-t-2 border-slate-100 flex justify-between text-[9px] font-black text-slate-300 uppercase tracking-[0.3em]">
+                            <span>System Auth: {calc.netAmount.toString(16).toUpperCase()}V9</span>
+                            <span>ADALA ERP : END OF SERVICE MODULE V5.0</span>
+                            <span>Doc Ref: {Math.random().toString(36).substring(7).toUpperCase()}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      )}
-      
-      <PrintableStatementModal 
-        isOpen={isPrintModalOpen}
-        onClose={() => setIsPrintModalOpen(false)}
-        result={calculationResult}
-      />
-    </div>
-  );
+    );
 };
+
+// --- Helper Components ---
+const SummaryCard = ({ icon, label, value, color, isNet = false }: { icon: any, label: string, value: number, color: string, isNet?: boolean }) => {
+    const colors: Record<string, string> = {
+        indigo: 'bg-white text-slate-900 border-indigo-100 border-b-indigo-500',
+        emerald: 'bg-white text-slate-900 border-emerald-100 border-b-emerald-500',
+        amber: 'bg-white text-slate-900 border-amber-100 border-b-amber-500',
+        rose: 'bg-slate-900 text-white dark:bg-slate-800'
+    };
+
+    return (
+        <div className={`p-8 rounded-[2.5rem] border-2 ${colors[color]} shadow-md space-y-5 flex flex-col items-center justify-center text-center group transition-all hover:translate-y-[-8px] hover:shadow-2xl`}>
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isNet ? 'bg-white/10' : 'bg-slate-50 dark:bg-slate-900'}`}>
+                {React.cloneElement(icon as React.ReactElement, { className: `w-7 h-7 ${isNet ? 'text-white' : ''}` } as any)}
+            </div>
+            <div>
+                <p className={`text-[10px] font-black uppercase tracking-[0.2em] mb-1 ${isNet ? 'text-slate-400' : 'text-slate-400'}`}>{label}</p>
+                <p className="text-2xl font-black tabular-nums tracking-tighter">{value.toLocaleString()} <span className="text-[10px] font-black opacity-40">د.ك</span></p>
+            </div>
+        </div>
+    );
+};
+
+const CalculationStep = ({ label, value, secondary = false, isRate = false, isFactor = false, isDays = false }: { label: string, value: any, secondary?: boolean, isRate?: boolean, isFactor?: boolean, isDays?: boolean }) => (
+    <li className="flex justify-between items-center text-sm border-b border-slate-50 dark:border-slate-800 pb-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 px-2 rounded-lg transition-colors">
+        <span className={`${secondary ? 'text-slate-400' : 'text-slate-500 dark:text-slate-400'} font-bold`}>{label}</span>
+        <span className={`font-black tabular-nums tracking-tight ${secondary ? 'text-slate-400 italic' : 'text-slate-900 dark:text-white'}`}>
+            {isFactor ? value : isRate ? `${(value as number).toLocaleString()} د.ك` : isDays ? `${value} يوم` : `${(value as number).toLocaleString()} د.ك`}
+        </span>
+    </li>
+);
+
+const PrintInfo = ({ label, value }: { label: string, value: any }) => (
+    <div className="flex flex-col gap-1 pr-4 border-r-2 border-slate-200">
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">{label}</span>
+        <span className="text-sm font-black text-slate-900 leading-tight">{value || '-'}</span>
+    </div>
+);
 
 export default EndOfServicePage;

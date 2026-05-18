@@ -6,7 +6,8 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
-import { ChatBubbleLeftEllipsisIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, DocumentTextIcon, PrinterIcon, CheckCircleIcon, XCircleIcon, OFFICE_NAME } from '../constants';
+import PrintHeader from '../components/ui/PrintHeader';
+import { ChatBubbleLeftEllipsisIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, DocumentTextIcon, PrinterIcon, CheckCircleIcon, XCircleIcon, OFFICE_NAME, ScaleIcon } from '../constants';
 import { 
     Employee, EmployeeRequest, EmployeeRequestType, EmployeeRequestStatus, 
     SalaryCertificateRequestDetails, ExperienceLetterRequestDetails, LeaveEncashmentRequestDetails, 
@@ -628,10 +629,25 @@ const PrintableCertificateModal: React.FC<{
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="lg">
-      <div id="printable-certificate-content" className="p-8 print-statement bg-white text-black font-serif" style={{direction: details.language === 'en' ? 'ltr' : 'rtl'}} dangerouslySetInnerHTML={{ __html: certificateContent }}>
+      <div id="printable-certificate-content" className="printable-sheet bg-white text-black font-serif p-10 min-h-[29cm]" style={{direction: details.language === 'en' ? 'ltr' : 'rtl'}}>
+        <PrintHeader title={title} subtitle={details.specificRecipient || 'إلى من يهمه الأمر'} />
+        
+        <div className="mt-12 text-lg leading-[2.5] text-justify" dangerouslySetInnerHTML={{ __html: certificateContent }}></div>
+        
+        <div className="mt-20 flex justify-between items-end signature-area no-print-bg">
+            <div className="text-center w-64">
+                <p className="font-bold border-b border-gray-400 pb-16 mb-2">اعتماد الإدارة</p>
+                <div className="text-[10px] text-gray-400">التاريخ: {today}</div>
+            </div>
+            <div className="text-center">
+                <div className="w-32 h-32 border-2 border-dashed border-gray-200 rounded-full flex items-center justify-center text-[10px] text-gray-300 transform rotate-12">
+                   الختم الرسمي
+                </div>
+            </div>
+        </div>
       </div>
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end print-hide-in-modal">
-        <Button variant="outline" onClick={onClose} className="me-2">إغلاق</Button>
+      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end print:hidden">
+        <Button variant="ghost" onClick={onClose} className="me-2">إغلاق</Button>
         <Button variant="primary" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4"/>}>طباعة الشهادة</Button>
       </div>
     </Modal>

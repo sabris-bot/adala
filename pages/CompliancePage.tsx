@@ -411,6 +411,7 @@ const ComplianceForm = ({ initialData, onSubmit, onCancel }: any) => {
 };
 
 const ViewComplianceItemModal = ({ item, onClose }: { item: ComplianceRequirement | null; onClose: () => void }) => {
+    const { t } = useTranslation();
     if (!item) return null;
     return (
         <Modal isOpen={!!item} onClose={onClose} title={t('legal_compliance_details', { defaultValue: 'تفاصيل الالتزام القانوني' })} size="xl">

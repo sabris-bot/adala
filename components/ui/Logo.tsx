@@ -7,7 +7,9 @@ interface LogoProps {
   iconClassName?: string;
   textClassName?: string;
   showText?: boolean;
+  hideText?: boolean;
   variant?: 'light' | 'dark' | 'auto';
+  showOfficeName?: boolean;
 }
 
 const Logo: React.FC<LogoProps> = ({ 
@@ -15,21 +17,25 @@ const Logo: React.FC<LogoProps> = ({
   iconClassName = "w-9 h-9 text-accent-DEFAULT me-2.5", 
   textClassName = "flex flex-col",
   showText = true,
-  variant = 'light'
+  hideText = false,
+  variant = 'light',
+  showOfficeName = false
 }) => {
   const arabicColor = variant === 'light' ? 'text-white' : 'text-primary dark:text-primary-light';
   const englishColor = variant === 'light' ? 'text-accent-light' : 'text-accent-dark dark:text-accent';
 
+  const shouldShowText = showText && !hideText;
+
   return (
     <div className={className}>
       <ScaleIcon className={iconClassName} />
-      {showText && (
+      {shouldShowText && (
         <div className={textClassName}>
-          <span className={`${textClassName.includes('flex-row') ? 'text-xl' : 'text-2xl'} font-marhey font-bold ${arabicColor} leading-none`}>
-            عدالة
+          <span className={`${textClassName.includes('flex-row') ? 'text-xl' : 'text-xl sm:text-2xl'} font-marhey font-bold ${arabicColor} leading-none whitespace-nowrap`}>
+            {showOfficeName ? 'مكتب صبري شطا للمحاماة' : 'عدالة'}
           </span>
-          <span className={`${textClassName.includes('flex-row') ? 'text-[10px]' : 'text-[10px]'} font-sans font-bold tracking-[0.2em] ${englishColor} uppercase leading-none ${textClassName.includes('flex-row') ? 'mt-0' : 'mt-1'}`}>
-            ADALA
+          <span className={`${textClassName.includes('flex-row') ? 'text-[8px]' : 'text-[9px]'} font-sans font-black tracking-[0.2em] ${englishColor} uppercase leading-none ${textClassName.includes('flex-row') ? 'mt-0' : 'mt-1'} whitespace-nowrap opacity-80`}>
+            {showOfficeName ? 'Sabri Shatta Law Firm' : 'ADALA'}
           </span>
         </div>
       )}

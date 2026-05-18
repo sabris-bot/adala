@@ -125,7 +125,7 @@ export enum CasePriority {
   LOW = "منخفضة",
   NORMAL = "عادية",
   HIGH = "عالية",
-  URGENST = "عاجلة",
+  URGENT = "عاجلة",
 }
 
 export enum CourtLevel {
@@ -135,6 +135,23 @@ export enum CourtLevel {
   CONSTITUTIONAL_COURT = "المحكمة الدستورية",
   SPECIALIZED_COURT = "محكمة الأسرة",
   ADMINISTRATIVE_COURT = "المحكمة الكلية - الدائرة الإدارية",
+  LABOR_COURT = "المحكمة العمالية",
+  RENT_COURT = "محكمة الإيجارات",
+}
+
+export enum LitigationStage {
+  FIRST_INSTANCE = "أول درجة",
+  APPEAL = "استئناف",
+  CASSATION = "تمييز",
+  EXECUTION = "تنفيذ",
+}
+
+export enum NotificationStatus {
+  NOT_SUBMITTED = "لم يتم تقديم الإعلان",
+  IN_PROCESS = "قيد الإعلان",
+  COMPLETED = "تم الإعلان",
+  FAILED = "فشل الإعلان (لم يستدل)",
+  POSTPONED = "مؤجل للإعلان",
 }
 
 export enum RiskLevel {
@@ -150,6 +167,8 @@ export enum JudgmentOutcome {
   SETTLED = "تسوية",
   PARTIAL_WIN = "فوز جزئي",
   PENDING = "انتظار",
+  DISMISSED = "شطب/رفض",
+  REFERRED_TO_EXPERT = "إحالة للخبراء",
 }
 
 export interface Hearing {
@@ -166,6 +185,7 @@ export interface Hearing {
   caseId?: string; 
   caseTitle?: string; 
   clientName?: string; 
+  lawyerSignature?: string; // Signature of the attending lawyer
 }
 
 export interface CaseFile {
@@ -222,6 +242,7 @@ export interface ExecutionAction {
   targetDetails?: string; // تفاصيل الهدف من الإجراء (رقم حساب، بيانات مركبة، إلخ)
   courtOrderReference?: string; // مرجع أمر المحكمة أو قرار قاضي التنفيذ
   notes?: string;
+  lawyerSignature?: string; // توقيع المحامي القائم بالإجراء
 }
 // --- END OF EXECUTION ACTIONS ---
 
@@ -254,6 +275,7 @@ export interface ExpertAction {
   reportSubmissionDate?: string; // تاريخ إيداع التقرير
   reportDiscussionDate?: string; // تاريخ جلسة مناقشة التقرير
   notes?: string;
+  lawyerSignature?: string; // توقيع المحامي المتابع لمهمة الخبير
 }
 // --- END OF EXPERT ACTIONS ---
 
@@ -261,8 +283,10 @@ export interface Case {
   id: string;
   title: string;
   caseNumber: string; 
-  internalCaseNumber?: string; 
+  internalCaseNumber?: string;
+  fileNumber?: string; // رقم الملف بالمكتب
   clientName: string;
+  clientId?: string;
   clientRole?: string; // e.g. 'مدعي', 'مدعى عليه'
   group?: string; // e.g. 'مجموعة أ', 'قضايا هامة'
   caseMainType: CaseMainType;
@@ -271,8 +295,12 @@ export interface Case {
   priority: CasePriority;
   riskLevel: RiskLevel;
   assignedLawyer: string;
+  assignedLegalTeam?: string[]; // Added: Team of lawyers
   courtName: string;
   courtLevel: CourtLevel;
+  litigationStage?: LitigationStage; // درجة التقاضي
+  circuit?: string; // Added: Circuit (الدائرة)
+  judgeName?: string; // اسم القاضي
   opposingPartyName?: string;
   opponentRole?: string; // e.g. 'مدعي', 'مدعى عليه'
   opposingCounsel?: string;
@@ -282,27 +310,145 @@ export interface Case {
   registrationDate?: string; 
   description?: string;
   caseObjective?: string; 
+  legalDemands?: string; // Added: Legal Demands (الطلبات القانونية)
+  legalNotes?: string; // الملاحظات القانونية
+  poaNumbers?: string[]; // أرقام التوكيلات
+  statuteOfLimitationsDate?: string; // مدة التقادم (تاريخ)
+  notificationStatus?: NotificationStatus;
+  notificationData?: {
+    date: string;
+    notes: string;
+  }[];
   budget?: number;
+  financials?: {
+    totalFees: number;
+    paid: number;
+    remaining: number;
+    currency: string;
+    expenses?: FinancialItem[]; // المصروفات
+  }; // Added: Fees and Payments
   nextHearingDate?: string;
   hearings?: Hearing[];
   caseFiles?: CaseFile[];
   caseNotes?: CaseNote[];
   relatedCases?: string[]; 
-  executionActions?: ExecutionAction[]; // Added
-  expertActions?: ExpertAction[]; // Added
+  executionActions?: ExecutionAction[]; 
+  expertActions?: ExpertAction[]; 
+  reminders?: { id: string; date: string; message: string; isRead: boolean }[]; // Added: Reminders
   createdDate: string;
   lastModifiedDate?: string;
   closedDate?: string;
   judgmentDate?: string;
   judgmentSummary?: string;
   judgmentOutcome?: JudgmentOutcome;
+  executionStatus?: string; // Added: Overall execution status
+  isArchived?: boolean; // Added: Archive status
+  archiveDate?: string; // Added: Archive date
+  tasks?: string[]; // Added: Linked tasks
 }
 
 // --- CONTRACT ANALYSIS (AI) ---
+export enum AnalyzedContractStatus {
+  DRAFT = "مسودة",
+  PENDING_UPLOAD = "بانتظار الرفع",
+  IN_ANALYSIS = "قيد التحليل",
+  ANALYZED = "تم التحليل",
+  UNDER_REVIEW = "تحت المراجعة القانونية",
+  APPROVED = "معتمد",
+  REJECTED = "مرفوض",
+  EXPIRED = "منتهي",
+}
+
+export enum ContractCategory {
+  EMPLOYMENT = "عقد عمل",
+  LEASE = "عقد إيجار",
+  PARTNERSHIP = "عقد شراكة",
+  SALES = "عقد بيع",
+  SERVICES = "عقد خدمات",
+  NDA = "اتفاقية سرية",
+  INVESTMENT = "عقد استثمار",
+  CONSTRUCTION = "عقد مقاولات",
+  OTHER = "آخر",
+}
+
 export interface ExtractedClause {
+  id: string;
   title: string;
   content: string;
   risk: RiskLevel;
+  category?: string;
+  aiRecommendation?: string;
+  legalBasis?: string; // References to laws
+}
+
+export interface ContractRiskReport {
+  overallRiskScore: number; // 0 to 100
+  riskLevel: RiskLevel;
+  criticalIssues: string[];
+  complianceCheck: {
+    isCompliant: boolean;
+    missingMandatoryClauses: string[];
+    conflictingClauses: string[];
+  };
+  securityPercentage: number; // 0 to 100
+}
+
+export interface ContractComparisonResult {
+  similarityPercentage: number;
+  differences: {
+    clauseTitle: string;
+    originalContent: string;
+    targetContent: string;
+    changeType: 'Added' | 'Modified' | 'Removed';
+  }[];
+}
+
+export interface AnalyzedContract {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  category: ContractCategory;
+  parties: {
+    firstParty: string;
+    secondParty: string;
+    otherParties?: string[];
+  };
+  dates: {
+    effectiveDate?: string;
+    expiryDate?: string;
+    signedDate?: string;
+    renewalDate?: string;
+  };
+  financials?: {
+    value: number;
+    currency: string;
+    paymentTerms?: string;
+    penalties?: string;
+  };
+  duration?: string;
+  status: AnalyzedContractStatus;
+  overallRisk: RiskLevel;
+  summary: string;
+  keywords: string[];
+  clauses: ExtractedClause[];
+  risks: ContractRiskReport;
+  recommendations: string[];
+  legalAdvice?: string;
+  ocrText?: string;
+  fileUrl?: string;
+  fileType: string;
+  uploadedBy: string;
+  createdAt: string;
+  updatedAt?: string;
+  linkedEntities?: {
+    employeeId?: string;
+    caseId?: string;
+    propertyId?: string;
+    caseNumber?: string;
+  };
+  qrCodeData?: string;
+  tags?: string[];
+  notes?: string[];
 }
 
 export interface GeminiAnalysisResult {
@@ -310,6 +456,7 @@ export interface GeminiAnalysisResult {
   extractedClauses: ExtractedClause[];
   overallRiskAssessment: RiskLevel;
   recommendations: string[];
+  legalAdvice?: string;
 }
 
 
@@ -394,6 +541,7 @@ export interface LegalResource {
   officialGazetteDetails?: string; 
   relatedDocuments?: RelatedDocument[]; 
   internalNotes?: string; 
+  propertyId?: string; // Link to a property for grouping
   contentTemplate?: string; 
   variables?: string[]; 
   instructions?: string; 
@@ -549,6 +697,7 @@ export interface Employee {
   residencyExpiry?: string;
   bankIban?: string;
   bankName?: string;
+  bankAccount?: string; // Added Bank Account
 
   // New Comprehensive Fields
   managerId?: string;
@@ -559,6 +708,25 @@ export interface Employee {
   qualifications?: EducationalQualification[];
   skills?: string[];
   bloodType?: string;
+
+  // HR Specific Extensions
+  socialStatus?: 'Single' | 'Married' | 'Divorced' | 'Widowed' | string;
+  jobGrade?: string;
+  branch?: string;
+  contractDuration?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  workHoursPerDay?: number;
+  workSystem?: string;
+  restDays?: string[];
+  healthInsuranceNumber?: string;
+  residencyFileNumber?: string;
+  residencyStatus?: string;
+  workPermitNumber?: string;
+  workPermitExpiry?: string;
+  socialSecurityNumber?: string; 
+  lastAppraisalScore?: number;
+  lastAppraisalDate?: string;
 }
 
 // -- End of Service (Kuwait Specific for now) --
@@ -570,26 +738,82 @@ export enum TerminationReasonKuwait {
   // Employer Actions (Dismissal)
   DISMISSAL_WITH_NOTICE = "إنهاء العقد من قبل صاحب العمل (مع مهلة إخطار) - استحقاق كامل",
   DISMISSAL_WITHOUT_NOTICE_ART_41 = "فصل العامل للأسباب الواردة بالمادة 41 (خطأ جسيم/غياب) - حرمان من المكافأة",
+  DISMISSAL_ART_41_LOSS = "فصل (المادة 41): خطأ جسيم تسبب في خسارة كبيرة للمعدات/الخامات",
+  DISMISSAL_ART_41_FRAUD = "فصل (المادة 41): الحصول على العمل بطريق الغش أو التدليس",
+  DISMISSAL_ART_41_SECRETS = "فصل (المادة 41): إفشاء أسرار المنشأة مما أدى لخسارة مؤكدة",
+  DISMISSAL_ART_41_MORALS = "فصل (المادة 41): ارتكاب فعل مخل بالآداب العامة أو جريمة مخلة بالشرف",
+  DISMISSAL_ART_41_ASSAULT = "فصل (المادة 41): الاعتداء على صاحب العمل أو الزملاء",
+  DISMISSAL_ART_41_OBLIGATIONS = "فصل (المادة 41): الإخلال بالالتزامات العقدية أو القانونية أو تعليمات السلامة",
   CLOSURE_OR_BANKRUPTCY = "إغلاق المنشأة أو إفلاسها - استحقاق كامل",
+  ORGANIZATIONAL_REDUNDANCY = "إنهاء لأسباب تنظيمية / تقليص العمالة",
+  TERMINATION_FOR_ABSENCE = "إنهاء الخدمة بسبب الانقطاع عن العمل (المادة 42)",
 
-  // Contract Expiry
+  // Contract Status
   CONTRACT_EXPIRY = "انتهاء مدة العقد (للعقود المحددة) - استحقاق كامل",
+  PROBATION_TERMINATION = "إنهاء الخدمة خلال فترة التجربة - لا مكافأة عادة",
 
   // Resignation (Employee Actions)
-  RESIGNATION_UNDER_3_YEARS = "استقالة (خدمة أقل من 3 سنوات) - لا مكافأة",
-  RESIGNATION_3_TO_5_YEARS = "استقالة (خدمة 3 - 5 سنوات) - نصف المكافأة",
-  RESIGNATION_5_TO_10_YEARS = "استقالة (خدمة 5 - 10 سنوات) - ثلثي المكافأة",
-  RESIGNATION_OVER_10_YEARS = "استقالة (خدمة أكثر من 10 سنوات) - مكافأة كاملة",
-  
-  // Specific Statutory Entitlements (Full Indemnity cases)
-  RESIGNATION_ART_48_EMPLOYER_FAULT = "ترك العمل لخطأ صاحب العمل/اعتداء (مادة 48) - استحقاق كامل",
-  RESIGNATION_WOMAN_MARRIAGE = "استقالة العاملة بسبب الزواج (خلال سنة من الزواج) - المادة 53 - استحقاق كامل",
-  
-  // Natural Causes / Force Majeure
-  RETIREMENT_AGE = "بلوغ سن التقاعد - استحقاق كامل",
-  DEATH_OR_TOTAL_DISABILITY = "الوفاة أو العجز الكلي - استحقاق كامل",
-  WORK_INJURY_DISABILITY = "إصابة عمل أدت للعجز أو الوفاة - استحقاق كامل",
+  RESIGNATION = "استقالة (سيتم تطبيق النسب حسب مدة الخدمة)",
+  RESIGNATION_UNDER_3_YEARS = "استقالة (خدمة أقل من 3 سنوات) - لا مكافأة (المادة 53)",
+  RESIGNATION_3_TO_5_YEARS = "استقالة (خدمة 3 - 5 سنوات) - نصف المكافأة (المادة 53)",
+  RESIGNATION_5_TO_10_YEARS = "استقالة (خدمة 5 - 10 سنوات) - ثلثي المكافأة (المادة 53)",
+  RESIGNATION_10_PLUS_YEARS = "استقالة (خدمة 10 سنوات فأكثر) - مكافأة كاملة",
+  PROBATION_RESIGNATION = "استقالة خلال فترة التجربة",
+
+  // Special Conditions
+  RETIREMENT = "تقاعد الموظف",
+  DEATH = "وفاة الموظف (المكافأة لورثته)",
+  TOTAL_DISABILITY = "عجز كلي أو جزئي مانع عن العمل",
+  CONSENSUAL_TERMINATION = "إنهاء العقد بالتراضي بين الطرفين",
+  MARRIAGE_RESIGNATION_WOMEN = "استقالة المرأة بسبب الزواج (المادة 54) - مكافأة كاملة",
+  RESIGNATION_ART_48_EMPLOYER_FAULT = "ترك العمل لخطأ صاحب العمل أو اعتداء (مادة 48) - استحقاق كامل",
+  RESIGNATION_ART_48_NON_COMPLIANCE = "ترك العمل (المادة 48): عدم التزام صاحب العمل بنصوص العقد/القانون",
+  RESIGNATION_ART_48_ASSAULT = "ترك العمل (المادة 48): الاعتداء على العامل من قبل صاحب العمل أو وكيله",
+  RESIGNATION_ART_48_HEALTH_SAFETY = "ترك العمل (المادة 48): وجود تهديد لسلامة أو صحة العامل بالمنشأة",
+  RESIGNATION_ART_48_FRAUD_CONDITIONS = "ترك العمل (المادة 48): وقع غش من صاحب العمل عند التعاقد بشأن شروط العمل",
 }
+
+export type EOS_SettlementStatus = 'UnderReview' | 'FinanciallyApproved' | 'LegallyApproved' | 'Completed' | 'Disbursed' | 'Cancelled';
+
+export interface EOS_Settlement {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  settlementDate: string;
+  lastWorkingDay: string;
+  terminationReason: TerminationReasonKuwait;
+  status: EOS_SettlementStatus;
+  
+  // Financial Details
+  basicSalary: number;
+  allowances: number;
+  grossSalary: number;
+  serviceYears: number;
+  serviceMonths: number;
+  serviceDays: number;
+  
+  // Calculated Assets
+  indemnityAmount: number;
+  leaveBalanceAmount: number;
+  accruedSalaryAmount: number;
+  noticePeriodAmount: number;
+  otherBonuses: number;
+  
+  // Deductions
+  loansDeduction: number;
+  absenceDeduction: number;
+  otherDeductions: number;
+  
+  netPayable: number;
+  
+  // Metadata/Legal
+  legalArticles: string[];
+  notes?: string;
+  attachments?: string[];
+  preparedBy: string;
+  approvedBy?: string;
+}
+
 export interface EndOfServiceInputs {
   companyName: string;
   employeeName: string;
@@ -674,6 +898,8 @@ export interface LeaveRequest {
   rejectionReason?: string;
   attachments?: RequestAttachment[];
   updatedAt?: string;
+  employeeSignature?: string;
+  managerSignature?: string;
 }
 
 // -- Loan Management --
@@ -753,18 +979,30 @@ export enum ViolationTypeKuwait {
     SAFETY_VIOLATION = "مخالفة تعليمات الأمن والسلامة المهنية",
     FORGERY_TAMPARING = "التزوير في المحررات أو التلاعب في البصمة",
     ALCOHOL_DRUGS = "الحضور تحت تأثير المسكرات أو العقاقير",
+    SOCIAL_MEDIA_MISUSE = "إساءة استخدام وسائل التواصل الاجتماعي بما يضر المنشأة",
+    CONFLICT_OF_INTEREST = "تضارب المصالح / العمل لدى مجهز أو عميل",
+    OFFICE_ETIQUETTE = "الإخلال بآداب العمل والوقار المهني",
+    BRIBERY_CORRUPTION = "الرشوة أو استغلال النفوذ الوظيفي",
+    SEXUAL_HARASSMENT = "التحرش الجنسي أو التنمر في بيئة العمل",
+    FRAUDULENT_EXPENSES = "تقديم مطالبات مالية أو فواتير وهمية",
     OTHER = "مخالفات أخرى",
 }
 export enum DisciplinaryPenaltyKuwait {
     VERBAL_WARNING = "تنبيه شفوي",
     WRITTEN_WARNING = "إنذار كتابي",
-    DEDUCTION_FROM_WAGE = "خصم من الأجر (بحد أقصى 5 أيام)",
-    SUSPENSION_WITHOUT_PAY = "إيقاف عن العمل بدون أجر",
-    SUSPENSION_WITH_HALF_PAY = "إيقاف عن العمل بقرار تأديبي (نصف أجر)",
-    DELAY_ANNUAL_INCREMENT = "تأجيل موعد العلاوة السنوية",
+    DEDUCTION_FROM_WAGE_1 = "خصم من الأجر (يوم واحد)",
+    DEDUCTION_FROM_WAGE_3 = "خصم من الأجر (3 أيام)",
+    DEDUCTION_FROM_WAGE_5 = "خصم من الأجر (5 أيام - الحد الأقصى الشهري)",
+    SUSPENSION_WITHOUT_PAY_5 = "إيقاف عن العمل بدون أجر (5 أيام)",
+    SUSPENSION_WITHOUT_PAY_10 = "إيقاف عن العمل بدون أجر (10 أيام)",
+    DELAY_ANNUAL_INCREMENT = "تأجيل موعد العلاوة السنوية (بحد أقصى 3 أشهر)",
+    DENIAL_OF_ANNUAL_INCREMENT = "الحرمان من العلاوة السنوية",
+    DELAY_PROMOTION = "تأجيل الترقية (بحد أقصى سنة واحدة)",
     DENIAL_OF_PROMOTION = "الحرمان من الترقية",
-    TERMINATION_WITH_INDEMNITY = "فصل من الخدمة مع صرف المكافأة",
-    TERMINATION_WITHOUT_INDEMNITY = "فصل من الخدمة بدون مكافأة (مادة 41)",
+    TERMINATION_WITH_NOTICE = "فصل من الخدمة مع صرف المكافأة ومهلة إخطار",
+    TERMINATION_WITHOUT_NOTICE = "فصل من الخدمة (تحت المادة 41 - بدون مكافأة)",
+    DEMOTION = "خفض الدرجة الوظيفية",
+    REPRIMAND = "توبيخ رسمي موثق",
 }
 export enum DisciplinaryActionStatus {
     PENDING_INVESTIGATION = "بانتظار التحقيق",
@@ -793,6 +1031,7 @@ export interface DisciplinaryAction {
     violationType: ViolationTypeKuwait;
     violationDetails: string;
     investigation?: InvestigationDetails;
+    linkedInvestigationId?: string;
     legalOpinionNotes?: string;
     actionTaken?: DisciplinaryPenaltyKuwait;
     penaltyDetails?: string;
@@ -882,6 +1121,119 @@ export interface EmployeeRequest {
     signedAt?: string;
 }
 
+// -- Performance Appraisal --
+export enum PerformanceAppraisalStatus {
+    DRAFT = "مسودة",
+    UNDER_REVIEW = "قيد المراجعة",
+    PENDING_APPROVAL = "بانتظار الاعتماد",
+    COMPLETED = "مكتملة ومعتمدة",
+    REJECTED = "مرفوضة",
+    CANCELLED = "ملغاة",
+}
+
+export interface PerformanceCriterion {
+    name: string;
+    score: number; // Usually 1 to 5
+    weight?: number;
+    notes?: string;
+}
+
+export enum PerformanceGoalPriority {
+    LOW = "منخفضة",
+    MEDIUM = "متوسطة",
+    HIGH = "عالية",
+}
+
+export enum PerformanceGoalStatus {
+    NOT_STARTED = "لم يبدأ",
+    IN_PROGRESS = "قيد التنفيذ",
+    COMPLETED = "مكتمل",
+    CANCELLED = "ملغى",
+    OVERDUE = "متأخر",
+}
+
+export interface PerformanceGoal {
+    id: string;
+    title: string;
+    description: string;
+    startDate: string;
+    endDate: string;
+    progress: number; // 0 to 100
+    priority: PerformanceGoalPriority;
+    status: PerformanceGoalStatus;
+    kpiMarkers?: string;
+    managerNotes?: string;
+}
+
+export interface PeriodicReview {
+    id: string;
+    date: string;
+    type: 'Monthly' | 'Quarterly' | 'Annual' | string;
+    managerNotes: string;
+    employeeNotes?: string;
+    developmentRecommendations?: string;
+}
+
+export interface PerformanceAppraisal {
+    id: string;
+    employeeId: string;
+    employeeName: string;
+    employeePhotoUrl?: string;
+    employeeJobTitle?: string;
+    employeeDepartment?: string;
+    employeeIdNumber?: string; 
+    managerId: string;
+    managerName: string;
+    appraisalDate: string;
+    appraisalPeriod: string; 
+    status: PerformanceAppraisalStatus;
+    
+    // Snapshots
+    experienceYears?: number;
+    joiningDate?: string;
+
+    // Criteria 
+    criteria: {
+        attendance: PerformanceCriterion;
+        workQuality: PerformanceCriterion;
+        speedOfDelivery: PerformanceCriterion;
+        teamwork: PerformanceCriterion;
+        communication: PerformanceCriterion;
+        responsibility: PerformanceCriterion;
+        problemSolving: PerformanceCriterion;
+        leadership: PerformanceCriterion;
+        creativity: PerformanceCriterion;
+        policyCompliance: PerformanceCriterion;
+    };
+    
+    overallScore: number; // Average or weighted
+    overallGrade: string; 
+    generalNotes?: string;
+
+    goals: PerformanceGoal[];
+    reviews: PeriodicReview[];
+
+    recommendations?: {
+        promotion: boolean;
+        salaryIncrease: boolean;
+        bonus: boolean;
+        trainingNeeded?: string;
+        warning: boolean;
+        developmentPlan?: string;
+    };
+
+    signatures?: {
+        manager?: { name: string; signedAt?: string; signatureUrl?: string };
+        hr?: { name: string; signedAt?: string; signatureUrl?: string };
+        employee?: { name: string; signedAt?: string; signatureUrl?: string };
+    };
+
+    referenceNumber: string;
+    qrCodeData?: string;
+    createdAt: string;
+    updatedAt?: string;
+}
+
 // --- PROPERTY MANAGEMENT ---
 export enum PropertyType {
     BUILDING = "بناية/عمارة",
@@ -938,6 +1290,7 @@ export enum PropertyUnitTypeKuwait {
     OFFICE = "مكتب",
     WAREHOUSE = "مخزن/قسيمة صناعية",
     CHALET = "شاليه",
+    VILLA = "فيلا",
     OTHER = "أخرى",
 }
 export enum PropertyIntendedUseKuwait {
@@ -957,6 +1310,7 @@ export interface PropertyUnit {
     areaSqM?: number;
     bedrooms?: number;
     bathrooms?: number;
+    rentAmount?: number;
     status: PropertyUnitStatus;
     currentLeaseId?: string;
     unitType?: PropertyUnitTypeKuwait;
@@ -972,6 +1326,7 @@ export interface Property {
     ownerName?: string;
     paciNumber?: string;
     description?: string;
+    imageUrl?: string;
     generalNotes?: string;
     propertyCategory?: PropertyCategoryKuwait;
     units?: PropertyUnit[];
@@ -1386,6 +1741,7 @@ export enum AdminTaskStatus {
     COMPLETED = "مكتملة",
     BLOCKED = "معلقة",
     CANCELLED = "ملغاة",
+    PENDING_REVIEW = "قيد المراجعة",
 }
 export enum AdminTaskPriority {
     LOW = "منخفضة",
@@ -1425,6 +1781,7 @@ export interface AdminTask {
     createdAt: string;
     updatedAt?: string;
     completedAt?: string;
+    assignerSignature?: string;
 }
 
 // Contacts
@@ -1802,7 +2159,7 @@ export enum NotificationChannel {
     SYSTEM = "إشعار بالنظام",
     SMS = "رسالة نصية SMS",
 }
-export enum NotificationStatus {
+export enum SystemNotificationStatus {
     PENDING = "قيد الإرسال",
     SENT = "مرسل",
     FAILED = "فشل الإرسال",
@@ -1877,7 +2234,7 @@ export interface NotificationLogEntry {
     channel: NotificationChannel;
     recipient: string; // email, phone, or user name
     dateTime: string;
-    status: NotificationStatus;
+    status: SystemNotificationStatus;
     subject?: string; // for email
     messagePreview?: string;
 }
@@ -1990,6 +2347,8 @@ export interface InvestigationSession {
     partyName: string;
     partyType: InvestigationPartyType;
     questions: InvestigationQuestion[];
+    partySignature?: string;
+    investigatorSignature?: string;
 }
 export interface Investigation {
     id: string;

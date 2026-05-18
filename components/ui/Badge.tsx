@@ -96,7 +96,7 @@ export const PriorityBadge: React.FC<{ priority: CasePriority | AdminTaskPriorit
   if (priority === CasePriority.LOW || priority === AdminTaskPriority.LOW) color = 'green';
   else if (priority === CasePriority.NORMAL || priority === AdminTaskPriority.MEDIUM) color = 'blue';
   else if (priority === CasePriority.HIGH || priority === AdminTaskPriority.HIGH) color = 'orange';
-  else if (priority === CasePriority.URGENST || priority === AdminTaskPriority.CRITICAL) color = 'red';
+  else if (priority === CasePriority.URGENT || priority === AdminTaskPriority.CRITICAL) color = 'red';
   return <Badge text={priority} color={color} size={size}/>;
 };
 
@@ -236,7 +236,7 @@ export const SettlementStatusBadge: React.FC<{ status: SettlementStatus, size?: 
   return <Badge text={status} color={color} size={size} />;
 };
 
-export const CompanyDocumentStatusBadge: React.FC<{ status: CompanyDocumentStatus, size?: 'xs' | 'sm' }> = ({ status, size }) => {
+export const CompanyDocumentStatusBadge: React.FC<{ status: CompanyDocumentStatus, size?: 'xs' | 'sm', className?: string }> = ({ status, size, className }) => {
   let color: BadgeColor = 'gray';
   switch(status) {
     case CompanyDocumentStatus.ACTIVE:
@@ -255,7 +255,7 @@ export const CompanyDocumentStatusBadge: React.FC<{ status: CompanyDocumentStatu
     case CompanyDocumentStatus.RECEIVED:
         color = 'blue'; break;
   }
-  return <Badge text={status} color={color} size={size} />;
+  return <Badge text={status} color={color} size={size} className={className} />;
 };
 
 export const DisciplinaryActionStatusBadge: React.FC<{ status: DisciplinaryActionStatus, size?: 'xs' | 'sm' }> = ({ status, size }) => {

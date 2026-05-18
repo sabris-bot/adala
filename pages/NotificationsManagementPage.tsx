@@ -17,7 +17,7 @@ import {
     Squares2X2Icon
 } from '../constants';
 import { 
-    NotificationChannel, NotificationStatus, NotificationType, 
+    NotificationChannel, SystemNotificationStatus, NotificationType, 
     NotificationSettingItem, NotificationLogEntry, NotificationModuleSettings 
 } from '../types';
 
@@ -88,11 +88,11 @@ const initialSettings: NotificationModuleSettings = {
 };
 
 const mockLogs: NotificationLogEntry[] = [
-    { id: 'L1', notificationType: NotificationType.HEARING_REMINDER, channel: NotificationChannel.WHATSAPP, recipient: '965 99887766', dateTime: '2024-05-02T10:15:00Z', status: NotificationStatus.VIEWED, messagePreview: 'تذكير: لديكم جلسة غداً الساعة 09:00 ص' },
-    { id: 'L2', notificationType: NotificationType.NEW_CASE_ASSIGNED, channel: NotificationChannel.EMAIL, recipient: 'legal.ops@office.com', dateTime: '2024-05-02T09:30:00Z', status: NotificationStatus.SENT, subject: 'إسناد قضية تظلم جديدة #2024/501' },
-    { id: 'L3', notificationType: NotificationType.CASE_DEADLINE_APPROACHING, channel: NotificationChannel.SYSTEM, recipient: 'أحمد محمود', dateTime: '2024-05-02T08:00:00Z', status: NotificationStatus.PENDING, messagePreview: 'باقي يومان على تسليم مذكرة الاستئناف لقضية 101' },
-    { id: 'L4', notificationType: NotificationType.PAYMENT_DUE_REMINDER, channel: NotificationChannel.EMAIL, recipient: 'client@company.com', dateTime: '2024-05-01T16:45:00Z', status: NotificationStatus.FAILED, subject: 'إشعار استحقاق الدفعة الثانية', messagePreview: 'العنوان البريدي غير صحيح أو ممتلئ' },
-    { id: 'L5', notificationType: NotificationType.TASK_OVERDUE_ALERT, channel: NotificationChannel.WHATSAPP, recipient: '965 50505050', dateTime: '2024-05-01T14:20:00Z', status: NotificationStatus.SENT, messagePreview: 'تنبيه: المهمة "مراجعة العقد" متأخرة عن موعدها' },
+    { id: 'L1', notificationType: NotificationType.HEARING_REMINDER, channel: NotificationChannel.WHATSAPP, recipient: '965 99887766', dateTime: '2024-05-02T10:15:00Z', status: SystemNotificationStatus.VIEWED, messagePreview: 'تذكير: لديكم جلسة غداً الساعة 09:00 ص' },
+    { id: 'L2', notificationType: NotificationType.NEW_CASE_ASSIGNED, channel: NotificationChannel.EMAIL, recipient: 'legal.ops@office.com', dateTime: '2024-05-02T09:30:00Z', status: SystemNotificationStatus.SENT, subject: 'إسناد قضية تظلم جديدة #2024/501' },
+    { id: 'L3', notificationType: NotificationType.CASE_DEADLINE_APPROACHING, channel: NotificationChannel.SYSTEM, recipient: 'أحمد محمود', dateTime: '2024-05-02T08:00:00Z', status: SystemNotificationStatus.PENDING, messagePreview: 'باقي يومان على تسليم مذكرة الاستئناف لقضية 101' },
+    { id: 'L4', notificationType: NotificationType.PAYMENT_DUE_REMINDER, channel: NotificationChannel.EMAIL, recipient: 'client@company.com', dateTime: '2024-05-01T16:45:00Z', status: SystemNotificationStatus.FAILED, subject: 'إشعار استحقاق الدفعة الثانية', messagePreview: 'العنوان البريدي غير صحيح أو ممتلئ' },
+    { id: 'L5', notificationType: NotificationType.TASK_OVERDUE_ALERT, channel: NotificationChannel.WHATSAPP, recipient: '965 50505050', dateTime: '2024-05-01T14:20:00Z', status: SystemNotificationStatus.SENT, messagePreview: 'تنبيه: المهمة "مراجعة العقد" متأخرة عن موعدها' },
 ];
 
 const NotificationsManagementPage: React.FC = () => {
@@ -100,7 +100,7 @@ const NotificationsManagementPage: React.FC = () => {
     const [settingsState, setSettingsState] = useState<NotificationModuleSettings>(initialSettings);
     const [logs, setLogs] = useState<NotificationLogEntry[]>(mockLogs);
     const [searchTerm, setSearchTerm] = useState('');
-    const [statusFilter, setStatusFilter] = useState<NotificationStatus | ''>('');
+    const [statusFilter, setStatusFilter] = useState<SystemNotificationStatus | ''>('');
 
     const filteredLogs = useMemo(() => {
         return logs.filter(log => {
@@ -256,9 +256,9 @@ const NotificationsManagementPage: React.FC = () => {
                         <Select 
                             options={[
                                 { value: '', label: 'كل الحالات' },
-                                { value: NotificationStatus.SENT, label: 'مرسل' },
-                                { value: NotificationStatus.FAILED, label: 'فشل' },
-                                { value: NotificationStatus.VIEWED, label: 'تم العرض' }
+                                { value: SystemNotificationStatus.SENT, label: 'مرسل' },
+                                { value: SystemNotificationStatus.FAILED, label: 'فشل' },
+                                { value: SystemNotificationStatus.VIEWED, label: 'تم العرض' }
                             ]}
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value as any)}
@@ -304,7 +304,7 @@ const NotificationsManagementPage: React.FC = () => {
                                     <td className="p-4 text-center">
                                         <Badge 
                                             text={log.status} 
-                                            variant={log.status === NotificationStatus.SENT ? 'success' : log.status === NotificationStatus.FAILED ? 'danger' : 'info'} 
+                                            variant={log.status === SystemNotificationStatus.SENT ? 'success' : log.status === SystemNotificationStatus.FAILED ? 'danger' : 'info'} 
                                             size="xs"
                                         />
                                     </td>

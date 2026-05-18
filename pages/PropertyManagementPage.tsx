@@ -9,13 +9,21 @@ import Modal from '../components/ui/Modal';
 import TextArea from '../components/ui/TextArea';
 import { 
     BuildingOffice2Icon, PlusCircleIcon, EyeIcon, PencilIcon, 
-    FolderIcon, UsersIcon, DocumentTextIcon,
+    FolderIcon, DocumentTextIcon,
     ReceiptPercentIcon, WrenchScrewdriverIcon, 
     PresentationChartLineIcon, HomeIcon, CheckCircleIcon,
     ExclamationTriangleIcon, BellAlertIcon, TrashIcon,
     DocumentDuplicateIcon, BanknotesIcon, ScaleIcon,
-    ArrowPathIcon, CalculatorIcon, LinkIcon, PrinterIcon
+    ArrowPathIcon, CalculatorIcon, LinkIcon, PrinterIcon,
+    MapPinIcon, UsersIcon, ShieldCheckIcon, CalendarDaysIcon,
+    ChevronLeftIcon, ChevronRightIcon, MagnifyingGlassIcon,
+    SparklesIcon, ChartBarIcon, TrendingUpIcon,
+    ArrowUpRightIcon, Square3Stack3DIcon
 } from '../constants';
+import { 
+    PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, LineChart, Line, AreaChart, Area
+} from 'recharts';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
     Property, Tenant, LeaseAgreement, RentPaymentStatus,
     PropertyUnitStatus, LeaseAgreementStatus, 
@@ -39,7 +47,37 @@ import { mockTenants, mockProperties, mockLeaseAgreements, mockRentPayments, moc
 const formatDate = (dateStr?: string) => dateStr ? new Date(dateStr).toLocaleDateString('ar-EG') : '-';
 const formatCurrency = (amount?: number) => amount !== undefined ? `${amount.toFixed(3)} د.ك` : '-';
 
-// --- SUB-COMPONENTS (FORMS) ---
+// --- UI COMPONENTS FOR DASHBOARD ---
+
+const StatCard: React.FC<{ 
+    title: string; 
+    value: string | number; 
+    trend?: { value: number; isUp: boolean }; 
+    icon: React.ReactNode; 
+    colorClass: string; 
+    bgClass: string 
+}> = ({ title, value, trend, icon, colorClass, bgClass }) => (
+    <Card className="relative overflow-hidden group hover:shadow-2xl transition-all duration-500 border-none bg-white dark:bg-slate-900 border-slate-100/50">
+        <div className={`absolute top-0 right-0 w-32 h-32 ${bgClass} rounded-full -mr-16 -mt-16 opacity-10 group-hover:scale-150 transition-transform duration-700`}></div>
+        <div className="relative p-2">
+            <div className="flex justify-between items-start mb-4">
+                <div className={`p-4 rounded-2xl ${bgClass} ${colorClass} shadow-lg shadow-current/10 group-hover:scale-110 transition-transform duration-500`}>
+                    {icon}
+                </div>
+                {trend && (
+                    <div className={`flex items-center gap-1 text-xs font-black px-2 py-1 rounded-full ${trend.isUp ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        {trend.isUp ? <ArrowUpRightIcon className="w-3 h-3"/> : <TrendingUpIcon className="w-3 h-3 rotate-180"/>}
+                        {trend.value}%
+                    </div>
+                )}
+            </div>
+            <div>
+                <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mb-1">{title}</p>
+                <div className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{value}</div>
+            </div>
+        </div>
+    </Card>
+);
 
 // 1. Property Form
 interface PropertyFormModalProps {
@@ -550,7 +588,7 @@ const LeaseContractPrintModal: React.FC<{ lease: LeaseAgreement | null; tenant: 
 
             <div className="flex justify-end p-4 border-t gap-3 no-print bg-gray-50">
                 <Button variant="ghost" onClick={onClose}>إغلاق</Button>
-                <Button variant="primary" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة العقد</Button>
+                <Button variant="primary" onClick={() => setTimeout(() => window.print(), 350)} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة العقد</Button>
             </div>
         </Modal>
     );
@@ -728,7 +766,7 @@ const LeaseReportsTab: React.FC<{ leases: LeaseAgreement[]; properties: Property
 
                     <div className="flex items-end gap-2">
                         <Button variant="outline" size="sm" fullWidth onClick={() => { setSelectedPropertyIds([]); setStartDate(''); setEndDate(''); }}>إعادة تعيين</Button>
-                        <Button variant="primary" size="sm" fullWidth leftIcon={<PrinterIcon className="w-4 h-4"/>} onClick={() => window.print()}>طباعة</Button>
+                        <Button variant="primary" size="sm" fullWidth leftIcon={<PrinterIcon className="w-4 h-4"/>} onClick={() => setTimeout(() => window.print(), 350)}>طباعة</Button>
                     </div>
                 </div>
             </Card>
@@ -823,7 +861,87 @@ const LeaseReportsTab: React.FC<{ leases: LeaseAgreement[]; properties: Property
     );
 };
 
-// --- Sub-Components ---
+const ReceiptModal: React.FC<{ payment: RentPayment | null; lease: LeaseAgreement | null; tenant: Tenant | null; property: Property | null; onClose: () => void }> = ({ payment, lease, tenant, property, onClose }) => {
+    if (!payment || !lease || !tenant || !property) return null;
+
+    return (
+        <Modal isOpen={!!payment} onClose={onClose} title="إيصال استلام أجرة إيجارية" size="md">
+            <div id="printable-receipt" className="p-8 bg-white text-slate-800 font-sans border-8 border-double border-slate-100 m-2 relative overflow-hidden" dir="rtl">
+                {/* Visual Accent */}
+                <div className="absolute top-0 left-0 w-32 h-32 bg-primary/5 rounded-full -ml-16 -mt-16"></div>
+                
+                <div className="flex justify-between items-center border-b-2 border-slate-900 pb-6 mb-8 relative">
+                    <div className="text-right">
+                        <h2 className="text-2xl font-black text-slate-900 tracking-tighter">مكتب صبري شطا للمحاماة</h2>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Sabri Shatta Law Office</p>
+                    </div>
+                    <div className="text-left font-mono">
+                        <div className="bg-slate-900 text-white px-3 py-1 rounded text-xs font-black mb-1">OFFICIAL RECEIPT</div>
+                        <div className="text-sm font-bold text-slate-700">NO: {payment.id?.toUpperCase()}</div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-8 mb-8">
+                    <div className="space-y-4">
+                        <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase">وصلني من السيد / Received From</span>
+                            <span className="text-lg font-black text-slate-900 border-b border-slate-200 block pb-1">{tenant.fullNameAr}</span>
+                        </div>
+                        <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase">مبلغ وقدره / The Sum Of</span>
+                            <span className="text-lg font-black text-primary border-b border-slate-200 block pb-1">{formatCurrency(payment.amountPaid)}</span>
+                        </div>
+                    </div>
+                    <div className="space-y-4">
+                        <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase">عن القيمة الإيجارية لـ / For Rent Of</span>
+                            <span className="text-sm font-bold text-slate-700">{payment.paymentForPeriod}</span>
+                        </div>
+                        <div>
+                            <span className="text-[10px] font-black text-slate-400 block uppercase">العقار والوحدة / Property & Unit</span>
+                            <span className="text-sm font-bold text-slate-700">{property.name} - وحدة {property.units?.find(u=>u.id===payment.leaseAgreementId)?.unitNumber || 'مبنى'}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center mb-8">
+                    <div className="flex gap-4">
+                        <div>
+                            <span className="text-[9px] font-black text-slate-400 block uppercase">طريقة الدفع / Payment Method</span>
+                            <span className="text-xs font-bold text-slate-900">{payment.paymentMethod === PaymentMethod.KNET ? 'كي-نت' : payment.paymentMethod || 'نقداً'}</span>
+                        </div>
+                        <div className="border-r border-slate-200 pr-4">
+                            <span className="text-[9px] font-black text-slate-400 block uppercase">تاريخ السداد / Date Of Payment</span>
+                            <span className="text-xs font-bold text-slate-900 font-mono tracking-tighter">{formatDate(payment.paymentDate)}</span>
+                        </div>
+                    </div>
+                    <div className="bg-white p-1 rounded border shadow-sm">
+                        <div className="w-16 h-16 bg-[url('https://api.qrserver.com/v1/create-qr-code/?size=64x64&data= عدالة-نظام-العقارات')] bg-cover opacity-80"></div>
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-end mt-12 pt-8">
+                    <div className="text-center font-serif italic text-2xl text-slate-900 opacity-80 select-none">
+                        S. Shatta
+                    </div>
+                    <div className="text-center">
+                        <div className="w-32 border-b-2 border-slate-900 mx-auto mb-2"></div>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">توقيع المستلم / Receiver Signature</p>
+                    </div>
+                </div>
+
+                <div className="mt-8 text-[8px] text-slate-400 text-center uppercase tracking-[0.2em]">
+                    Powered by Adala - Intelligent Property Management Solutions
+                </div>
+            </div>
+
+            <div className="flex justify-end p-4 border-t gap-3 no-print bg-slate-50">
+                <Button variant="ghost" onClick={onClose}>إغلاق</Button>
+                <Button variant="primary" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة الإيصال</Button>
+            </div>
+        </Modal>
+    );
+};
 
 const PropertyCard: React.FC<{ property: Property; onEdit: (p: Property) => void; onDelete: (id: string) => void }> = ({ property, onEdit, onDelete }) => {
     const rentedUnits = property.units?.filter(u => u.status === PropertyUnitStatus.RENTED).length || 0;
@@ -831,46 +949,73 @@ const PropertyCard: React.FC<{ property: Property; onEdit: (p: Property) => void
     const occupancyRate = totalUnits > 0 ? Math.round((rentedUnits / totalUnits) * 100) : 0;
 
     return (
-        <Card className="hover:shadow-lg transition-shadow border border-gray-100 dark:border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-                <div className="flex items-center">
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400 me-3">
-                        <HomeIcon className="w-6 h-6"/>
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-gray-800 dark:text-gray-100 text-lg">{property.name}</h3>
-                        <p className="text-xs text-gray-500">{property.type} | {property.propertyCategory}</p>
+        <Card className="p-0 overflow-hidden group hover:shadow-2xl transition-all duration-500 border-slate-100 bg-white dark:bg-slate-900">
+            <div className="relative h-48 overflow-hidden">
+                <img 
+                    src={property.imageUrl || 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&q=80&w=800'} 
+                    alt={property.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6 flex flex-col justify-end">
+                    <div className="flex justify-between items-end">
+                        <div>
+                            <span className="text-[10px] font-black text-primary bg-white/90 px-2 py-0.5 rounded-full uppercase tracking-widest mb-2 inline-block">
+                                {property.propertyCategory}
+                            </span>
+                            <h3 className="text-xl font-black text-white leading-tight">{property.name}</h3>
+                        </div>
+                        {totalUnits > 0 && (
+                            <div className="text-right">
+                                <div className="text-[10px] font-bold text-white/60 mb-1">نسبة الإشغال</div>
+                                <div className={`text-sm font-black ${occupancyRate >= 90 ? 'text-emerald-400' : occupancyRate >= 50 ? 'text-amber-400' : 'text-rose-400'}`}>
+                                    {occupancyRate}%
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
-                {totalUnits > 0 && (
-                    <span className={`px-2 py-1 rounded text-xs font-bold ${occupancyRate >= 90 ? 'bg-green-100 text-green-700' : occupancyRate >= 50 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
-                        إشغال {occupancyRate}%
-                    </span>
-                )}
+                <div className="absolute top-4 right-4 flex gap-2">
+                    <button onClick={() => onEdit(property)} className="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-white hover:text-primary transition-all shadow-lg">
+                        <PencilIcon className="w-4 h-4"/>
+                    </button>
+                    <button onClick={() => onDelete(property.id)} className="p-2 bg-white/20 backdrop-blur-md rounded-full text-white hover:bg-rose-500 hover:text-white transition-all shadow-lg">
+                        <TrashIcon className="w-4 h-4"/>
+                    </button>
+                </div>
             </div>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 flex items-center"><BuildingOffice2Icon className="w-4 h-4 me-1 text-gray-400"/> {property.address}</p>
             
-            <div className="grid grid-cols-3 gap-2 text-center text-xs bg-gray-50 dark:bg-gray-800 p-2 rounded mb-3">
-                <div>
-                    <span className="block font-bold text-gray-800 dark:text-gray-200">{totalUnits}</span>
-                    <span className="text-gray-500">وحدة</span>
+            <div className="p-5">
+                <div className="flex items-center gap-2 text-slate-400 text-xs mb-4">
+                    <MapPinIcon className="w-3.5 h-3.5" />
+                    <span className="font-bold line-clamp-1">{property.address}</span>
                 </div>
-                <div>
-                    <span className="block font-bold text-green-600">{rentedUnits}</span>
-                    <span className="text-gray-500">مؤجرة</span>
-                </div>
-                <div>
-                    <span className="block font-bold text-red-500">{property.units?.filter(u=>u.status === PropertyUnitStatus.VACANT).length}</span>
-                    <span className="text-gray-500">شاغرة</span>
-                </div>
-            </div>
 
-            <div className="flex justify-end gap-2 border-t pt-2 dark:border-gray-700">
-                <Link to="/property-management/reports" className="me-auto">
-                    <Button variant="ghost" size="sm" leftIcon={<PresentationChartLineIcon className="w-4 h-4 text-primary"/>}>تقرير مفصل</Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={() => onEdit(property)} leftIcon={<PencilIcon className="w-4 h-4 text-yellow-600"/>}>تعديل</Button>
-                <Button variant="ghost" size="sm" onClick={() => onDelete(property.id)} className="text-red-500"><TrashIcon className="w-4 h-4"/></Button>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                    <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl text-center flex flex-col items-center">
+                        <Square3Stack3DIcon className="w-4 h-4 text-slate-400 mb-1"/>
+                        <div className="text-sm font-black text-slate-800 dark:text-slate-200">{totalUnits}</div>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase">وحدات</div>
+                    </div>
+                    <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl text-center flex flex-col items-center">
+                        <UsersIcon className="w-4 h-4 text-emerald-500 mb-1"/>
+                        <div className="text-sm font-black text-emerald-700 dark:text-emerald-400">{rentedUnits}</div>
+                        <div className="text-[9px] font-bold text-emerald-500 uppercase">مؤجرة</div>
+                    </div>
+                    <div className="p-3 bg-rose-50 dark:bg-rose-900/20 rounded-2xl text-center flex flex-col items-center">
+                        <SparklesIcon className="w-4 h-4 text-rose-500 mb-1"/>
+                        <div className="text-sm font-black text-rose-700 dark:text-rose-400">{property.units?.filter(u=>u.status === PropertyUnitStatus.VACANT).length}</div>
+                        <div className="text-[9px] font-bold text-rose-500 uppercase">شاغرة</div>
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-4 border-t border-slate-50">
+                    <Link to="/property-management/reports" className="flex-grow">
+                        <Button variant="ghost" size="sm" fullWidth className="text-primary hover:bg-primary/5 font-black gap-2">
+                            <ChartBarIcon className="w-4 h-4"/>
+                            إحصائيات متقدمة
+                        </Button>
+                    </Link>
+                </div>
             </div>
         </Card>
     );
@@ -989,6 +1134,7 @@ const NoticesTab: React.FC<{
 
 // --- Main Component ---
 export const PropertyManagementPage: React.FC = () => {
+    const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<RentPayment | null>(null);
     const [activeTab, setActiveTab] = useState<'overview' | 'properties' | 'tenants' | 'leases' | 'payments' | 'notices' | 'reports' | 'maintenance' | 'documents'>('overview');
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -1020,6 +1166,222 @@ export const PropertyManagementPage: React.FC = () => {
 
     const [isCaseLinkModalOpen, setIsCaseLinkModalOpen] = useState(false);
     const [linkingTargetId, setLinkingTargetId] = useState<string | null>(null);
+
+    // --- TAB RENDERING ---
+    const renderOverviewTab = () => {
+        const totalProperties = properties.length;
+        const totalUnits = properties.reduce((acc, p) => acc + (p.units?.length || 0), 0);
+        const rentedUnits = properties.reduce((acc, p) => acc + (p.units?.filter(u => u.status === PropertyUnitStatus.RENTED).length || 0), 0);
+        const occupancyRate = totalUnits > 0 ? Math.round((rentedUnits / totalUnits) * 100) : 0;
+        const totalMonthlyRevenue = payments
+            .filter(p => {
+                const payDate = new Date(p.paymentDate);
+                const now = new Date();
+                return payDate.getMonth() === now.getMonth() && payDate.getFullYear() === now.getFullYear();
+            })
+            .reduce((acc, p) => acc + p.amountPaid, 0);
+
+        // Chart Data
+        const occupancyData = [
+            { name: 'مؤجرة', value: rentedUnits, color: '#0ea5e9' },
+            { name: 'شاغرة', value: totalUnits - rentedUnits, color: '#f43f5e' }
+        ];
+
+        const revenueData = [
+            { name: 'يناير', value: 4500 },
+            { name: 'فبراير', value: 5200 },
+            { name: 'مارس', value: 4800 },
+            { name: 'أبريل', value: 6100 },
+            { name: 'مايو', value: 5900 },
+            { name: 'يونيو', value: totalMonthlyRevenue || 6500 },
+        ];
+
+        return (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000">
+                {/* 1. Top Stats Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard 
+                        title="إجمالي العقارات" 
+                        value={totalProperties} 
+                        trend={{ value: 12, isUp: true }}
+                        icon={<BuildingOffice2Icon className="w-6 h-6" />}
+                        bgClass="bg-primary/20"
+                        colorClass="text-primary"
+                    />
+                    <StatCard 
+                        title="نسبة الإشغال" 
+                        value={`${occupancyRate}%`} 
+                        trend={{ value: 5, isUp: true }}
+                        icon={<ChartBarIcon className="w-6 h-6" />}
+                        bgClass="bg-emerald-500/20"
+                        colorClass="text-emerald-600"
+                    />
+                    <StatCard 
+                        title="الإيراد الشهري" 
+                        value={formatCurrency(totalMonthlyRevenue)} 
+                        trend={{ value: 8, isUp: true }}
+                        icon={<BanknotesIcon className="w-6 h-6" />}
+                        bgClass="bg-amber-500/20"
+                        colorClass="text-amber-600"
+                    />
+                    <StatCard 
+                        title="تنبيهات نشطة" 
+                        value={notices.filter(n => n.status === 'Sent').length} 
+                        trend={{ value: 2, isUp: false }}
+                        icon={<BellAlertIcon className="w-6 h-6" />}
+                        bgClass="bg-rose-500/20"
+                        colorClass="text-rose-600"
+                    />
+                </div>
+
+                {/* 2. Charts & Insights Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <Card className="lg:col-span-2 p-8 border-none bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 dark:shadow-none min-h-[400px]">
+                        <div className="flex justify-between items-center mb-10">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                    <TrendingUpIcon className="w-6 h-6 text-primary"/>
+                                    تحليل الإيرادات السنوية
+                                </h3>
+                                <p className="text-sm font-bold text-slate-400 mt-1">عرض تطور التحصيل النقدي الشهري</p>
+                            </div>
+                            <select className="bg-slate-50 dark:bg-slate-800 border-none rounded-xl px-4 py-2 text-xs font-black text-slate-600 outline-none">
+                                <option>سنة 2024</option>
+                                <option>سنة 2023</option>
+                            </select>
+                        </div>
+                        <div className="h-[300px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={revenueData}>
+                                    <defs>
+                                        <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.3}/>
+                                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 'bold', fill: '#94a3b8'}} dy={10} />
+                                    <YAxis hide />
+                                    <Tooltip 
+                                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', background: '#fff' }}
+                                        labelStyle={{ fontWeight: 'black', color: '#1e293b' }}
+                                    />
+                                    <Area type="monotone" dataKey="value" stroke="#0ea5e9" strokeWidth={4} fillOpacity={1} fill="url(#colorRev)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </Card>
+
+                    <Card className="p-8 border-none bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 dark:shadow-none min-h-[400px]">
+                        <h3 className="text-xl font-black text-slate-800 dark:text-white mb-10 flex items-center gap-2">
+                            <ChartBarIcon className="w-6 h-6 text-emerald-500"/>
+                            توزيع الوحدات
+                        </h3>
+                        <div className="h-[250px] relative">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={occupancyData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={10}
+                                        dataKey="value"
+                                    >
+                                        {occupancyData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+                                <div className="text-3xl font-black text-slate-800 dark:text-white">{occupancyRate}%</div>
+                                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">إشغال</div>
+                            </div>
+                        </div>
+                        <div className="mt-8 space-y-3">
+                            {occupancyData.map((item, i) => (
+                                <div key={i} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                                        <span className="text-xs font-black text-slate-600 dark:text-slate-300">{item.name}</span>
+                                    </div>
+                                    <span className="text-sm font-black text-slate-800 dark:text-white">{item.value} وحدة</span>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+
+                {/* 3. Notifications & Recent Activity Row */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <Card className="p-8 border-none bg-slate-900 text-white shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-64 h-64 bg-primary rounded-full -mr-32 -mt-32 opacity-20 blur-3xl"></div>
+                        <div className="relative">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-xl font-black flex items-center gap-2">
+                                    <SparklesIcon className="w-6 h-6 text-primary-light"/>
+                                    التنبيهات الذكية
+                                </h3>
+                                <span className="bg-primary/20 text-primary-light px-3 py-1 rounded-full text-xs font-black">4 تنبيهات جديدة</span>
+                            </div>
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                                    <div className="p-3 rounded-xl bg-orange-500/20 text-orange-400">
+                                        <CalendarDaysIcon className="w-5 h-5"/>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-sm">عقد إيجار قيد الانتهاء</h4>
+                                        <p className="text-xs text-slate-400 mt-1">برج ناصر - وحدة 101 (تنتهي غداً)</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-4 p-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
+                                    <div className="p-3 rounded-xl bg-rose-500/20 text-rose-400">
+                                        <ExclamationTriangleIcon className="w-5 h-5"/>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-sm">تأخر في السداد</h4>
+                                        <p className="text-xs text-slate-400 mt-1">3 مستأجرين تجاوزوا موعد الدفع بـ 5 أيام</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card className="p-8 border-none bg-white dark:bg-slate-900 shadow-xl">
+                        <div className="flex justify-between items-center mb-8">
+                            <h3 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                <ArrowPathIcon className="w-6 h-6 text-primary"/>
+                                آخر النشاطات
+                            </h3>
+                            <Button variant="ghost" size="sm" className="text-xs font-black">عرض السجل الكامل</Button>
+                        </div>
+                        <div className="space-y-6">
+                            {[
+                                { user: 'أحمد محمود', Action: 'تحصيل إيجار', target: 'وحدة 302', time: 'منذ ساعتين', icon: <BanknotesIcon className="w-4 h-4 text-emerald-500"/> },
+                                { user: 'خالد العتيبي', Action: 'تجديد عقد', target: 'فيلا السرة', time: 'منذ 5 ساعات', icon: <DocumentDuplicateIcon className="w-4 h-4 text-primary"/> },
+                                { user: 'النظام', Action: 'أمر صيانة', target: 'برج ناصر', time: 'منذ يوم', icon: <WrenchScrewdriverIcon className="w-4 h-4 text-amber-500"/> },
+                            ].map((act, i) => (
+                                <div key={i} className="flex justify-between items-center">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-800">
+                                            {act.icon}
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-black text-slate-800 dark:text-white">{act.user} <span className="text-slate-400 font-bold px-2">●</span> {act.Action}</div>
+                                            <div className="text-xs text-slate-400 font-bold mt-1">{act.target}</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs font-black text-slate-500">{act.time}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+            </div>
+        );
+    };
 
     // CRUD Handlers - Property
     const handleAddProperty = () => { setEditingProperty(null); setIsPropertyModalOpen(true); };
@@ -1109,9 +1471,9 @@ export const PropertyManagementPage: React.FC = () => {
                     <BuildingOffice2Icon className="w-8 h-8 text-primary me-3" />
                     <h1 className="text-3xl font-bold text-primary-dark dark:text-primary-light">إدارة العقارات والأصول</h1>
                 </div>
-                 <div className="flex gap-2">
-                    <Button onClick={handleAddProperty} leftIcon={<PlusCircleIcon className="w-5 h-5"/>}>عقار جديد</Button>
-                    <Button onClick={handleAddTenant} variant="secondary" leftIcon={<UsersIcon className="w-5 h-5"/>}>مستأجر جديد</Button>
+                  <div className="flex gap-4">
+                    <Button onClick={handleAddProperty} leftIcon={<PlusCircleIcon className="w-5 h-5"/>} className="shadow-lg shadow-primary/20">عقار جديد</Button>
+                    <Button onClick={handleAddTenant} variant="ghost" leftIcon={<UsersIcon className="w-5 h-5"/>} className="text-slate-600">مستأجر جديد</Button>
                 </div>
             </div>
 
@@ -1134,64 +1496,34 @@ export const PropertyManagementPage: React.FC = () => {
                 </button>
             </div>
             
-            {/* Tabs Header */}
-            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-6 overflow-x-auto scrollbar-thin pb-1">
-                {[
-                    {id: 'overview', label: 'نظرة عامة', icon: <PresentationChartLineIcon className="w-4 h-4"/>},
-                    {id: 'properties', label: 'العقارات والوحدات', icon: <BuildingOffice2Icon className="w-4 h-4"/>},
-                    {id: 'maintenance', label: 'الصيانة', icon: <WrenchScrewdriverIcon className="w-4 h-4"/>},
-                    {id: 'documents', label: 'المستندات', icon: <FolderIcon className="w-4 h-4"/>},
-                    {id: 'tenants', label: 'المستأجرين', icon: <UsersIcon className="w-4 h-4"/>},
-                    {id: 'leases', label: 'عقود الإيجار', icon: <DocumentTextIcon className="w-4 h-4"/>},
-                    {id: 'payments', label: 'المديونيات والتحصيل', icon: <BanknotesIcon className="w-4 h-4"/>},
-                    {id: 'notices', label: 'الإنذارات والإخلاء', icon: <BellAlertIcon className="w-4 h-4"/>},
-                    {id: 'reports', label: 'تقارير الإدارة', icon: <PrinterIcon className="w-4 h-4"/>},
-                ].map(tab => (
-                    <button 
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)} 
-                        className={`flex items-center gap-2 px-6 py-3 border-b-2 font-medium transition-colors whitespace-nowrap ${activeTab === tab.id ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
-                    >
-                        {tab.icon} {tab.label}
-                    </button>
-                ))}
+            {/* Tabs Header - Finesse Design */}
+            <div className="bg-white dark:bg-slate-900 p-2 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex items-center justify-between mb-8">
+                <div className="flex gap-2 p-1 overflow-x-auto scrollbar-none no-scrollbar">
+                    {[
+                        {id: 'overview', label: 'الرئيسية', icon: <PresentationChartLineIcon className="w-4 h-4"/>},
+                        {id: 'properties', label: 'العقارات', icon: <BuildingOffice2Icon className="w-4 h-4"/>},
+                        {id: 'maintenance', label: 'الصيانة', icon: <WrenchScrewdriverIcon className="w-4 h-4"/>},
+                        {id: 'tenants', label: 'المستأجرين', icon: <UsersIcon className="w-4 h-4"/>},
+                        {id: 'payments', label: 'المالية', icon: <BanknotesIcon className="w-4 h-4"/>},
+                        {id: 'notices', label: 'الإنذارات', icon: <BellAlertIcon className="w-4 h-4"/>},
+                    ].map(tab => (
+                        <button 
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)} 
+                            className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs transition-all duration-300 whitespace-nowrap ${activeTab === tab.id ? 'bg-primary text-white shadow-xl shadow-primary/30 scale-105' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                            {tab.icon} {tab.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="hidden lg:flex items-center gap-2 px-6 border-r border-slate-100 ml-2">
+                   <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{new Date().toLocaleDateString('ar-KW', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</div>
+                </div>
             </div>
 
             {/* Tab Content */}
             <div className="min-h-[400px]">
-                {activeTab === 'overview' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <Card className="text-center py-6 bg-white dark:bg-dm-card border-t-4 border-blue-500">
-                            <p className="text-gray-500">إجمالي العقارات</p>
-                            <p className="text-3xl font-bold text-blue-600">{properties.length}</p>
-                        </Card>
-                        <Card className="text-center py-6 bg-white dark:bg-dm-card border-t-4 border-green-500">
-                            <p className="text-gray-500">إجمالي المستأجرين</p>
-                            <p className="text-3xl font-bold text-green-600">{tenants.length}</p>
-                        </Card>
-                         <Card className="text-center py-6 bg-white dark:bg-dm-card border-t-4 border-yellow-500">
-                            <p className="text-gray-500">عقود سارية</p>
-                            <p className="text-3xl font-bold text-yellow-600">{leases.filter(l => l.status === LeaseAgreementStatus.ACTIVE).length}</p>
-                        </Card>
-                         <Card className="text-center py-6 bg-white dark:bg-dm-card border-t-4 border-red-500">
-                            <p className="text-gray-500">دفعات متعثرة</p>
-                            <p className="text-3xl font-bold text-red-600">{mockRentPayments.filter(p => p.status === RentPaymentStatus.OVERDUE).length}</p>
-                        </Card>
-
-                        <div className="col-span-full md:col-span-2">
-                            <Card title="أحدث العقارات المضافة">
-                                <ul className="space-y-3">
-                                    {properties.slice(0, 3).map(p => (
-                                        <li key={p.id} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                                            <span className="font-medium text-gray-800 dark:text-gray-200">{p.name}</span>
-                                            <span className="text-xs text-gray-500">{p.type}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </Card>
-                        </div>
-                    </div>
-                )}
+                {activeTab === 'overview' && renderOverviewTab()}
 
                 {activeTab === 'properties' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-right">
@@ -1200,38 +1532,62 @@ export const PropertyManagementPage: React.FC = () => {
                 )}
 
                 {activeTab === 'maintenance' && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">ملخص طلبات الصيانة النشطة</h2>
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
+                        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800 dark:text-white">إدارة طلبات الصيانة</h2>
+                                <p className="text-xs font-bold text-slate-400 mt-1">تتبع الإصلاحات، التكاليف، والفنيين</p>
+                            </div>
                             <Link to="/property-management/maintenance">
-                                <Button variant="outline" size="sm">عرض سجل الصيانة الكامل</Button>
+                                <Button variant="primary" size="sm" className="shadow-lg shadow-primary/20">وحدة الصيانة المتكاملة</Button>
                             </Link>
                         </div>
-                        <Card>
-                            <div className="p-10 text-center">
-                                <WrenchScrewdriverIcon className="w-12 h-12 mx-auto text-blue-200 mb-4" />
-                                <p className="text-gray-500 italic">يتم سحب البيانات من وحدة الصيانة المركزية...</p>
-                                <Link to="/property-management/maintenance" className="text-primary hover:underline block mt-2 font-bold select-none">انقر للانتقال لإدارة الصيانة</Link>
-                            </div>
-                        </Card>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                             <Card className="p-10 border-none bg-gradient-to-br from-blue-600 to-blue-700 text-white relative overflow-hidden group">
+                                <WrenchScrewdriverIcon className="absolute -bottom-10 -right-10 w-48 h-48 opacity-10 group-hover:rotate-12 transition-transform duration-700" />
+                                <div className="relative">
+                                    <h3 className="text-2xl font-black mb-4">الصيانة الوقائية</h3>
+                                    <p className="text-blue-100 text-sm font-bold mb-8 leading-relaxed">جدولة الفحوصات الدورية للمصاعد، أنظمة التكييف، ومعدات الحريق لضمان سلامة الأصول.</p>
+                                    <Button variant="ghost" className="text-white hover:bg-white/10 border border-white/20">فتح الجدول</Button>
+                                </div>
+                             </Card>
+                             <Card className="p-10 border-none bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 flex flex-col justify-center items-center text-center">
+                                <div className="p-5 rounded-3xl bg-orange-50 text-orange-500 mb-6">
+                                    <ArrowPathIcon className="w-10 h-10 animate-spin-slow" />
+                                </div>
+                                <h4 className="text-lg font-black text-slate-800 dark:text-white mb-2">مزامنة البيانات الحية</h4>
+                                <p className="text-xs font-bold text-slate-400 max-w-xs">يتم الآن تحديث حالة الطلبات من المكتب الفني...</p>
+                             </Card>
+                        </div>
                     </div>
                 )}
 
                 {activeTab === 'documents' && (
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="text-xl font-bold">أرشيف المستندات والوثائق</h2>
+                    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
+                        <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm">
+                            <div>
+                                <h2 className="text-xl font-black text-slate-800 dark:text-white">المستودع الرقمي للأصول</h2>
+                                <p className="text-xs font-bold text-slate-400 mt-1">عقود الملكية، المخططات الهندسية، وتراخيص البلدية</p>
+                            </div>
                             <Link to="/property-management/property-documents">
-                                <Button variant="outline" size="sm">عرض المستودع الرقمي</Button>
+                                <Button variant="primary" size="sm" className="shadow-lg shadow-primary/20">فتح الأرشيف</Button>
                             </Link>
                         </div>
-                        <Card>
-                            <div className="p-10 text-center">
-                                <FolderIcon className="w-12 h-12 mx-auto text-purple-200 mb-4" />
-                                <p className="text-gray-500 italic">نظام إدارة الوثائق العقارية يتيح لك أرشفة كافة العقود والخرائط...</p>
-                                <Link to="/property-management/property-documents" className="text-primary hover:underline block mt-2 font-bold select-none">افتح نظام إدارة المستندات</Link>
-                            </div>
-                        </Card>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            {[
+                                { title: 'وثائق التملك', count: 12, icon: <ShieldCheckIcon className="w-8 h-8"/>, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+                                { title: 'عقود الإيجار', count: 45, icon: <DocumentDuplicateIcon className="w-8 h-8"/>, color: 'text-primary', bg: 'bg-primary/10' },
+                                { title: 'تراخيص بلدية', count: 8, icon: <ScaleIcon className="w-8 h-8"/>, color: 'text-purple-500', bg: 'bg-purple-50' },
+                            ].map((cat, i) => (
+                                <Card key={i} className="p-8 border-none bg-white dark:bg-slate-900 shadow-xl shadow-slate-200/50 hover:-translate-y-1 transition-all duration-300">
+                                    <div className={`p-4 rounded-2xl ${cat.bg} ${cat.color} w-fit mb-6`}>
+                                        {cat.icon}
+                                    </div>
+                                    <h4 className="text-lg font-black text-slate-800 dark:text-white mb-1">{cat.title}</h4>
+                                    <div className="text-xs font-black text-slate-400 uppercase tracking-widest">{cat.count} مستند مؤرشف</div>
+                                </Card>
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -1323,13 +1679,81 @@ export const PropertyManagementPage: React.FC = () => {
                     </Card>
                 )}
 
-                {activeTab === 'payments' && <PaymentsTab payments={payments} leases={leases} tenants={tenants} onAdd={handleAddPayment} onEdit={handleEditPayment} onDelete={handleDeletePayment} />}
+                {activeTab === 'payments' && (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <StatCard title="إجمالي المحصل" value={formatCurrency(payments.filter(p=>p.status === RentPaymentStatus.PAID).reduce((a,b)=>a+b.amountPaid, 0))} icon={<BanknotesIcon className="w-6 h-6"/>} bgClass="bg-emerald-500/10" colorClass="text-emerald-600" />
+                            <StatCard title="متأخرات في الذمة" value={formatCurrency(payments.filter(p=>p.status === RentPaymentStatus.OVERDUE).reduce((a,b)=>a+b.amountPaid, 0))} icon={<BellAlertIcon className="w-6 h-6"/>} bgClass="bg-rose-500/10" colorClass="text-rose-600" />
+                            <StatCard title="عمليات هذا الشهر" value={payments.filter(p=>new Date(p.paymentDate).getMonth() === new Date().getMonth()).length} icon={<ArrowPathIcon className="w-6 h-6"/>} bgClass="bg-primary/10" colorClass="text-primary" />
+                        </div>
+                        
+                        <Card className="p-0 overflow-hidden border-none shadow-xl">
+                            <div className="p-6 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 flex justify-between items-center">
+                                <h3 className="text-lg font-black text-slate-800 dark:text-white">سجل العمليات المالية</h3>
+                                <Button size="sm" onClick={() => setIsPaymentModalOpen(true)} leftIcon={<PlusCircleIcon className="w-5 h-5"/>}>تحصيل جديد</Button>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-right">
+                                    <thead>
+                                        <tr className="bg-slate-100/50 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            <th className="px-6 py-4 text-right">التاريخ</th>
+                                            <th className="px-6 py-4 text-right">المستأجر</th>
+                                            <th className="px-6 py-4 text-right">العقار</th>
+                                            <th className="px-6 py-4 text-right">المبلغ</th>
+                                            <th className="px-6 py-4 text-right">الحالة</th>
+                                            <th className="px-6 py-4 text-right">الإجراء</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {payments.map(p => {
+                                            const lease = leases.find(l => l.id === p.leaseAgreementId);
+                                            const tenant = tenants.find(t => t.id === lease?.tenantId);
+                                            const property = properties.find(prop => prop.id === lease?.propertyId);
+                                            return (
+                                                <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="px-6 py-4 font-mono text-xs">{formatDate(p.paymentDate)}</td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="text-sm font-black text-slate-800 dark:text-white">{tenant?.fullNameAr}</div>
+                                                        <div className="text-[10px] text-slate-400 font-bold">هاتف: {tenant?.phone}</div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-xs font-bold text-slate-500">{property?.name}</td>
+                                                    <td className="px-6 py-4 font-black text-primary">{formatCurrency(p.amountPaid)}</td>
+                                                    <td className="px-6 py-4">
+                                                        <div className={`px-3 py-1 rounded-full text-[10px] font-black inline-flex items-center ${
+                                                            p.status === RentPaymentStatus.PAID ? 'bg-emerald-50 text-emerald-600' : 
+                                                            p.status === RentPaymentStatus.PENDING ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                                        }`}>
+                                                            {p.status === RentPaymentStatus.PAID ? 'تم التحصيل' : p.status === RentPaymentStatus.PENDING ? 'قيد الانتظار' : 'متأخر'}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-right">
+                                                        <div className="flex gap-2 justify-end">
+                                                            <Button size="sm" variant="ghost" onClick={() => setSelectedPaymentForReceipt(p)} leftIcon={<PrinterIcon className="w-3 h-3"/>}>إيصال</Button>
+                                                            <Button size="sm" variant="ghost" className="text-rose-500"><TrashIcon className="w-3 h-3"/></Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    </div>
+                )}
 
                 {activeTab === 'notices' && <NoticesTab notices={notices} leases={leases} tenants={tenants} properties={properties} onAdd={handleAddNotice} onEdit={handleEditNotice} onDelete={handleDeleteNotice} />}
                 {activeTab === 'reports' && <LeaseReportsTab leases={leases} properties={properties} tenants={tenants} />}
             </div>
 
             {/* --- Modals --- */}
+            <ReceiptModal 
+                payment={selectedPaymentForReceipt} 
+                onClose={() => setSelectedPaymentForReceipt(null)}
+                lease={leases.find(l => l.id === selectedPaymentForReceipt?.leaseAgreementId) || null}
+                tenant={tenants.find(t => t.id === leases.find(l => l.id === selectedPaymentForReceipt?.leaseAgreementId)?.tenantId) || null}
+                property={properties.find(p => p.id === leases.find(l => l.id === selectedPaymentForReceipt?.leaseAgreementId)?.propertyId) || null}
+            />
             <PropertyFormModal 
                 isOpen={isPropertyModalOpen} 
                 onClose={() => setIsPropertyModalOpen(false)} 

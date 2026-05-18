@@ -8,16 +8,26 @@ import TextArea from '../components/ui/TextArea';
 import Select from '../components/ui/Select';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { geminiService } from '../services/geminiService';
-import { GeminiAnalysisResult } from '../types';
-import { RiskLevelBadge } from '../components/ui/Badge';
+import { GeminiAnalysisResult, ExtractedClause, AnalyzedContract, AnalyzedContractStatus, ContractCategory } from '../types';
+import { RiskLevelBadge, Badge } from '../components/ui/Badge';
+import Modal from '../components/ui/Modal';
+import ReactMarkdown from 'react-markdown';
+import AnalysisDashboard from '@/components/ContractAnalysis/AnalysisDashboard';
+import ContractList from '@/components/ContractAnalysis/ContractList';
+import LegalLibrary from '@/components/ContractAnalysis/LegalLibrary';
+import { mockAnalyzedContracts } from '@/data/contractAnalysisData';
 import { 
     DocumentTextIcon, ClipboardListCheckIcon, ShieldExclamationIcon, 
     LightBulbIcon, SparklesIcon, InformationCircleIcon, PaperClipIcon, 
     XCircleIcon, CameraIcon, PrinterIcon, PlusCircleIcon, SaveIcon,
     ArrowPathIcon, MagnifyingGlassIcon, PencilIcon,
     CheckCircleIcon, ExclamationTriangleIcon, BookOpenIcon,
-    ArrowUturnLeftIcon, ScaleIcon, CpuChipIcon, ChatBubbleLeftEllipsisIcon
+    ArrowUturnLeftIcon, ScaleIcon, CpuChipIcon, ChatBubbleLeftEllipsisIcon,
+    GavelIcon, Squares2X2Icon, FunnelIcon, ArrowRightIcon, ShareIcon
 } from '../constants';
+
+// --- Types ---
+type PageView = 'dashboard' | 'analyze' | 'editor' | 'details' | 'library';
 
 // --- Mock Templates ---
 const initialTemplates = [
@@ -85,6 +95,10 @@ const fileToBase64 = (file: File): Promise<{ base64Data: string; mimeType: strin
 };
 
 const ContractAnalysisPage: React.FC = () => {
+    // Navigation State
+    const [view, setView] = useState<PageView>('dashboard');
+    const [selectedContract, setSelectedContract] = useState<AnalyzedContract | null>(null);
+
     // Analysis State
     const [contractText, setContractText] = useState<string>('');
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -92,8 +106,9 @@ const ContractAnalysisPage: React.FC = () => {
     const [analysisResult, setAnalysisResult] = useState<GeminiAnalysisResult | null>(null);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'analyze' | 'editor'>('analyze');
     const [analysisSource, setAnalysisSource] = useState<'text' | 'file' | 'image'>('text');
+    const [jurisdiction, setJurisdiction] = useState<string>('الكويت');
+    const [contractType, setContractType] = useState<string>('عقد عمل');
 
     // Editor State
     const [editorContent, setEditorContent] = useState<string>('');
@@ -101,6 +116,13 @@ const ContractAnalysisPage: React.FC = () => {
     const [selectedTemplateId, setSelectedTemplateId] = useState('');
     const [variableValues, setVariableValues] = useState<Record<string, string>>({});
     const [isSaving, setIsSaving] = useState(false);
+    const [isCorrecting, setIsCorrecting] = useState(false);
+
+    // Deep Analysis State
+    const [deepAnalysisClause, setDeepAnalysisClause] = useState<ExtractedClause | null>(null);
+    const [deepAnalysisContent, setDeepAnalysisContent] = useState<string>('');
+    const [isDeepAnalyzing, setIsDeepAnalyzing] = useState(false);
+    const [isDeepAnalysisModalOpen, setIsDeepAnalysisModalOpen] = useState(false);
 
     // Refs
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -190,9 +212,9 @@ const ContractAnalysisPage: React.FC = () => {
             let result: GeminiAnalysisResult;
             if (selectedFile) {
                 const { base64Data, mimeType } = await fileToBase64(selectedFile);
-                result = await geminiService.analyzeContract(undefined, { base64Data, mimeType });
+                result = await geminiService.analyzeContract(undefined, { base64Data, mimeType }, jurisdiction, contractType);
             } else {
-                result = await geminiService.analyzeContract(contractText, undefined);
+                result = await geminiService.analyzeContract(contractText, undefined, jurisdiction, contractType);
             }
             setAnalysisResult(result);
         } catch (err) {
@@ -208,7 +230,9 @@ const ContractAnalysisPage: React.FC = () => {
     };
 
     const handlePrint = () => {
-        window.print();
+        setTimeout(() => {
+            window.print();
+        }, 300);
     };
 
     const handleReset = () => {
@@ -216,6 +240,57 @@ const ContractAnalysisPage: React.FC = () => {
         clearSelection();
         setAnalysisResult(null);
         setError(null);
+    };
+
+    const handleCorrectGrammar = async (target: 'contract' | 'editor') => {
+        const textToCorrect = target === 'contract' ? contractText : editorContent.replace(/<[^>]*>/g, '');
+        if (!textToCorrect.trim()) return;
+
+        setIsCorrecting(true);
+        try {
+            const correctedText = await geminiService.correctGrammarAndSpelling(textToCorrect);
+            if (target === 'contract') {
+                setContractText(correctedText);
+            } else {
+                setEditorContent(`<div style="direction: rtl; text-align: right;">${correctedText.replace(/\n/g, '<br/>')}</div>`);
+            }
+            alert("تم تدقيق النص وتصحيحه لغوياً بنجاح.");
+        } catch (err) {
+            alert("حدث خطأ أثناء التدقيق اللغوي.");
+        } finally {
+            setIsCorrecting(false);
+        }
+    };
+
+    const handleApplyClauseToEditor = (clause: { title: string, content: string, aiRecommendation?: string }) => {
+        const formattedClause = `
+            <div style="direction: rtl; text-align: right; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px; margin-bottom: 20px; background-color: #f8fafc;">
+                <h3 style="color: #1e3a8a; margin-bottom: 10px;">${clause.title}</h3>
+                <p style="margin-bottom: 15px; font-style: italic;">${clause.content}</p>
+                ${clause.aiRecommendation ? `<div style="background-color: #e0f2fe; padding: 10px; border-radius: 8px; border-right: 4px solid #0369a1; font-size: 0.9em;">
+                    <strong>توصية الذكاء الاصطناعي:</strong> ${clause.aiRecommendation}
+                </div>` : ''}
+            </div>
+        `;
+        setEditorContent(prev => prev + formattedClause);
+        setView('editor');
+        alert("تمت إضافة البند إلى محرر الصياغة.");
+    };
+
+    const handleDeepAnalyzeClause = async (clause: ExtractedClause) => {
+        setDeepAnalysisClause(clause);
+        setDeepAnalysisContent('');
+        setIsDeepAnalyzing(true);
+        setIsDeepAnalysisModalOpen(true);
+
+        try {
+            const analysis = await geminiService.analyzeClauseDeeply(clause, jurisdiction, contractType);
+            setDeepAnalysisContent(analysis);
+        } catch (err) {
+            setError("فشل إجراء التحليل المعمق للبند.");
+        } finally {
+            setIsDeepAnalyzing(false);
+        }
     };
 
     // --- RENDER HELPERS ---
@@ -265,30 +340,202 @@ const ContractAnalysisPage: React.FC = () => {
                     </div>
                     <div>
                         <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">تحليل وصياغة العقود الذكية</h1>
-                        <p className="text-slate-500 font-bold">استخدم قوة الذكاء الاصطناعي لمراجعة وبناء مستندات قانونية خالية من الثغرات</p>
+                        <p className="text-slate-500 font-bold">بوابة التحليل القانوني المتطور المدعوم بالذكاء الاصطناعي</p>
                     </div>
                 </div>
 
                 <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-2xl self-end">
                     <button 
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'analyze' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                        onClick={() => setActiveTab('analyze')}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${view === 'dashboard' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setView('dashboard')}
                     >
-                        <MagnifyingGlassIcon className={`w-5 h-5 ${activeTab === 'analyze' ? 'text-indigo-600' : 'text-slate-400'}`} />
-                        تحليل العقود
+                        <Squares2X2Icon className={`w-5 h-5 ${view === 'dashboard' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        الرئيسية
                     </button>
                     <button 
-                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
-                        onClick={() => setActiveTab('editor')}
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${view === 'analyze' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setView('analyze')}
                     >
-                        <PencilIcon className={`w-5 h-5 ${activeTab === 'editor' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        <MagnifyingGlassIcon className={`w-5 h-5 ${view === 'analyze' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        تحليل جديد
+                    </button>
+                    <button 
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${view === 'editor' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setView('editor')}
+                    >
+                        <PencilIcon className={`w-5 h-5 ${view === 'editor' ? 'text-indigo-600' : 'text-slate-400'}`} />
                         محرر الصياغة
+                    </button>
+                    <button 
+                        className={`flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-black transition-all ${view === 'library' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700'}`}
+                        onClick={() => setView('library')}
+                    >
+                        <BookOpenIcon className={`w-5 h-5 ${view === 'library' ? 'text-indigo-600' : 'text-slate-400'}`} />
+                        المكتبة القانونية
                     </button>
                 </div>
             </div>
 
             <AnimatePresence mode="wait">
-                {activeTab === 'analyze' ? (
+                {view === 'dashboard' && (
+                    <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="space-y-12">
+                        <AnalysisDashboard />
+                        
+                        <div className="space-y-6">
+                            <div className="flex justify-between items-end">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">العقود المحللة مؤخراً</h3>
+                                    <p className="text-slate-500 font-bold">آخر مستندات تم إجراء فحص قانوني لها</p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <Button variant="outline" size="sm" className="rounded-xl border-slate-200" leftIcon={<FunnelIcon className="w-4 h-4"/>}>تصفية</Button>
+                                    <Button variant="outline" size="sm" className="rounded-xl border-slate-200" leftIcon={<PlusCircleIcon className="w-4 h-4"/>}>إضافة يدوي</Button>
+                                </div>
+                            </div>
+                            <ContractList 
+                                contracts={mockAnalyzedContracts} 
+                                onSelect={(contract) => {
+                                    setSelectedContract(contract);
+                                    setView('details');
+                                }} 
+                            />
+                        </div>
+                    </motion.div>
+                )}
+
+                {view === 'details' && selectedContract && (
+                    <motion.div key="details" initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.98 }} className="space-y-8">
+                        <div className="flex justify-between items-center bg-white dark:bg-dm-card p-6 rounded-[2rem] shadow-xl border border-slate-100 dark:border-slate-800">
+                             <div className="flex items-center gap-4">
+                                <Button variant="ghost" className="rounded-xl" onClick={() => setView('dashboard')}><ArrowUturnLeftIcon className="w-5 h-5"/></Button>
+                                <div>
+                                    <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-3">
+                                        {selectedContract.title}
+                                        <Badge variant="secondary" text={selectedContract.referenceNumber} className="text-[10px] uppercase tracking-tighter" />
+                                    </h2>
+                                    <p className="text-xs text-slate-500 font-bold">{selectedContract.category} • تم الرفع بواسطة {selectedContract.uploadedBy}</p>
+                                </div>
+                             </div>
+                             <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="rounded-xl font-black" leftIcon={<PrinterIcon className="w-4 h-4"/>} onClick={handlePrint}>طباعة</Button>
+                                <Button variant="secondary" size="sm" className="rounded-xl font-black" leftIcon={<ShareIcon className="w-4 h-4"/>}>مشاركة</Button>
+                                <Button variant="primary" size="sm" className="rounded-xl font-black" leftIcon={<PencilIcon className="w-4 h-4"/>} onClick={() => {
+                                    setEditorContent(`<div style="direction: rtl; text-align: right;">${selectedContract.summary}</div>`);
+                                    setView('editor');
+                                }}>تعديل في المحرر</Button>
+                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                            <div className="lg:col-span-8 space-y-8">
+                                <Card className="border-none shadow-xl rounded-[2.5rem] p-8">
+                                    <SectionHeader title="الملخص التنفيذي والتحليل" icon={<InformationCircleIcon className="w-5 h-5 text-indigo-600"/>} />
+                                    <p className="text-slate-700 dark:text-slate-300 leading-8 text-[15px] font-medium whitespace-pre-wrap p-6 bg-slate-50 dark:bg-slate-800/30 rounded-3xl border border-slate-100 dark:border-slate-800 mb-8">
+                                        {selectedContract.summary}
+                                    </p>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="p-6 bg-indigo-50 dark:bg-indigo-900/10 rounded-3xl border border-indigo-100 dark:border-indigo-900/30">
+                                            <h4 className="text-[10px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest mb-3">درجة الأمان</h4>
+                                            <div className="text-3xl font-black text-indigo-600">{selectedContract.risks.securityPercentage}%</div>
+                                        </div>
+                                        <div className="p-6 bg-rose-50 dark:bg-rose-900/10 rounded-3xl border border-rose-100 dark:border-rose-900/30">
+                                            <h4 className="text-[10px] font-black text-rose-900 dark:text-rose-300 uppercase tracking-widest mb-3">المخاطر المكتشفة</h4>
+                                            <div className="text-3xl font-black text-rose-600">{selectedContract.risks.criticalIssues.length}</div>
+                                        </div>
+                                        <div className="p-6 bg-emerald-50 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-900/30">
+                                            <h4 className="text-[10px] font-black text-emerald-900 dark:text-emerald-300 uppercase tracking-widest mb-3">بند مطابق للمعايير</h4>
+                                            <div className="text-3xl font-black text-emerald-600">{selectedContract.clauses.length}</div>
+                                        </div>
+                                    </div>
+                                </Card>
+
+                                <SectionHeader title="تشريح بنود العقد" icon={<LightBulbIcon className="w-5 h-5 text-indigo-600"/>} className="px-4" />
+                                <div className="space-y-4">
+                                    {selectedContract.clauses.map((clause, idx) => (
+                                        <Card key={idx} className="border-none shadow-lg rounded-3xl hover:ring-2 hover:ring-indigo-500/10 transition-all p-6">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500">{idx + 1}</span>
+                                                    <h4 className="font-black text-slate-800 dark:text-white">{clause.title}</h4>
+                                                </div>
+                                                <RiskLevelBadge level={clause.risk} />
+                                            </div>
+                                            <p className="p-5 bg-slate-50 dark:bg-slate-800/20 rounded-2xl text-[13px] text-slate-600 dark:text-slate-400 font-medium leading-7 mb-4 border border-slate-100 dark:border-slate-800">
+                                                {clause.content}
+                                            </p>
+                                            {clause.aiRecommendation && (
+                                                <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border-r-4 border-indigo-600">
+                                                    <div className="flex items-center gap-2 text-[11px] text-indigo-700 dark:text-indigo-300 font-black mb-1">
+                                                        <SparklesIcon className="w-4 h-4"/>
+                                                        توجيه قانوني (AI)
+                                                    </div>
+                                                    <p className="text-[11px] text-indigo-600/80 dark:text-indigo-400 font-medium">{clause.aiRecommendation}</p>
+                                                </div>
+                                            )}
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="lg:col-span-4 space-y-8">
+                                <Card className="border-none shadow-xl rounded-[2.5rem] p-8">
+                                    <h4 className="text-sm font-black text-slate-800 dark:text-white mb-6">تفاصيل المستند</h4>
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-800">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">التصنيف</span>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white">{selectedContract.category}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-800">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">الطرف الأول</span>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white">{selectedContract.parties.firstParty}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-800">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">الطرف الثاني</span>
+                                            <span className="text-xs font-black text-slate-800 dark:text-white">{selectedContract.parties.secondParty}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center pb-4 border-b border-slate-50 dark:border-slate-800">
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">القيمة</span>
+                                            <span className="text-xs font-black text-indigo-600">{selectedContract.financials?.value} {selectedContract.financials?.currency}</span>
+                                        </div>
+                                    </div>
+                                    <div className="mt-8">
+                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${selectedContract.qrCodeData}`} alt="QR Verification" className="w-24 h-24 mx-auto rounded-xl opacity-50 hover:opacity-100 transition-opacity cursor-help" title="تحقق من العقد رقمياً"/>
+                                        <p className="text-[9px] text-center text-slate-400 font-bold mt-2">كود التحقق الرقمي الموحد</p>
+                                    </div>
+                                </Card>
+
+                                <Card className="border-none shadow-xl rounded-[2.5rem] p-8 bg-slate-900 text-white">
+                                     <h4 className="text-sm font-black mb-6 flex items-center gap-2">
+                                        <ExclamationTriangleIcon className="w-5 h-5 text-rose-500" /> تنبيهات الامتثال القانوين
+                                     </h4>
+                                     <div className="space-y-4">
+                                        {selectedContract.risks.criticalIssues.map((issue, i) => (
+                                            <div key={i} className="p-4 bg-rose-500/10 rounded-2xl border border-rose-500/20 text-[11px] font-medium text-rose-200">
+                                                {issue}
+                                            </div>
+                                        ))}
+                                        {selectedContract.risks.criticalIssues.length === 0 && (
+                                            <div className="p-4 bg-emerald-500/10 rounded-2xl border border-emerald-500/20 text-[11px] font-medium text-emerald-200 text-center">
+                                                لا توجد قضايا امتثال حرجة مكتشفة
+                                            </div>
+                                        )}
+                                     </div>
+                                </Card>
+
+                                <Card className="border-none shadow-xl rounded-[2.5rem] p-8 bg-indigo-600 text-white">
+                                     <h4 className="text-sm font-black mb-4">نصيحة الخبير الذكي</h4>
+                                     <p className="text-xs font-medium leading-7 opacity-90 mb-6">
+                                        {selectedContract.legalAdvice}
+                                     </p>
+                                     <Button variant="primary" className="w-full rounded-2xl bg-white text-indigo-600 shadow-xl border-none font-black text-xs" leftIcon={<ArrowPathIcon className="w-4 h-4"/>}>تحميل البدائل المقترحة</Button>
+                                </Card>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+
+                {view === 'analyze' && (
                     <motion.div 
                         key="analyze" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} 
                         className="space-y-6"
@@ -319,17 +566,64 @@ const ContractAnalysisPage: React.FC = () => {
                                             >صورة / كاميرا</button>
                                         </div>
 
+                                        {/* Jurisdcition and Contract Type Inputs */}
+                                        <div className="grid grid-cols-2 gap-3 mb-6">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black text-white/60 px-1">الاختصاص القضائي</label>
+                                                <Select 
+                                                    value={jurisdiction} 
+                                                    onChange={(e) => setJurisdiction(e.target.value)}
+                                                    className="bg-white/10 border-white/20 text-white rounded-xl text-xs h-10"
+                                                    options={[
+                                                        { label: 'الكويت', value: 'الكويت' },
+                                                        { label: 'السعودية', value: 'السعودية' },
+                                                        { label: 'الإمارات', value: 'الإمارات' },
+                                                        { label: 'مصر', value: 'مصر' },
+                                                        { label: 'الأردن', value: 'الأردن' },
+                                                        { label: 'أخرى', value: 'أخرى' },
+                                                    ]}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-black text-white/60 px-1">نوع العقد</label>
+                                                <Select 
+                                                    value={contractType} 
+                                                    onChange={(e) => setContractType(e.target.value)}
+                                                    className="bg-white/10 border-white/20 text-white rounded-xl text-xs h-10"
+                                                    options={[
+                                                        { label: 'عقد عمل', value: 'عقد عمل' },
+                                                        { label: 'عقد تجاري', value: 'عقد تجاري' },
+                                                        { label: 'عقد إيجار', value: 'عقد إيجار' },
+                                                        { label: 'اتفاقية سرية', value: 'اتفاقية سرية' },
+                                                        { label: 'عقد توريد', value: 'عقد توريد' },
+                                                        { label: 'أخرى', value: 'أخرى' },
+                                                    ]}
+                                                />
+                                            </div>
+                                        </div>
+
                                         <div className="min-h-[300px]">
                                             <AnimatePresence mode="wait">
                                                 {analysisSource === 'text' ? (
                                                     <motion.div key="text-in" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }}>
-                                                        <TextArea 
-                                                            value={contractText} 
-                                                            onChange={(e) => setContractText(e.target.value)}
-                                                            rows={10} 
-                                                            placeholder="قم بلصق نصوص بنود العقد هنا للتحليل..." 
-                                                            className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-2xl resize-none"
-                                                        />
+                                                        <div className="relative">
+                                                            <TextArea 
+                                                                value={contractText} 
+                                                                onChange={(e) => setContractText(e.target.value)}
+                                                                rows={10} 
+                                                                placeholder="قم بلصق نصوص بنود العقد هنا للتحليل..." 
+                                                                className="bg-white/10 border-white/20 text-white placeholder:text-white/40 rounded-2xl resize-none pb-12"
+                                                            />
+                                                            <button 
+                                                                onClick={() => handleCorrectGrammar('contract')}
+                                                                disabled={isCorrecting || !contractText.trim()}
+                                                                className="absolute bottom-3 left-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] font-black text-white transition-all disabled:opacity-50"
+                                                                title="تدقيق لغوي ونحوي"
+                                                            >
+                                                                {isCorrecting ? <LoadingSpinner size="sm" color="text-white" /> : <CheckCircleIcon className="w-3.5 h-3.5" />}
+                                                                تدقيق إملائي
+                                                            </button>
+                                                        </div>
                                                     </motion.div>
                                                 ) : analysisSource === 'file' || analysisSource === 'image' ? (
                                                     <motion.div key="file-in" initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="h-full">
@@ -455,60 +749,128 @@ const ContractAnalysisPage: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Risk Breakdown Chart Style */ }
+                                                    <div className="space-y-4">
+                                                        <h4 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                                            <ShieldExclamationIcon className="w-5 h-5 text-indigo-600"/> توزيع مخاطر البنود
+                                                        </h4>
+                                                        <div className="grid grid-cols-3 gap-2 h-3 rounded-full overflow-hidden bg-slate-100">
+                                                            <div 
+                                                                className="bg-emerald-500 transition-all" 
+                                                                style={{ width: `${(analysisResult.extractedClauses.filter(c => c.risk === 'منخفض').length / analysisResult.extractedClauses.length) * 100}%` }} 
+                                                            />
+                                                            <div 
+                                                                className="bg-yellow-500 transition-all" 
+                                                                style={{ width: `${(analysisResult.extractedClauses.filter(c => c.risk === 'متوسط').length / analysisResult.extractedClauses.length) * 100}%` }} 
+                                                            />
+                                                            <div 
+                                                                className="bg-red-500 transition-all" 
+                                                                style={{ width: `${(analysisResult.extractedClauses.filter(c => (c.risk === 'مرتفع' || c.risk === 'حرج')).length / analysisResult.extractedClauses.length) * 100}%` }} 
+                                                            />
+                                                        </div>
+                                                        <div className="flex justify-between text-[10px] font-black text-slate-400 px-1">
+                                                            <span className="text-emerald-600">منخفضة: {analysisResult.extractedClauses.filter(c => c.risk === 'منخفض').length}</span>
+                                                            <span className="text-yellow-600">متوسطة: {analysisResult.extractedClauses.filter(c => c.risk === 'متوسط').length}</span>
+                                                            <span className="text-red-600">عالية/حرجة: {analysisResult.extractedClauses.filter(c => (c.risk === 'مرتفع' || c.risk === 'حرج')).length}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </Card>
 
                                             {/* Detailed Clauses */ }
                                             <SectionHeader title="تحليل البنود القانونية" icon={<LightBulbIcon className="w-5 h-5 text-indigo-600"/>} className="px-4" />
                                             <div className="grid grid-cols-1 gap-4">
-                                                {analysisResult.extractedClauses.map((clause, idx) => (
-                                                    <motion.div 
-                                                        key={idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
-                                                    >
-                                                        <Card className="border-none shadow-lg rounded-3xl group hover:ring-2 hover:ring-indigo-600/10 transition-all">
-                                                            <div className="p-6">
-                                                                <div className="flex justify-between items-start mb-4">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">{idx + 1}</span>
-                                                                        <h4 className="font-black text-slate-800 dark:text-white">{clause.title}</h4>
-                                                                    </div>
-                                                                    <RiskLevelBadge level={clause.risk} />
-                                                                </div>
-                                                                <div className="p-4 bg-slate-50 dark:bg-slate-800/20 rounded-2xl text-[13px] text-slate-600 dark:text-slate-400 font-medium leading-7 whitespace-pre-wrap mb-4">
-                                                                    {clause.content}
-                                                                </div>
-                                                                <div className="flex items-center gap-2 text-[10px] text-indigo-600 font-medium">
-                                                                    <ChatBubbleLeftEllipsisIcon className="w-4 h-4"/>
-                                                                    <span>توصية AI: سيتم توفير تفاصيل إضافية في الإصدارات القادمة...</span>
-                                                                </div>
-                                                            </div>
-                                                        </Card>
-                                                    </motion.div>
-                                                ))}
-                                            </div>
+    {analysisResult.extractedClauses.map((clause, idx) => (
+        <motion.div 
+            key={idx} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}
+        >
+            <Card className="border-none shadow-lg rounded-3xl group hover:ring-2 hover:ring-indigo-600/10 transition-all">
+                <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500">{idx + 1}</span>
+                            <h4 className="font-black text-slate-800 dark:text-white">{clause.title}</h4>
+                        </div>
+                        <RiskLevelBadge level={clause.risk} />
+                    </div>
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/20 rounded-2xl text-[13px] text-slate-600 dark:text-slate-400 font-medium leading-7 whitespace-pre-wrap mb-4 border border-transparent group-hover:border-slate-200 transition-all">
+                        {clause.content}
+                    </div>
+                    
+                    {clause.aiRecommendation && (
+                        <div className="p-4 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-2xl border-r-4 border-indigo-600 mb-4">
+                            <div className="flex items-center gap-2 text-[11px] text-indigo-700 dark:text-indigo-300 font-black mb-1">
+                                <SparklesIcon className="w-4 h-4"/>
+                                توصية الذكاء الاصطناعي
+                            </div>
+                            <p className="text-[11px] text-indigo-600/80 dark:text-indigo-400 font-medium leading-5">
+                                {clause.aiRecommendation}
+                            </p>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-2">
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="rounded-xl text-[10px] font-black h-8 text-amber-600 hover:bg-amber-50"
+                            leftIcon={<SparklesIcon className="w-3 h-3"/>}
+                            onClick={() => handleDeepAnalyzeClause(clause)}
+                        >
+                            تحليل قانوني معمق
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="rounded-xl text-[10px] font-black h-8 text-indigo-600 hover:bg-indigo-50"
+                            leftIcon={<ArrowUturnLeftIcon className="w-3 h-3 rotate-180"/>}
+                            onClick={() => handleApplyClauseToEditor(clause)}
+                        >
+                            نقل للمحرر للتعديل
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        </motion.div>
+    ))}
+</div>
 
                                             {/* AI Recommendations */ }
-                                            <Card className="border-none shadow-xl rounded-[2.5rem] bg-slate-900 text-white overflow-hidden p-8 relative">
-                                                <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-600/20 rounded-full blur-3xl -ml-32 -mt-32" />
-                                                <div className="flex items-center gap-3 mb-6 relative z-10 text-white">
-                                                    <span className="text-white bg-white/10 p-2 rounded-xl"><SparklesIcon className="w-5 h-5"/></span>
-                                                    <h3 className="text-lg font-black tracking-tight">توصيات قانونية ذكية</h3>
-                                                </div>
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                                                    <div className="p-6 rounded-3xl bg-white/5 border border-white/10">
-                                                        <h5 className="font-black text-indigo-400 mb-3 flex items-center gap-2">
-                                                            <CheckCircleIcon className="w-5 h-5"/> نقاط القوة
-                                                        </h5>
-                                                        <p className="text-[11px] text-white/70 leading-6 font-medium">العقد يشمل البنود الجوهرية التي تضمن حقوق الطرفين بشكل متوازن في معظم الأقسام الفنية.</p>
+                                            <div className="space-y-6">
+                                                <Card className="border-none shadow-2xl rounded-[2.5rem] bg-indigo-900 text-white overflow-hidden p-8 relative">
+                                                    <div className="absolute top-0 left-0 w-64 h-64 bg-indigo-400/20 rounded-full blur-3xl -ml-32 -mt-32" />
+                                                    <div className="flex items-center gap-4 mb-8 relative z-10">
+                                                        <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                                                            <GavelIcon className="w-8 h-8 text-indigo-200" />
+                                                        </div>
+                                                        <div>
+                                                            <h3 className="text-xl font-black tracking-tight">الرأي القانوني والمشورة الذكية</h3>
+                                                            <p className="text-[10px] font-black text-indigo-300/60 uppercase">الولاية القضائية: {jurisdiction}</p>
+                                                        </div>
                                                     </div>
-                                                    <div className="p-6 rounded-3xl bg-white/5 border border-white/10">
-                                                        <h5 className="font-black text-amber-400 mb-3 flex items-center gap-2">
-                                                            <ExclamationTriangleIcon className="w-5 h-5"/> نقاط الضعف / ثغرات
-                                                        </h5>
-                                                        <p className="text-[11px] text-white/70 leading-6 font-medium">هناك نقص في تحديد الغرامات التأخيرية وآلية فض المنازعات عبر التحكيم المحلي.</p>
+                                                    <div className="relative z-10">
+                                                        <div className="p-8 rounded-[2rem] bg-indigo-950/40 backdrop-blur-sm border border-white/10 leading-9 text-slate-100 font-medium whitespace-pre-wrap">
+                                                            {analysisResult.legalAdvice || "يتم جاري معالجة الرأي القانوني المخصص..."}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            </Card>
+                                                </Card>
+
+                                                <Card className="border-none shadow-xl rounded-[2.5rem] bg-slate-100 dark:bg-dm-card overflow-hidden p-8 relative border-l-4 border-indigo-600">
+                                                    <div className="flex items-center gap-3 mb-6 relative z-10">
+                                                        <span className="text-indigo-600 bg-indigo-50 p-2 rounded-xl"><ClipboardListCheckIcon className="w-5 h-5"/></span>
+                                                        <h3 className="text-lg font-black tracking-tight text-slate-800 dark:text-white">توصيات إضافية</h3>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 relative z-10">
+                                                        {analysisResult.recommendations.map((rec, i) => (
+                                                            <div key={i} className="flex gap-3 p-4 bg-white dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-800">
+                                                                <CheckCircleIcon className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                                                                <p className="text-xs text-slate-600 dark:text-slate-300 font-bold leading-5">{rec}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </Card>
+                                            </div>
                                         </motion.div>
                                     ) : (
                                         <div className="h-full min-h-[500px] flex flex-col items-center justify-center p-12 bg-white dark:bg-dm-card/30 border border-dashed border-slate-200 rounded-[2.5rem] text-slate-400">
@@ -521,7 +883,18 @@ const ContractAnalysisPage: React.FC = () => {
                             </div>
                         </div>
                     </motion.div>
-                ) : (
+                )}
+                {view === 'library' && (
+                    <motion.div key="library" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+                        <div className="mb-8">
+                            <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">المكتبة القانونية الذكية</h3>
+                            <p className="text-slate-500 font-bold">تصفح القوانين، السوابق، والقوالب المعتمدة</p>
+                        </div>
+                        <LegalLibrary />
+                    </motion.div>
+                )}
+
+                {view === 'editor' && (
                     <motion.div 
                         key="editor" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} 
                         className="grid grid-cols-1 lg:grid-cols-12 gap-8"
@@ -599,6 +972,16 @@ const ContractAnalysisPage: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
+                                        <Button 
+                                            variant="ghost" 
+                                            size="md" 
+                                            className="rounded-2xl font-black text-indigo-600 hover:bg-indigo-50" 
+                                            leftIcon={isCorrecting ? <LoadingSpinner size="sm" color="text-indigo-600" /> : <CheckCircleIcon className="w-5 h-5"/>} 
+                                            onClick={() => handleCorrectGrammar('editor')}
+                                            disabled={isCorrecting || !editorContent.replace(/<[^>]*>/g, '').trim()}
+                                        >
+                                            تدقيق لغوي
+                                        </Button>
                                         <Button variant="outline" size="md" className="rounded-2xl font-black bg-white dark:bg-dm-card shadow-sm" leftIcon={<SaveIcon className="w-5 h-5 text-indigo-600"/>} onClick={handleSaveAsTemplate} isLoading={isSaving}>حفظ المسودة</Button>
                                         <Button variant="primary" size="md" className="rounded-2xl font-black shadow-lg shadow-indigo-100" leftIcon={<PrinterIcon className="w-5 h-5"/>} onClick={handlePrint}>تصدير PDF</Button>
                                     </div>
@@ -642,6 +1025,57 @@ const ContractAnalysisPage: React.FC = () => {
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Deep Analysis Modal */}
+            <Modal
+                isOpen={isDeepAnalysisModalOpen}
+                onClose={() => setIsDeepAnalysisModalOpen(false)}
+                title={`التحليل الاستراتيجي: ${deepAnalysisClause?.title}`}
+                size="xl"
+            >
+                <div className="space-y-6">
+                    <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">النص الأصلي للبند</label>
+                        <p className="text-sm text-slate-700 dark:text-slate-300 font-medium italic">{deepAnalysisClause?.content}</p>
+                    </div>
+
+                    {isDeepAnalyzing ? (
+                        <div className="py-20 flex flex-col items-center justify-center">
+                            <LoadingSpinner size="lg" className="text-indigo-600 mb-4" />
+                            <p className="text-sm font-black text-slate-500 animate-pulse">جاري تشريح البند قانونياً واستخراج البدائل...</p>
+                        </div>
+                    ) : (
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-right" style={{ direction: 'rtl' }}>
+                            <div className="p-6 bg-white dark:bg-dm-card rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
+                                <ReactMarkdown>{deepAnalysisContent}</ReactMarkdown>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-3 pt-4">
+                        <Button 
+                            variant="secondary" 
+                            className="rounded-xl font-black" 
+                            onClick={() => setIsDeepAnalysisModalOpen(false)}
+                        >
+                            إغلاق
+                        </Button>
+                        <Button 
+                            variant="primary" 
+                            className="rounded-xl font-black"
+                            leftIcon={<ClipboardListCheckIcon className="w-5 h-5" />}
+                            onClick={() => {
+                                setEditorContent(prev => prev + `<div style="direction: rtl; text-align: right; background: #f0f9ff; padding: 20px; border-radius: 12px; margin-top: 20px;"><h3>بديل مقترح لـ ${deepAnalysisClause?.title}</h3>${deepAnalysisContent.replace(/\n/g, '<br/>')}</div>`);
+                                setIsDeepAnalysisModalOpen(false);
+                                setView('editor');
+                            }}
+                            disabled={isDeepAnalyzing}
+                        >
+                            نقل المقترح للمحرر
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

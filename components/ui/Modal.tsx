@@ -9,9 +9,11 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
   footer?: React.ReactNode;
+  hideHeader?: boolean;
+  className?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', footer }) => {
+const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 'md', footer, hideHeader = false, className = '' }) => {
   const modalContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,9 +61,9 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, size = 
     >
       <div
         ref={modalContentRef}
-        className={`bg-white rounded-xl shadow-2xl transform transition-all w-full ${sizeClasses[size]} m-4 flex flex-col max-h-[calc(100vh-3rem)]`} // Increased max-h
+        className={`bg-white rounded-xl shadow-2xl transform transition-all w-full ${sizeClasses[size]} m-4 flex flex-col max-h-[calc(100vh-3rem)] ${className}`} // Increased max-h
       >
-        {(title || onClose) && (
+        {((title || onClose) && !hideHeader) && (
           <div className="flex items-center justify-between p-4 sm:p-5 border-b border-gray-200">
             {title && <h3 id="modal-title" className="text-lg font-semibold text-primary-dark">{title}</h3>}
             <button

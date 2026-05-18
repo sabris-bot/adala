@@ -5,12 +5,12 @@ import React from 'react';
 interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
   label?: string;
   error?: string;
-  options: Array<{ value: string | number; label: string }>;
+  options?: Array<{ value: string | number; label: string }>;
   containerClassName?: string;
   placeholder?: string;
 }
 
-const Select: React.FC<SelectProps> = ({ label, id, error, options, className = '', containerClassName = '', placeholder, ...props }) => {
+const Select: React.FC<SelectProps> = ({ label, id, error, options, className = '', containerClassName = '', placeholder, children, ...props }) => {
   const defaultId = id || (label ? label.toLowerCase().replace(/\s+/g, '-') : Math.random().toString(36).substring(7));
   return (
     <div className={`mb-4 ${containerClassName}`}>
@@ -25,11 +25,11 @@ const Select: React.FC<SelectProps> = ({ label, id, error, options, className = 
         {...props}
       >
         {placeholder && <option value="" className="text-gray-500">{placeholder}</option>}
-        {options.map((option, index) => (
+        {options ? options.map((option, index) => (
           <option key={`${option.value}-${index}`} value={option.value}>
             {option.label}
           </option>
-        ))}
+        )) : children}
       </select>
       {error && <p className="mt-1 text-xs text-danger">{error}</p>}
     </div>

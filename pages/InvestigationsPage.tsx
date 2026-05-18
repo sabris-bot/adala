@@ -3,27 +3,106 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
+import SignaturePad from '../components/ui/SignaturePad';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
 import { 
     GavelIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, 
     InformationCircleIcon, ClockIcon, MagnifyingGlassIcon, CheckCircleIcon, 
-    ExclamationTriangleIcon, ArrowUturnLeftIcon, DocumentTextIcon, PrinterIcon, OFFICE_NAME
+    ExclamationTriangleIcon, ArrowUturnLeftIcon, DocumentTextIcon, PrinterIcon, 
+    ShieldCheckIcon, ScaleIcon, UsersIcon, BriefcaseIcon, OFFICE_NAME
 } from '../constants';
 import { 
     Investigation, InvestigationSession, InvestigationQuestion, 
-    InvestigationStatus, InvestigationPartyType, Case
+    InvestigationStatus, InvestigationPartyType, Case, Employee
 } from '../types';
 import { initialCases } from '../data/caseData';
 import { 
     investigationStatusOptions, 
     investigationPartyTypeOptions, 
     INVESTIGATION_TEMPLATES, 
-    KUWAIT_LABOR_LAW_INVESTIGATION_RULES 
+    KUWAIT_LABOR_LAW_INVESTIGATION_RULES,
+    INVESTIGATION_STATUS_LEGAL
 } from '../constants';
 import { Badge } from '../components/ui/Badge';
-import { useNavigate } from 'react-router-dom';
+import { sampleEmployees } from '../data/employeeData';
+
+// --- Legal Summons View ---
+const SummonsModal: React.FC<{ isOpen: boolean; onClose: () => void; investigation: Investigation | null; employee: Employee | null }> = ({ isOpen, onClose, investigation, employee }) => {
+    if (!investigation || !employee) return null;
+    
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title="إعلان رسمي للمثول أمام التحقيق" size="lg">
+            <div id="printable-summons" className="p-12 bg-white text-slate-900 font-serif text-right" dir="rtl">
+                <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-8">
+                    <div>
+                        <h2 className="text-xl font-black">{OFFICE_NAME}</h2>
+                        <p className="text-sm font-bold">الإدارة القانونية - وحدة التحقيقات</p>
+                    </div>
+                    <div className="text-left font-mono text-xs">
+                        <p>REF: SUM-{investigation.id.split('-').pop()?.toUpperCase()}</p>
+                        <p>DATE: {new Date().toLocaleDateString('ar-EG')}</p>
+                    </div>
+                </div>
+
+                <div className="text-center mb-10">
+                    <h1 className="text-2xl font-black underline underline-offset-8 uppercase tracking-widest">إعلان بالحضور للتحقيق الإداري</h1>
+                    <p className="text-xs font-bold text-slate-500 mt-2">(إخطار رسمي مسجل)</p>
+                </div>
+
+                <div className="space-y-6 text-sm leading-relaxed mb-12">
+                    <p>السيد/ <strong>{employee.fullNameAr}</strong> المحترم</p>
+                    <p>المسمى الوظيفي: <strong>{employee.jobTitle}</strong> | الرقم الوظيفي: <strong>{employee.employeeId}</strong></p>
+                    
+                    <div className="p-6 bg-slate-50 border-r-4 border-slate-900">
+                        <p className="mb-4">تحية طيبة وبعد ،،،</p>
+                        <p>بناءً على مقتضيات المصلحة العامة، وبإشارة إلى ملف التحقيق رقم <strong>({investigation.investigationNumber})</strong> المقيد تحت موضوع <strong>({investigation.subject})</strong>.</p>
+                        <p className="mt-4">تقرر استدعاؤكم للمثول أمام المحقق المختص بالإدارة القانونية، وذلك لسماع أقوالكم فيما هو منسوب إليكم من وقائع، وذلك في الموعد والمكان المحددين أدناه:</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                        <div className="p-4 border rounded-xl bg-indigo-50">
+                            <p className="text-[10px] font-black text-indigo-600 mb-1 uppercase tracking-widest">تاريخ الجلسة</p>
+                            <p className="font-black text-lg">{new Date().toLocaleDateString('ar-EG')}</p>
+                        </div>
+                        <div className="p-4 border rounded-xl bg-indigo-50">
+                            <p className="text-[10px] font-black text-indigo-600 mb-1 uppercase tracking-widest">وقت الحضور</p>
+                            <p className="font-black text-lg">10:00 صباحاً</p>
+                        </div>
+                    </div>
+
+                    <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl">
+                        <p className="text-[10px] font-black text-rose-700 underline mb-2">تنبيه قانوني هام:</p>
+                        <ul className="list-disc list-inside text-[11px] space-y-1 font-bold text-rose-900">
+                            <li>يعتبر حضوركم لهذا التحقيق إلزامياً بموجب لوائح العمل والقانون.</li>
+                            <li>لكم الحق في الاستعانة بمن ترون من ذوي الاختصاص القانوني.</li>
+                            <li>التخلف عن الحضور دون عذر مقبول قد يترتب عليه إجراءات تأديبية غيابية.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-end pt-10">
+                    <div className="text-center">
+                        <p className="text-xs font-black mb-12">توقيع الموظف المستلم</p>
+                        <p className="text-[10px] text-slate-400 border-t pt-1 w-40">................................</p>
+                    </div>
+                    <div className="text-center">
+                        <p className="text-xs font-black mb-12">اعتماد مدير الإدارة القانونية</p>
+                        <div className="w-24 h-24 border-2 border-dashed border-slate-200 mx-auto mb-2 flex items-center justify-center">
+                            <span className="text-[10px] text-slate-300 italic">ختم الإدارة</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-20 pt-4 border-t border-slate-100 flex justify-between text-[9px] font-black text-slate-400 uppercase italic">
+                    <span>Adala Juridical Module - Investigation Summons</span>
+                    <Button variant="primary" size="sm" className="no-print bg-slate-900" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة الإعلان الآن</Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
 
 // MOCK DATA - Expanded with diverse scenarios
 const mockInvestigations: Investigation[] = [
@@ -201,6 +280,9 @@ interface SessionEditorProps {
 const SessionEditor: React.FC<SessionEditorProps> = ({ session, onSave, onCancel }) => {
     const [formData, setFormData] = useState<Partial<InvestigationSession>>(session);
     const [questions, setQuestions] = useState<InvestigationQuestion[]>(session.questions || []);
+    const [partySignature, setPartySignature] = useState(session.partySignature || '');
+    const [investigatorSignature, setInvestigatorSignature] = useState(session.investigatorSignature || '');
+    const [signatureType, setSignatureType] = useState<'party' | 'investigator' | null>(null);
     
     // New Question Inputs
     const [newQText, setNewQText] = useState('');
@@ -246,10 +328,18 @@ const SessionEditor: React.FC<SessionEditorProps> = ({ session, onSave, onCancel
             alert('يرجى إدخال تاريخ الجلسة واسم الطرف.');
             return;
         }
+
+        if (!partySignature || !investigatorSignature) {
+            alert('يجب استكمال توقيعات الطرف والمحقق قبل حفظ المحضر.');
+            return;
+        }
+
         onSave({ 
             ...formData, 
             id: formData.id || `sess-${Date.now()}`, 
-            questions 
+            questions,
+            partySignature,
+            investigatorSignature
         } as InvestigationSession);
     };
 
@@ -313,10 +403,54 @@ const SessionEditor: React.FC<SessionEditorProps> = ({ session, onSave, onCancel
                 </div>
             </Card>
 
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <p className="text-sm font-bold text-slate-700 mb-3 border-b pb-2">التوقيعات الإلكترونية والاعتماد</p>
+                <div className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-col items-center p-3 border rounded bg-white">
+                        <p className="text-xs font-bold mb-2">توقيع {formData.partyType === InvestigationPartyType.WITNESS ? 'الشاهد' : 'المستجوب'}</p>
+                        {partySignature ? (
+                            <img src={partySignature} alt="Party Signature" className="h-16 mb-2 border p-1" />
+                        ) : (
+                            <div className="h-16 w-full border-2 border-dashed border-gray-200 rounded flex items-center justify-center text-gray-300 text-xs mb-2">بانتظار التوقيع</div>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => setSignatureType('party')}>
+                            {partySignature ? 'تغيير التوقيع' : 'بدء التوقيع'}
+                        </Button>
+                    </div>
+                    <div className="flex flex-col items-center p-3 border rounded bg-white">
+                        <p className="text-xs font-bold mb-2">توقيع المحقق</p>
+                        {investigatorSignature ? (
+                            <img src={investigatorSignature} alt="Investigator Signature" className="h-16 mb-2 border p-1" />
+                        ) : (
+                            <div className="h-16 w-full border-2 border-dashed border-gray-200 rounded flex items-center justify-center text-gray-300 text-xs mb-2">بانتظار التوقيع</div>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => setSignatureType('investigator')}>
+                            {investigatorSignature ? 'تغيير التوقيع' : 'بدء التوقيع'}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={onCancel}>إلغاء</Button>
-                <Button onClick={handleSave}>حفظ الجلسة</Button>
+                <Button onClick={handleSave} disabled={!partySignature || !investigatorSignature}>حفظ الجلسة واعتماد المحضر</Button>
             </div>
+
+            {signatureType && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-dm-card p-6 rounded-2xl shadow-2xl max-w-lg w-full">
+                        <SignaturePad 
+                            title={signatureType === 'party' ? `توقيع الطرف (${formData.partyName})` : "توقيع المحقق"}
+                            onSave={(sig) => {
+                                if (signatureType === 'party') setPartySignature(sig);
+                                else setInvestigatorSignature(sig);
+                                setSignatureType(null);
+                            }}
+                            onCancel={() => setSignatureType(null)}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -596,8 +730,22 @@ const PrintableInvestigationModal: React.FC<{ investigation: Investigation | nul
                             </div>
                             
                             <div className="signature-grid mt-8 text-xs font-bold">
-                                <div className="signature-box">توقيع المستجوب</div>
-                                <div className="signature-box">توقيع المحقق</div>
+                                <div className="signature-box flex flex-col items-center">
+                                    <p className="mb-2">توقيع المستجوب</p>
+                                    {session.partySignature ? (
+                                        <img src={session.partySignature} alt="Party Signature" className="h-12 object-contain" />
+                                    ) : (
+                                        <p className="mt-4 text-slate-300">....................</p>
+                                    )}
+                                </div>
+                                <div className="signature-box flex flex-col items-center">
+                                    <p className="mb-2">توقيع المحقق</p>
+                                    {session.investigatorSignature ? (
+                                        <img src={session.investigatorSignature} alt="Investigator Signature" className="h-12 object-contain" />
+                                    ) : (
+                                        <p className="mt-4 text-slate-300">....................</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     ))}
@@ -628,16 +776,33 @@ const InvestigationsPage: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<InvestigationStatus | ''>('');
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
+    const [isSummonsModalOpen, setIsSummonsModalOpen] = useState(false);
     const [editingInvestigation, setEditingInvestigation] = useState<Partial<Investigation> | null>(null);
     const [viewingInvestigation, setViewingInvestigation] = useState<Investigation | null>(null);
     const [printingInvestigation, setPrintingInvestigation] = useState<Investigation | null>(null);
+    const [selectedEmployeeForSummons, setSelectedEmployeeForSummons] = useState<Employee | null>(null);
 
     const stats = useMemo(() => ({
         total: investigations.length,
         ongoing: investigations.filter(i => i.status === InvestigationStatus.ONGOING).length,
         closed: investigations.filter(i => i.status === InvestigationStatus.CLOSED).length,
-        onHold: investigations.filter(i => i.status === InvestigationStatus.ON_HOLD).length,
+        penaltyIssued: investigations.filter(i => (i as any).status === 'Penalty_Issued').length,
     }), [investigations]);
+
+    const handleSummons = (inv: Investigation) => {
+        const firstParty = inv.sessions[0]?.partyName;
+        const emp = sampleEmployees.find(e => e.fullNameAr === firstParty) || sampleEmployees[0];
+        setEditingInvestigation(inv);
+        setSelectedEmployeeForSummons(emp);
+        setIsSummonsModalOpen(true);
+    };
+
+    const handleReferral = (inv: Investigation) => {
+        if(window.confirm('هل ترغب في إحالة ملف التحقيق هذا إلى اللجنة التأديبية لإصدار قرار جزائي؟')) {
+            const updatedInv = { ...inv, status: 'Referred_to_Legal' as any };
+            setInvestigations(prev => prev.map(i => i.id === inv.id ? updatedInv : i));
+        }
+    };
 
     const filteredInvestigations = useMemo(() => {
         return investigations.filter(inv => 
@@ -681,7 +846,7 @@ const InvestigationsPage: React.FC = () => {
                         <InvestigationStatCard title="إجمالي الملفات" count={stats.total} color="border-blue-500" icon={<FolderIcon className="w-5 h-5"/>}/>
                         <InvestigationStatCard title="تحقيقات جارية" count={stats.ongoing} color="border-yellow-500" icon={<ClockIcon className="w-5 h-5"/>}/>
                         <InvestigationStatCard title="تم إغلاقها" count={stats.closed} color="border-green-500" icon={<CheckCircleIcon className="w-5 h-5"/>}/>
-                        <InvestigationStatCard title="معلقة" count={stats.onHold} color="border-gray-500" icon={<ExclamationTriangleIcon className="w-5 h-5"/>}/>
+                        <InvestigationStatCard title="أحيلت للجزاء" count={stats.penaltyIssued} color="border-rose-500" icon={<ScaleIcon className="w-5 h-5"/>}/>
                     </div>
 
                     <Card>
@@ -709,9 +874,13 @@ const InvestigationsPage: React.FC = () => {
                                             <td className="px-3 py-2">{new Date(inv.startDate).toLocaleDateString('ar-EG')}</td>
                                             <td className="px-3 py-2"><Badge text={inv.status} color={inv.status === InvestigationStatus.CLOSED ? 'green' : inv.status === InvestigationStatus.ONGOING ? 'yellow' : 'gray'} size="sm"/></td>
                                             <td className="px-3 py-2 space-x-1 space-x-reverse">
+                                                <Button variant="ghost" size="sm" onClick={() => handleSummons(inv)} title="إصدار إعلان حضور"><UsersIcon className="w-4 text-indigo-600"/></Button>
                                                 <Button variant="ghost" size="sm" onClick={() => setViewingInvestigation(inv)} title="عرض وتعديل المحضر"><EyeIcon className="w-4 text-primary"/></Button>
                                                 <Button variant="ghost" size="sm" onClick={() => setPrintingInvestigation(inv)} title="طباعة المحضر"><PrinterIcon className="w-4 text-slate-600"/></Button>
                                                 <Button variant="ghost" size="sm" onClick={() => handleEdit(inv)} title="تعديل البيانات"><PencilIcon className="w-4 text-yellow-600"/></Button>
+                                                {inv.status !== InvestigationStatus.CLOSED && (
+                                                    <Button variant="ghost" size="sm" onClick={() => handleReferral(inv)} title="إحالة للجنة التأديبية"><ScaleIcon className="w-4 text-rose-600"/></Button>
+                                                )}
                                                 <Button variant="ghost" size="sm" onClick={() => handleDelete(inv.id)} className="text-danger"><TrashIcon className="w-4"/></Button>
                                             </td>
                                         </tr>
@@ -818,6 +987,12 @@ const InvestigationsPage: React.FC = () => {
             </Modal>
 
             <PrintableInvestigationModal investigation={printingInvestigation} onClose={() => setPrintingInvestigation(null)} />
+            <SummonsModal 
+                isOpen={isSummonsModalOpen} 
+                onClose={() => setIsSummonsModalOpen(false)} 
+                investigation={editingInvestigation as Investigation} 
+                employee={selectedEmployeeForSummons} 
+            />
         </div>
     );
 };

@@ -89,33 +89,63 @@ export const mockTenants: Tenant[] = [
 
 export const mockProperties: Property[] = [
     {
-        id: 'prop1', name: 'بناية النخيل السكنية', type: PropertyType.BUILDING, address: 'السالمية، قطعة 5، شارع عمان', propertyCategory: PropertyCategoryKuwait.INVESTMENT_RESIDENTIAL,
+        id: 'prop1', 
+        name: 'برج ناصر السكني الفاخر', 
+        type: PropertyType.BUILDING, 
+        address: 'السالمية، شارع الخليج العربي، قطعة 2', 
+        propertyCategory: PropertyCategoryKuwait.INVESTMENT_RESIDENTIAL,
+        ownerName: 'الشيخ ناصر المحمد الصباح',
+        paciNumber: '99887766',
+        description: 'برج سكني فاخر يطل على الخليج العربي، يتميز بتشطيبات عالية الجودة ونظام حماية متطور وفريق صيانة على مدار الساعة.',
+        imageUrl: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&q=80&w=800',
         units: [
-            { id: 'u1a', propertyId: 'prop1', unitNumber: '1', floor: '1', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 2, bathrooms: 2 },
-            { id: 'u1b', propertyId: 'prop1', unitNumber: '2', floor: '1', status: PropertyUnitStatus.VACANT, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 2, bathrooms: 2 },
-            { id: 'u1c', propertyId: 'prop1', unitNumber: '3', floor: '2', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 3, bathrooms: 3 },
-            { id: 'u1d', propertyId: 'prop1', unitNumber: '4', floor: '2', status: PropertyUnitStatus.UNDER_MAINTENANCE, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 2, bathrooms: 2 },
+            { id: 'u1a', propertyId: 'prop1', unitNumber: '101', floor: '1', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 3, bathrooms: 4, rentAmount: 850 },
+            { id: 'u1b', propertyId: 'prop1', unitNumber: '102', floor: '1', status: PropertyUnitStatus.VACANT, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 2, bathrooms: 2, rentAmount: 650 },
+            { id: 'u1c', propertyId: 'prop1', unitNumber: '201', floor: '2', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 4, bathrooms: 5, rentAmount: 1200 },
+            { id: 'u1d', propertyId: 'prop1', unitNumber: '202', floor: '2', status: PropertyUnitStatus.UNDER_MAINTENANCE, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 2, bathrooms: 2, rentAmount: 600 },
         ],
         createdAt: '2022-01-01'
     },
     {
-        id: 'prop2', name: 'فيلا السعادة - السرة', type: PropertyType.VILLA, address: 'السرة، قطعة 4', propertyCategory: PropertyCategoryKuwait.PRIVATE_RESIDENTIAL,
-        units: [{ id: 'u2a', propertyId: 'prop2', unitNumber: 'الفيلا بالكامل', floor: '0', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT }], createdAt: '2022-03-10'
+        id: 'prop2', 
+        name: 'قصر السعادة الملكي', 
+        type: PropertyType.VILLA, 
+        address: 'السرة، قطعة 4، شارع 101، قسيمة 5', 
+        propertyCategory: PropertyCategoryKuwait.PRIVATE_RESIDENTIAL,
+        ownerName: 'عائلة الروضان الكرام',
+        description: 'فيلا فاخرة بتصميم معماري حديث، تحتوي على مسبح خاص وحديقة واسعة ونظام تحكم ذكي.',
+        imageUrl: 'https://images.unsplash.com/photo-1613490493576-7fde63acd811?auto=format&fit=crop&q=80&w=800',
+        units: [
+            { id: 'u2a', propertyId: 'prop2', unitNumber: 'الفيلا بالكامل', floor: '0', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.VILLA, rentAmount: 2500 }
+        ], 
+        createdAt: '2022-03-10'
     },
     {
-        id: 'prop3', name: 'مجمع النور التجاري', type: PropertyType.BUILDING, address: 'الشويخ الصناعية', propertyCategory: PropertyCategoryKuwait.COMMERCIAL,
+        id: 'prop3', 
+        name: 'مجمع ميريديان التجاري', 
+        type: PropertyType.BUILDING, 
+        address: 'العاصمة، منطقة الشويخ الصناعية، شارع بيبسي', 
+        propertyCategory: PropertyCategoryKuwait.COMMERCIAL,
+        ownerName: 'شركة العقارات المتحدة',
+        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&q=80&w=800',
         units: [
-             { id: 'u3a', propertyId: 'prop3', unitNumber: 'محل 1', floor: 'أرضي', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.SHOP },
-             { id: 'u3b', propertyId: 'prop3', unitNumber: 'محل 2', floor: 'أرضي', status: PropertyUnitStatus.VACANT, unitType: PropertyUnitTypeKuwait.SHOP },
-             { id: 'u3c', propertyId: 'prop3', unitNumber: 'مكتب 101', floor: '1', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.OFFICE },
+             { id: 'u3a', propertyId: 'prop3', unitNumber: 'Showroom A1', floor: 'أرضي', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.SHOP, rentAmount: 3200 },
+             { id: 'u3b', propertyId: 'prop3', unitNumber: 'Showroom B2', floor: 'أرضي', status: PropertyUnitStatus.VACANT, unitType: PropertyUnitTypeKuwait.SHOP, rentAmount: 2800 },
+             { id: 'u3c', propertyId: 'prop3', unitNumber: 'Office 1001', floor: '10', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.OFFICE, rentAmount: 1100 },
         ],
         createdAt: '2021-06-15'
     },
     {
-        id: 'prop4', name: 'بناية الحولي الاستثمارية', type: PropertyType.BUILDING, address: 'حولي، قطعة 10', propertyCategory: PropertyCategoryKuwait.INVESTMENT_RESIDENTIAL,
+        id: 'prop4', 
+        name: 'عمارة اللؤلؤة الاستثمارية', 
+        type: PropertyType.BUILDING, 
+        address: 'حولي، قطعة 10، شارع بن خلدون', 
+        propertyCategory: PropertyCategoryKuwait.INVESTMENT_RESIDENTIAL,
+        ownerName: 'فهد الوقيان',
+        imageUrl: 'https://images.unsplash.com/photo-1460317442991-0ec239fe326a?auto=format&fit=crop&q=80&w=800',
         units: [
-            { id: 'u4a', propertyId: 'prop4', unitNumber: '11', floor: '3', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 1, bathrooms: 1 },
-            { id: 'u4b', propertyId: 'prop4', unitNumber: '12', floor: '3', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 1, bathrooms: 1 },
+            { id: 'u4a', propertyId: 'prop4', unitNumber: 'A11', floor: '3', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 1, bathrooms: 1, rentAmount: 380 },
+            { id: 'u4b', propertyId: 'prop4', unitNumber: 'A12', floor: '3', status: PropertyUnitStatus.RENTED, unitType: PropertyUnitTypeKuwait.APARTMENT, bedrooms: 1, bathrooms: 1, rentAmount: 380 },
         ],
         createdAt: '2023-10-01'
     }

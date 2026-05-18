@@ -1,15 +1,22 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { motion, AnimatePresence } from 'motion/react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import PrintHeader from '../components/ui/PrintHeader';
+import { geminiService } from '../services/geminiService';
 import { 
     BuildingLibraryIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, 
     FolderIcon, InformationCircleIcon, UserGroupIcon, CogIcon, IdentificationIcon,
-    PrinterIcon, ClockIcon, UserTieIcon, ChartBarIcon, DocumentTextIcon
+    PrinterIcon, ClockIcon, UserTieIcon, ChartBarIcon, DocumentTextIcon,
+    SparklesIcon, ChevronRightIcon, ArrowDownTrayIcon, PaperAirplaneIcon,
+    ChatBubbleLeftRightIcon, BuildingOffice2Icon, ShieldCheckIcon,
+    BellIcon, CheckCircleIcon, ClipboardDocumentCheckIcon
 } from '../constants';
 import { 
     CompanyProfile, ShareholderInfo, BoardMemberInfo, AuthorizedSignatoryInfo, 
@@ -294,11 +301,61 @@ const DocumentModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (d
 
 // --- MAIN PAGE ---
 const CompanyAffairsPage: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<TabKey>('profile');
+    const [activeTab, setActiveTab] = useState<TabKey | 'ai'>('profile');
     const [company, setCompany] = useState<CompanyProfile>(mockCompanyProfile);
     const [meetings, setMeetings] = useState<CompanyMeeting[]>(mockMeetings);
     const [actions, setActions] = useState<CorporateAction[]>(mockCorporateActions);
     const [documents, setDocuments] = useState<CompanyDocument[]>(mockCompanyDocuments);
+
+    // AI Assistant State
+    const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
+        { role: 'model', content: 'مرحباً بك في وحدة حوكمة الشركات الذكية. يمكنني مساعدتك في صياغة محاضر الاجتماعات، تدقيق قرارات مجلس الإدارة، أو تقديم استشارات حول قانون الشركات والقواعد الرقابية. كيف يمكنني خدمتك؟' }
+    ]);
+    const [chatInput, setChatInput] = useState('');
+    const [isAiLoading, setIsAiLoading] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
+    const scrollToBottom = () => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    };
+
+    useEffect(() => {
+        scrollToBottom();
+    }, [chatMessages]);
+
+    const handleSendMessage = async () => {
+        if (!chatInput.trim() || isAiLoading) return;
+
+        const userMessage = chatInput.trim();
+        setChatInput('');
+        setChatMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+        setIsAiLoading(true);
+
+        try {
+            const history = chatMessages.map(msg => ({
+                role: msg.role,
+                parts: [{ text: msg.content }]
+            }));
+
+            const contextPrompt = `
+                أنت خبير حوكمة شركات.
+                بيانات الشركة:
+                - الاسم: ${company.companyNameAr}
+                - الشكل القانوني: ${company.legalForm}
+                - رأس المال: ${formatCurrency(company.paidUpCapital)}
+                - عدد المساهمين: ${company.shareholders?.length}
+                
+                طلب المستخدم: ${userMessage}
+            `;
+
+            const response = await geminiService.getChatbotResponse(contextPrompt, history);
+            setChatMessages(prev => [...prev, { role: 'model', content: response }]);
+        } catch (error) {
+            setChatMessages(prev => [...prev, { role: 'model', content: 'عذراً، واجه المساعد مشكلة في معالجة طلبك حالياً.' }]);
+        } finally {
+            setIsAiLoading(false);
+        }
+    };
 
     // Modal States
     const [modals, setModals] = useState({
@@ -405,22 +462,54 @@ const CompanyAffairsPage: React.FC = () => {
     const renderProfileTab = () => (
         <div className="space-y-6 animate-fade-in-right">
             {/* KPI Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 no-print">
-                <Card className="text-center py-4 bg-white border-t-4 border-blue-500">
-                    <p className="text-gray-500 text-xs text-nowrap">رأس المال المدفوع</p>
-                    <p className="text-xl font-bold text-blue-700 mt-1">{formatCurrency(company.paidUpCapital)}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 no-print">
+                <Card className="text-right p-6 bg-white dark:bg-dm-card rounded-[2rem] border-none shadow-xl shadow-blue-500/5 group hover:scale-[1.02] transition-all relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-16 h-16 bg-blue-500/5 rounded-full -ml-8 -mt-8 group-hover:scale-150 transition-transform" />
+                    <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-2xl w-fit mb-4">
+                            <ChartBarIcon className="w-6 h-6 text-blue-600" />
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">رأس المال المدفوع</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{formatCurrency(company.paidUpCapital)}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card className="text-center py-4 bg-white border-t-4 border-green-500">
-                    <p className="text-gray-500 text-xs">عدد المساهمين</p>
-                    <p className="text-xl font-bold text-green-700 mt-1">{company.shareholders?.length || 0}</p>
+                <Card className="text-right p-6 bg-white dark:bg-dm-card rounded-[2rem] border-none shadow-xl shadow-emerald-500/5 group hover:scale-[1.02] transition-all relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-16 h-16 bg-emerald-500/5 rounded-full -ml-8 -mt-8 group-hover:scale-150 transition-transform" />
+                    <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl w-fit mb-4">
+                            <UserGroupIcon className="w-6 h-6 text-emerald-600" />
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">إجمالي المساهمين</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{company.shareholders?.length || 0}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card className="text-center py-4 bg-white border-t-4 border-purple-500">
-                    <p className="text-gray-500 text-xs">أعضاء مجلس الإدارة</p>
-                    <p className="text-xl font-bold text-purple-700 mt-1">{company.boardMembers?.length || 0}</p>
+                <Card className="text-right p-6 bg-white dark:bg-dm-card rounded-[2rem] border-none shadow-xl shadow-purple-500/5 group hover:scale-[1.02] transition-all relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-16 h-16 bg-purple-500/5 rounded-full -ml-8 -mt-8 group-hover:scale-150 transition-transform" />
+                    <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-2xl w-fit mb-4">
+                            <UserTieIcon className="w-6 h-6 text-purple-600" />
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">أعضاء مجلس الإدارة</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{company.boardMembers?.length || 0}</p>
+                        </div>
+                    </div>
                 </Card>
-                <Card className="text-center py-4 bg-white border-t-4 border-yellow-500">
-                    <p className="text-gray-500 text-xs">السنة المالية</p>
-                    <p className="text-xl font-bold text-yellow-700 mt-1">{company.fiscalYearEnd}</p>
+                <Card className="text-right p-6 bg-white dark:bg-dm-card rounded-[2rem] border-none shadow-xl shadow-amber-500/5 group hover:scale-[1.02] transition-all relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-16 h-16 bg-amber-500/5 rounded-full -ml-8 -mt-8 group-hover:scale-150 transition-transform" />
+                    <div className="relative z-10 flex flex-col justify-between h-full">
+                        <div className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-2xl w-fit mb-4">
+                            <ClockIcon className="w-6 h-6 text-amber-600" />
+                        </div>
+                        <div>
+                            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">نهاية السنة المالية</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{company.fiscalYearEnd}</p>
+                        </div>
+                    </div>
                 </Card>
             </div>
 
@@ -507,27 +596,53 @@ const CompanyAffairsPage: React.FC = () => {
         <div className="space-y-6 animate-fade-in-right">
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Board Members */}
-                <Card title="مجلس الإدارة" actions={<Button size="sm" variant="outline" onClick={() => toggleModal('board', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة</Button>}>
+                <Card 
+                    title="مجلس الإدارة" 
+                    className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden"
+                    actions={<Button size="sm" variant="ghost" className="rounded-xl font-black text-primary hover:bg-primary/5 h-10 px-4" onClick={() => toggleModal('board', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة عضو جديد</Button>}
+                >
                     {company.boardMembers?.length ? (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {company.boardMembers.map(bm => (
-                                <div key={bm.id} className="flex justify-between items-center p-3 bg-white border rounded shadow-sm hover:border-primary transition-colors group">
-                                    <div className="flex items-center">
-                                        <div className="p-2 bg-purple-50 rounded-full text-purple-600 me-3"><UserTieIcon className="w-5 h-5"/></div>
+                                <motion.div 
+                                    key={bm.id} 
+                                    whileHover={{ x: -8 }}
+                                    className="flex justify-between items-center p-5 bg-slate-50 dark:bg-slate-800/20 rounded-3xl border border-transparent hover:border-primary/20 hover:bg-white dark:hover:bg-dm-card hover:shadow-xl transition-all group"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-primary relative overflow-hidden group-hover:bg-primary group-hover:text-white transition-colors">
+                                            <UserTieIcon className="w-7 h-7 relative z-10" />
+                                            <div className="absolute inset-0 bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
                                         <div>
-                                            <p className="font-bold text-sm text-gray-800">{bm.name}</p>
-                                            <p className="text-xs text-primary">{bm.position}</p>
-                                            <p className="text-[10px] text-gray-400">تنتهي: {formatDate(bm.termEndDate)}</p>
+                                            <div className="flex items-center gap-2 mb-0.5">
+                                                <p className="font-black text-slate-800 dark:text-white">{bm.name}</p>
+                                                {bm.isAuthorizedSignatory && (
+                                                    <span className="p-1 bg-blue-500/10 text-blue-500 rounded-lg" title="مخول بالتوقيع">
+                                                        <ShieldCheckIcon className="w-3.5 h-3.5" />
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <Badge text={bm.position} color="blue" size="xs" className="font-black" />
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                                    <ClockIcon className="w-3 h-3" />
+                                                    تنتهي: {formatDate(bm.termEndDate)}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button variant="ghost" size="sm" onClick={() => handleEdit('board', bm)}><PencilIcon className="w-4 h-4 text-gray-400 group-hover:text-yellow-600"/></Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete('board', bm.id)} className="text-red-400"><TrashIcon className="w-4"/></Button>
+                                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="sm" className="rounded-xl w-10 h-10 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50" onClick={() => handleEdit('board', bm)}><PencilIcon className="w-4 h-4"/></Button>
+                                        <Button variant="ghost" size="sm" className="rounded-xl w-10 h-10 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete('board', bm.id)}><TrashIcon className="w-4 h-4"/></Button>
                                     </div>
-                                </div>
+                                </motion.div>
                             ))}
                         </div>
-                    ) : <p className="text-center text-gray-500 py-4">لا يوجد أعضاء.</p>}
+                    ) : <div className="py-12 text-center flex flex-col items-center gap-3">
+                            <UserGroupIcon className="w-12 h-12 text-slate-200" />
+                            <p className="text-sm font-black text-slate-400">لا يوجد أعضاء مجلس إدارة مسجلين حالياً</p>
+                        </div>}
                 </Card>
 
                 {/* Signatories */}
@@ -562,37 +677,71 @@ const CompanyAffairsPage: React.FC = () => {
             </div>
 
             {/* Shareholders */}
-            <Card title="سجل المساهمين / الشركاء" actions={<Button size="sm" onClick={() => toggleModal('shareholder', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة مساهم</Button>}>
-                <div className="overflow-x-auto">
+            <Card 
+                title="سجل المساهمين والشركاء" 
+                className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden"
+                actions={<Button size="sm" className="rounded-xl font-black bg-primary text-white h-11 px-6 shadow-xl shadow-primary/20" onClick={() => toggleModal('shareholder', true)} leftIcon={<PlusCircleIcon className="w-5"/>}>إضافة مساهم</Button>}
+            >
+                <div className="overflow-x-auto -mx-6 px-6">
                     <table className="min-w-full text-sm text-right">
-                        <thead className="bg-gray-50 border-b">
-                            <tr>
-                                <th className="px-4 py-3">الاسم</th>
-                                <th className="px-4 py-3">الجنسية</th>
-                                <th className="px-4 py-3">الفئة</th>
-                                <th className="px-4 py-3">حق التصويت</th>
-                                <th className="px-4 py-3 text-center">النسبة</th>
-                                <th className="px-4 py-3 no-print">إجراءات</th>
+                        <thead>
+                            <tr className="border-b border-slate-100 dark:border-slate-800">
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">المساهم الرسمي</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">الجنسية</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">نوع الأسهم</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">حق التصويت</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">حصة الملكية</th>
+                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest no-print">الإجراءات</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y">
+                        <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                             {company.shareholders?.map(sh => (
-                                <tr key={sh.id} className="hover:bg-gray-50 group">
-                                    <td className="px-4 py-3 font-medium">{sh.name}</td>
-                                    <td className="px-4 py-3">{sh.nationality}</td>
-                                    <td className="px-4 py-3"><Badge text={sh.shareClass} color="gray" size="xs"/></td>
-                                    <td className="px-4 py-3">{sh.votingRights ? <Badge text="نعم" color="green" size="xs"/> : <Badge text="لا" color="red" size="xs"/>}</td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-center">
-                                            <span className="w-10 text-right font-bold text-gray-700">{sh.sharePercentage}%</span>
-                                            <div className="w-20 bg-gray-200 h-1.5 rounded-full ms-2 overflow-hidden hidden sm:block">
-                                                <div className="bg-blue-600 h-1.5" style={{width: `${sh.sharePercentage}%`}}></div>
+                                <tr key={sh.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-all group">
+                                    <td className="px-6 py-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 font-black text-xs">
+                                                {sh.name.substring(0, 1)}
+                                            </div>
+                                            <div>
+                                                <p className="font-black text-slate-800 dark:text-white leading-none mb-1">{sh.name}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">ID: {sh.civilIdOrRegNumber}</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-4 py-3 no-print flex gap-2 justify-end">
-                                        <Button variant="ghost" size="sm" onClick={() => handleEdit('shareholder', sh)}><PencilIcon className="w-4 h-4 text-gray-400 group-hover:text-yellow-600"/></Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleDelete('shareholder', sh.id)} className="text-red-500"><TrashIcon className="w-4"/></Button>
+                                    <td className="px-6 py-6 font-bold text-slate-600 dark:text-slate-400">{sh.nationality}</td>
+                                    <td className="px-6 py-6">
+                                        <Badge text={sh.shareClass} color="gray" size="xs" className="font-black px-3 py-1 rounded-lg" />
+                                    </td>
+                                    <td className="px-6 py-6 text-center">
+                                        {sh.votingRights ? (
+                                            <div className="flex items-center justify-center gap-1.5 text-emerald-600 font-black text-[10px] uppercase">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                                مفعل
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center justify-center gap-1.5 text-slate-400 font-black text-[10px] uppercase">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-slate-300" />
+                                                معطل
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-6">
+                                        <div className="flex items-center justify-center gap-4">
+                                            <span className="text-lg font-black text-primary leading-none w-12 text-center">{sh.sharePercentage}%</span>
+                                            <div className="w-24 bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden hidden sm:block">
+                                                <motion.div 
+                                                    initial={{ width: 0 }}
+                                                    animate={{ width: `${sh.sharePercentage}%` }}
+                                                    className="bg-primary h-2 rounded-full shadow-[0_0_10px_rgba(59,130,246,0.3)]"
+                                                />
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-6 no-print">
+                                        <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50" onClick={() => handleEdit('shareholder', sh)}><PencilIcon className="w-4 h-4"/></Button>
+                                            <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete('shareholder', sh.id)}><TrashIcon className="w-4 h-4"/></Button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -631,95 +780,178 @@ const CompanyAffairsPage: React.FC = () => {
     );
 
     const renderGovernanceTab = () => (
-        <div className="space-y-6 animate-fade-in-right">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <Card title="الاجتماعات والمحاضر" actions={<Button size="sm" variant="outline" onClick={() => toggleModal('meeting', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>توثيق اجتماع</Button>}>
+        <div className="space-y-8 animate-fade-in-right">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 space-y-8">
+                    <Card 
+                        title="وثائق الاجتماعات والمحاضر" 
+                        className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden"
+                        actions={<Button size="sm" variant="ghost" className="rounded-xl font-black text-primary hover:bg-primary/5 h-10 px-4" onClick={() => toggleModal('meeting', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>توثيق اجتماع جديد</Button>}
+                    >
                         {meetings.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 {meetings.map(m => (
-                                    <div key={m.id} className="border-l-4 border-blue-500 bg-white p-3 rounded shadow-sm hover:shadow-md transition-shadow group">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <p className="font-bold text-sm text-gray-800">{m.meetingType}</p>
-                                                <p className="text-xs text-gray-500 flex items-center mt-1"><ClockIcon className="w-3 h-3 me-1"/> {formatDate(m.meetingDate)}</p>
+                                    <motion.div 
+                                        key={m.id} 
+                                        whileHover={{ y: -4 }}
+                                        className="group bg-slate-50 dark:bg-slate-800/20 p-5 rounded-3xl border border-transparent hover:border-blue-500/20 hover:bg-white dark:hover:bg-dm-card hover:shadow-xl transition-all relative overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-blue-500/10 transition-colors" />
+                                        
+                                        <div className="relative z-10">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                                                        <ClipboardDocumentCheckIcon className="w-6 h-6" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-black text-slate-800 dark:text-white leading-tight mb-1">{m.meetingType}</h4>
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                                                <ClockIcon className="w-3 h-3" />
+                                                                {formatDate(m.meetingDate)}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                                                <BuildingOffice2Icon className="w-3 h-3" />
+                                                                {m.meetingLocation}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all translate-x-4 group-hover:translate-x-0">
+                                                    <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50" onClick={() => handleEdit('meeting', m)}><PencilIcon className="w-4 h-4"/></Button>
+                                                    <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete('meeting', m.id)}><TrashIcon className="w-4 h-4"/></Button>
+                                                    <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-blue-600 hover:bg-blue-100" title="طباعة المحضر الرسمي"><PrinterIcon className="w-4 h-4"/></Button>
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-1 no-print">
-                                                <Button variant="ghost" size="sm" onClick={() => handleEdit('meeting', m)}><PencilIcon className="w-4 h-4 text-gray-400 group-hover:text-yellow-600"/></Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleDelete('meeting', m.id)} className="text-red-400"><TrashIcon className="w-4"/></Button>
-                                                <Button variant="ghost" size="sm" className="text-blue-600" title="طباعة المحضر"><PrinterIcon className="w-4"/></Button>
-                                            </div>
+                                            
+                                            {m.resolutionsPassed && (
+                                                <div className="bg-white dark:bg-slate-800/50 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <CheckCircleIcon className="w-4 h-4 text-emerald-500" />
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ملخص القرارات المعتمدة</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed line-clamp-2">
+                                                        {m.resolutionsPassed}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </div>
-                                        {m.resolutionsPassed && (
-                                            <div className="mt-2 text-xs text-gray-600 bg-gray-50 p-2 rounded line-clamp-2">
-                                                <strong>القرارات:</strong> {m.resolutionsPassed}
-                                            </div>
-                                        )}
-                                    </div>
+                                    </motion.div>
                                 ))}
                             </div>
-                        ) : <p className="text-gray-500 text-center py-4">لا توجد اجتماعات.</p>}
+                        ) : (
+                            <div className="py-16 text-center">
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-full w-fit mx-auto mb-4">
+                                    <ClockIcon className="w-8 h-8 text-slate-300" />
+                                </div>
+                                <p className="text-sm font-black text-slate-400 uppercase tracking-widest">لا يوجد سجل اجتماعات حالياً</p>
+                            </div>
+                        )}
                     </Card>
 
-                    <Card title="الإجراءات المؤسسية" actions={<Button size="sm" variant="outline" onClick={() => toggleModal('action', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>إجراء جديد</Button>}>
+                    <Card 
+                        title="خريطة الإجراءات المؤسسية" 
+                        className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden"
+                        actions={<Button size="sm" variant="ghost" className="rounded-xl font-black text-primary hover:bg-primary/5 h-10 px-4" onClick={() => toggleModal('action', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>تسجيل إجراء جديد</Button>}
+                    >
                         {actions.length > 0 ? (
-                            <div className="space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {actions.map(act => (
-                                    <div key={act.id} className="border rounded p-3 bg-white flex flex-col gap-2 group shadow-sm hover:border-primary transition-colors">
-                                        <div className="flex justify-between items-center">
-                                            <Badge text={act.status} color={act.status === CorporateActionStatus.COMPLETED ? 'green' : act.status === CorporateActionStatus.IN_PROGRESS ? 'blue' : 'yellow'} size="xs"/>
-                                            <div className="flex items-center gap-1 no-print">
-                                                <Button variant="ghost" size="sm" onClick={() => handleEdit('action', act)}><PencilIcon className="w-4 h-4 text-gray-400 group-hover:text-yellow-600"/></Button>
-                                                <Button variant="ghost" size="sm" onClick={() => handleDelete('action', act.id)} className="text-red-400"><TrashIcon className="w-4"/></Button>
+                                    <motion.div 
+                                        key={act.id} 
+                                        whileHover={{ scale: 1.02 }}
+                                        className="group bg-white dark:bg-dm-card p-5 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all"
+                                    >
+                                        <div className="flex justify-between items-start mb-4">
+                                            <Badge 
+                                                text={act.status} 
+                                                color={act.status === CorporateActionStatus.COMPLETED ? 'green' : act.status === CorporateActionStatus.IN_PROGRESS ? 'blue' : 'yellow'} 
+                                                size="xs" 
+                                                className="font-black px-3 py-1 rounded-lg"
+                                            />
+                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Button variant="ghost" size="sm" className="rounded-lg w-8 h-8 p-0" onClick={() => handleEdit('action', act)}><PencilIcon className="w-3.5 h-3.5"/></Button>
+                                                <Button variant="ghost" size="sm" className="rounded-lg w-8 h-8 p-0 text-rose-500 hover:bg-rose-50" onClick={() => handleDelete('action', act.id)}><TrashIcon className="w-3.5 h-3.5"/></Button>
                                             </div>
                                         </div>
-                                        <p className="font-bold text-sm">{act.actionType}</p>
-                                        <p className="text-xs text-gray-600">{act.description}</p>
-                                        <p className="text-xs text-gray-400">{formatDate(act.actionDate)}</p>
-                                    </div>
+                                        <h4 className="font-black text-sm text-slate-800 dark:text-white mb-2 leading-tight">{act.actionType}</h4>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-4 line-clamp-2">
+                                            {act.description}
+                                        </p>
+                                        <div className="flex items-center justify-between pt-4 border-t border-slate-50 dark:border-slate-800">
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{formatDate(act.actionDate)}</span>
+                                            <div className="flex items-center gap-1.5 text-primary text-[10px] font-black group-hover:gap-2 transition-all cursor-pointer">
+                                                التفاصيل الكاملة
+                                                <ChevronRightIcon className="w-3 h-3" />
+                                            </div>
+                                        </div>
+                                    </motion.div>
                                 ))}
                             </div>
-                        ) : <p className="text-gray-500 text-center py-4">لا توجد إجراءات.</p>}
+                        ) : (
+                            <div className="py-16 text-center">
+                                <CogIcon className="w-12 h-12 text-slate-200 mx-auto mb-3" />
+                                <p className="text-sm font-black text-slate-400">لا يوجد إجراءات مؤسسية مسجلة</p>
+                            </div>
+                        )}
                     </Card>
                 </div>
 
-                <div className="space-y-6">
-                    <Card title="تتبع السياسات واللوائح">
+                <div className="space-y-8">
+                    <Card title="الأدلة واللوائح" className="border-none shadow-2xl rounded-[2.5rem]">
                         <div className="space-y-4">
-                            <div className="p-3 bg-gray-50 rounded border border-gray-100">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-xs font-bold">دليل تفويض السلطات</span>
-                                    <Badge text="محدث" color="green" size="xs"/>
+                            {[
+                                { title: 'دليل تفويض السلطات', date: '01/01/2024', status: 'محدث', color: 'green' },
+                                { title: 'لائحة حوكمة الشركات', date: '15/05/2023', status: 'قيد المراجعة', color: 'yellow' },
+                                { title: 'سياسة الإفصاح والشفافية', date: '20/09/2023', status: 'محدث', color: 'green' }
+                            ].map((policy, i) => (
+                                <div key={i} className="p-4 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border border-transparent hover:border-slate-200 transition-all group cursor-pointer">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-xs font-black text-slate-800 dark:text-white group-hover:text-primary transition-colors">{policy.title}</span>
+                                        <Badge text={policy.status} color={policy.color as any} size="xs" className="font-black" />
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[10px] text-slate-400 font-bold tracking-tight">آخر اعتماد: {policy.date}</p>
+                                        <ArrowDownTrayIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-primary transition-all" />
+                                    </div>
                                 </div>
-                                <p className="text-[10px] text-gray-500">تم الاعتماد: 01/01/2024</p>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded border border-gray-100">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-xs font-bold">لائحة حوكمة الشركات</span>
-                                    <Badge text="قيد المراجعة" color="yellow" size="xs"/>
-                                </div>
-                                <p className="text-[10px] text-gray-500">آخر تحديث: 15/05/2023</p>
-                            </div>
-                            <div className="p-3 bg-gray-50 rounded border border-gray-100">
-                                <div className="flex justify-between items-start mb-1">
-                                    <span className="text-xs font-bold">سياسة الإفصاح والشفافية</span>
-                                    <Badge text="محدث" color="green" size="xs"/>
-                                </div>
-                                <p className="text-[10px] text-gray-500">تم الاعتماد: 20/09/2023</p>
-                            </div>
-                            <Button fullWidth variant="outline" size="sm">إضافة سياسة جديدة</Button>
+                            ))}
+                            <Button fullWidth variant="ghost" size="sm" className="rounded-xl h-12 font-black text-primary border border-dashed border-primary/20 hover:bg-primary/5">
+                                <PlusCircleIcon className="w-4 h-4 me-2" />
+                                إدراج سياسة جديدة
+                            </Button>
                         </div>
                     </Card>
 
-                    <Card title="الإفصاحات المطلوبة">
-                         <div className="space-y-2">
-                             <div className="flex items-center gap-2 p-2 bg-red-50 text-red-700 rounded text-[10px]">
-                                 <InformationCircleIcon className="w-4 h-4"/>
-                                 <span>إفصاح هيئة أسهم المال (ربع سنوي)</span>
+                    <Card title="مواعيد الإفصاح" className="border-none shadow-2xl rounded-[2.5rem] bg-slate-900 text-white relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full -mr-16 -mt-16 blur-2xl opacity-50" />
+                        <h3 className="text-sm font-black mb-4 relative z-10 flex items-center gap-2">
+                            <ClockIcon className="w-4 h-4 text-primary-light" />
+                            الاستحقاقات القادمة
+                        </h3>
+                         <div className="space-y-3 relative z-10">
+                             <div className="p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl group hover:bg-white/10 transition-all cursor-pointer">
+                                 <div className="flex items-start gap-3">
+                                     <div className="w-10 h-10 rounded-xl bg-rose-500/20 flex items-center justify-center shrink-0">
+                                         <BellIcon className="w-5 h-5 text-rose-500 animate-pulse" />
+                                     </div>
+                                     <div>
+                                         <p className="text-xs font-black group-hover:text-primary-light transition-colors mb-1">إفصاح هيئة أسهم المال</p>
+                                         <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest italic">الموعد النهائي: 31/03/2025</p>
+                                     </div>
+                                 </div>
                              </div>
-                             <div className="flex items-center gap-2 p-2 bg-blue-50 text-blue-700 rounded text-[10px]">
-                                 <ClockIcon className="w-4 h-4"/>
-                                 <span>تقرير الحوكمة السنوي</span>
+                             <div className="p-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl group hover:bg-white/10 transition-all cursor-pointer">
+                                 <div className="flex items-start gap-3">
+                                     <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0">
+                                         <DocumentTextIcon className="w-5 h-5 text-blue-400" />
+                                     </div>
+                                     <div>
+                                         <p className="text-xs font-black group-hover:text-primary-light transition-colors mb-1">تقرير الحوكمة السنوي</p>
+                                         <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest italic">قيد الإعداد - 15 يوم متبقي</p>
+                                     </div>
+                                 </div>
                              </div>
                          </div>
                     </Card>
@@ -729,32 +961,49 @@ const CompanyAffairsPage: React.FC = () => {
     );
 
     const renderDocumentsTab = () => (
-        <Card title="الأرشيف المؤسسي" actions={<Button size="sm" onClick={() => toggleModal('document', true)} leftIcon={<PlusCircleIcon className="w-4"/>}>إيداع مستند</Button>}>
-             <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                    <thead className="bg-gray-50">
-                        <tr>
-                            <th className="px-4 py-3 text-right">عنوان المستند</th>
-                            <th className="px-4 py-3 text-right">النوع</th>
-                            <th className="px-4 py-3 text-right">التاريخ</th>
-                            <th className="px-4 py-3 text-right">الحالة</th>
-                            <th className="px-4 py-3 no-print">إجراءات</th>
+        <Card 
+            title="الأرشيف الرقمي المؤسسي" 
+            className="border-none shadow-2xl rounded-[2.5rem] overflow-hidden"
+            actions={<Button size="sm" className="rounded-xl font-black bg-primary text-white h-11 px-6 shadow-xl shadow-primary/20" onClick={() => toggleModal('document', true)} leftIcon={<PlusCircleIcon className="w-5"/>}>إيداع مستند جديد</Button>}
+        >
+             <div className="overflow-x-auto -mx-6 px-6">
+                <table className="min-w-full text-sm text-right">
+                    <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-800">
+                            <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">المستند</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">التصنيف</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">تاريخ الإصدار</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest">حالة الصلاحية</th>
+                            <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-widest no-print text-left">خيارات</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y">
+                    <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                         {documents.map(doc => (
-                            <tr key={doc.id} className="hover:bg-gray-50 group">
-                                <td className="px-4 py-3 font-medium flex items-center">
-                                    <DocumentTextIcon className="w-5 h-5 text-gray-400 me-2"/>
-                                    {doc.title}
+                            <tr key={doc.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10 transition-all group">
+                                <td className="px-6 py-6 font-black text-slate-800 dark:text-white">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600">
+                                            <DocumentTextIcon className="w-5 h-5" />
+                                        </div>
+                                        <div>
+                                            <p className="leading-none mb-1">{doc.title}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wide">Ref: {doc.id}</p>
+                                        </div>
+                                    </div>
                                 </td>
-                                <td className="px-4 py-3">{doc.documentType}</td>
-                                <td className="px-4 py-3">{formatDate(doc.documentDate)}</td>
-                                <td className="px-4 py-3"><CompanyDocumentStatusBadge status={doc.status} size="xs"/></td>
-                                <td className="px-4 py-3 text-left no-print flex gap-2 justify-end">
-                                    <Button variant="ghost" size="sm"><EyeIcon className="w-4 h-4 text-blue-600"/></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleEdit('document', doc)}><PencilIcon className="w-4 h-4 text-gray-400 group-hover:text-yellow-600"/></Button>
-                                    <Button variant="ghost" size="sm" onClick={() => handleDelete('document', doc.id)}><TrashIcon className="w-4 h-4 text-red-500"/></Button>
+                                <td className="px-6 py-6">
+                                    <Badge text={doc.documentType} color="gray" size="xs" className="font-black px-3 py-1 rounded-lg" />
+                                </td>
+                                <td className="px-6 py-6 font-bold text-slate-600 dark:text-slate-400">{formatDate(doc.documentDate)}</td>
+                                <td className="px-6 py-6">
+                                    <CompanyDocumentStatusBadge status={doc.status} size="xs" className="font-black" />
+                                </td>
+                                <td className="px-6 py-6 text-left no-print">
+                                    <div className="flex gap-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-blue-600 hover:bg-blue-50" title="معاينة المستند"><EyeIcon className="w-4 h-4"/></Button>
+                                        <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50" onClick={() => handleEdit('document', doc)}><PencilIcon className="w-4 h-4"/></Button>
+                                        <Button variant="ghost" size="sm" className="rounded-xl w-9 h-9 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50" onClick={() => handleDelete('document', doc.id)}><TrashIcon className="w-4 h-4"/></Button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
@@ -766,33 +1015,155 @@ const CompanyAffairsPage: React.FC = () => {
 
     // --- MAIN RENDER ---
     return (
-        <div className="space-y-6">
-             <div className="flex items-center mb-2">
-                <BuildingLibraryIcon className="w-8 h-8 text-primary me-3" />
-                <h1 className="text-3xl font-bold text-primary-dark">إدارة شؤون الشركات والحوكمة</h1>
+        <div className="space-y-10 pb-20 font-sans" dir="rtl">
+            <PrintHeader title="تقرير حوكمة الشركات والشؤون المؤسسية" />
+
+            {/* Premium Header Container */}
+            <div className="max-w-7xl mx-auto mb-10 no-print">
+                <div className="bg-white rounded-[2.5rem] p-8 md:p-12 border border-gray-100 shadow-2xl shadow-primary/5 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl opacity-50" />
+                    <div className="absolute bottom-0 left-0 w-64 h-64 bg-primary/5 rounded-full -ml-32 -mb-32 blur-3xl opacity-50" />
+                    
+                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="p-3 bg-primary rounded-2xl shadow-xl shadow-primary/20">
+                                    <BuildingLibraryIcon className="w-8 h-8 text-white" />
+                                </div>
+                                <span className="text-primary font-black uppercase tracking-[0.2em] text-xs">Corporate Governance & Affairs</span>
+                            </div>
+                            <h1 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 tracking-tighter leading-tight">
+                                إدارة شؤون <span className="text-primary text-nowrap">الشركات والحوكمة</span>
+                            </h1>
+                            <p className="text-slate-500 text-lg max-w-2xl font-medium leading-relaxed">
+                                نظام مركزي ذكي لإدارة الكيانات القانونية، الحوكمة المؤسسية، هيكل الملكية، وتوثيق اجتماعات مجلس الإدارة والجمعيات العمومية وفقاً للمعايير الرقابية.
+                            </p>
+                        </div>
+                        
+                        <div className="flex flex-col gap-3 w-full md:w-auto">
+                            <div className="flex bg-gray-100 p-1.5 rounded-2xl">
+                                <button 
+                                    onClick={() => setActiveTab('profile')}
+                                    className={`flex-1 py-3 px-6 rounded-xl transition-all font-black text-sm whitespace-nowrap ${activeTab !== 'ai' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    لوحة التحكم
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('ai')}
+                                    className={`flex-1 py-3 px-6 rounded-xl transition-all font-black text-sm flex items-center justify-center gap-2 whitespace-nowrap ${activeTab === 'ai' ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    <SparklesIcon className="w-4 h-4" />
+                                    المستشار الذكي
+                                </button>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" className="flex-1 rounded-xl h-14 border-slate-200" leftIcon={<ArrowDownTrayIcon className="w-5"/>}>تصدير السجل</Button>
+                                <Button className="flex-1 bg-primary hover:bg-primary-dark text-white rounded-xl h-14 font-black shadow-lg shadow-primary/20" leftIcon={<PrinterIcon className="w-5"/>} onClick={handlePrint}>طباعة</Button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
-            <div className="flex border-b border-gray-200 overflow-x-auto">
-                <button onClick={() => setActiveTab('profile')} className={`px-6 py-3 border-b-2 font-medium text-sm transition-colors flex items-center ${activeTab === 'profile' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <IdentificationIcon className="w-4 h-4 me-2"/> الملف العام
-                </button>
-                <button onClick={() => setActiveTab('structure')} className={`px-6 py-3 border-b-2 font-medium text-sm transition-colors flex items-center ${activeTab === 'structure' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <UserGroupIcon className="w-4 h-4 me-2"/> الهيكل والملكية
-                </button>
-                <button onClick={() => setActiveTab('governance')} className={`px-6 py-3 border-b-2 font-medium text-sm transition-colors flex items-center ${activeTab === 'governance' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <CogIcon className="w-4 h-4 me-2"/> الحوكمة والقرارات
-                </button>
-                <button onClick={() => setActiveTab('documents')} className={`px-6 py-3 border-b-2 font-medium text-sm transition-colors flex items-center ${activeTab === 'documents' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                    <FolderIcon className="w-4 h-4 me-2"/> الأرشيف
-                </button>
-            </div>
+            {activeTab !== 'ai' && (
+                <div className="flex border-b border-gray-200 overflow-x-auto no-print mb-8">
+                    <button onClick={() => setActiveTab('profile')} className={`px-8 py-4 border-b-2 font-black text-sm transition-all flex items-center gap-3 ${activeTab === 'profile' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        <IdentificationIcon className={`w-5 h-5 ${activeTab === 'profile' ? 'text-primary' : 'text-gray-400'}`}/> 
+                        الملف العام
+                    </button>
+                    <button onClick={() => setActiveTab('structure')} className={`px-8 py-4 border-b-2 font-black text-sm transition-all flex items-center gap-3 ${activeTab === 'structure' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        <UserGroupIcon className={`w-5 h-5 ${activeTab === 'structure' ? 'text-primary' : 'text-gray-400'}`}/> 
+                        الهيكل والملكية
+                    </button>
+                    <button onClick={() => setActiveTab('governance')} className={`px-8 py-4 border-b-2 font-black text-sm transition-all flex items-center gap-3 ${activeTab === 'governance' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        <CogIcon className={`w-5 h-5 ${activeTab === 'governance' ? 'text-primary' : 'text-gray-400'}`}/> 
+                        الحوكمة والقرارات
+                    </button>
+                    <button onClick={() => setActiveTab('documents')} className={`px-8 py-4 border-b-2 font-black text-sm transition-all flex items-center gap-3 ${activeTab === 'documents' ? 'border-primary text-primary bg-primary/5' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                        <FolderIcon className={`w-5 h-5 ${activeTab === 'documents' ? 'text-primary' : 'text-gray-400'}`}/> 
+                        الأرشيف المؤسسي
+                    </button>
+                </div>
+            )}
 
-            <div className="min-h-[400px]">
-                {activeTab === 'profile' && renderProfileTab()}
-                {activeTab === 'structure' && renderStructureTab()}
-                {activeTab === 'governance' && renderGovernanceTab()}
-                {activeTab === 'documents' && renderDocumentsTab()}
-            </div>
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={activeTab}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="min-h-[400px]"
+                >
+                    {activeTab === 'profile' && renderProfileTab()}
+                    {activeTab === 'structure' && renderStructureTab()}
+                    {activeTab === 'governance' && renderGovernanceTab()}
+                    {activeTab === 'documents' && renderDocumentsTab()}
+                    
+                    {activeTab === 'ai' && (
+                        <div className="max-w-4xl mx-auto h-[700px] flex flex-col bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden font-sans no-print">
+                            <div className="bg-primary p-8 flex items-center justify-between text-white relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
+                                <div className="relative z-10 flex items-center gap-4">
+                                    <div className="p-4 bg-white/20 backdrop-blur-md rounded-2xl">
+                                        <SparklesIcon className="w-8 h-8 text-white" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-black tracking-tight">مستشار الحوكمة الذكي</h3>
+                                        <p className="text-primary-light text-xs font-bold uppercase tracking-widest">AI powered corporate governance intelligence</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 space-y-6 no-scrollbar bg-slate-50/30">
+                                {chatMessages.map((msg, idx) => (
+                                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-start' : 'justify-end'}`}>
+                                        <div className={`max-w-[85%] rounded-[2rem] p-6 shadow-sm border ${
+                                            msg.role === 'user' 
+                                            ? 'bg-white text-slate-700 border-slate-100 rounded-tr-none font-bold' 
+                                            : 'bg-primary text-white border-transparent rounded-tl-none font-medium'
+                                        }`}>
+                                            <div className="markdown-body text-sm leading-relaxed">
+                                                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                                {isAiLoading && (
+                                    <div className="flex justify-end">
+                                        <div className="bg-primary/5 border border-primary/10 rounded-[1.5rem] p-4 flex gap-2">
+                                            <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" />
+                                            <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                                            <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                                        </div>
+                                    </div>
+                                )}
+                                <div ref={chatEndRef} />
+                            </div>
+
+                            <div className="p-8 border-t border-gray-100 bg-white">
+                                <div className="flex gap-4 p-2 bg-slate-50 rounded-[2.5rem] border border-slate-200">
+                                    <input 
+                                        type="text" 
+                                        className="flex-1 bg-transparent px-6 py-4 focus:outline-none text-sm font-bold placeholder:text-slate-400"
+                                        placeholder="اسأل المستشار الذكي حول الحوكمة، قانون الشركات، أو تحليل المحاضر..."
+                                        value={chatInput}
+                                        onChange={(e) => setChatInput(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                                    />
+                                    <button 
+                                        onClick={handleSendMessage}
+                                        disabled={isAiLoading || !chatInput.trim()}
+                                        className="bg-primary text-white p-4 rounded-full shadow-xl shadow-primary/30 hover:bg-primary-dark transition-all disabled:opacity-50 flex items-center justify-center w-14 h-14 shrink-0 focus:ring-4 focus:ring-primary/20"
+                                    >
+                                        <PaperAirplaneIcon className="w-6 h-6 rotate-180" />
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </motion.div>
+            </AnimatePresence>
 
             {/* Modals */}
             <ShareholderModal 

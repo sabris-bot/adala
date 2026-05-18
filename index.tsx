@@ -4,6 +4,7 @@ import App from './App';
 import './index.css'; // Global base styles, Tailwind is primary
 import './services/i18n';
 import { JurisdictionProvider } from './components/JurisdictionContext';
+import { CaseTaskProvider } from './components/CaseTaskContext';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,7 +15,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <JurisdictionProvider>
-      <App />
+      <CaseTaskProvider>
+        <App />
+      </CaseTaskProvider>
     </JurisdictionProvider>
   </React.StrictMode>
 );

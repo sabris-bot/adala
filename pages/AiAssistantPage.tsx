@@ -11,7 +11,7 @@ import {
   SparklesIcon, InformationCircleIcon, LightBulbIcon, CpuChipIcon, 
   BookOpenIcon, ClipboardIcon, PrinterIcon, PaperClipIcon, CameraIcon, 
   XCircleIcon, DocumentTextIcon, EnvelopeIcon, SendIcon, TrashIcon,
-  SearchIcon, ScaleIcon, FileEditIcon, HistoryIcon
+  SearchIcon, ScaleIcon, FileEditIcon, HistoryIcon, MaximizeIcon, MinimizeIcon
 } from '../constants';
 import { format } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -44,6 +44,7 @@ const AiAssistantPage: React.FC = () => {
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [activeMode, setActiveMode] = useState<'consult' | 'research' | 'draft' | 'analyze'>('consult');
+  const [isFullScreen, setIsFullScreen] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,6 +56,16 @@ const AiAssistantPage: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && isFullScreen) {
+        setIsFullScreen(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isFullScreen]);
 
   const fileToBase64 = (file: File): Promise<{ base64Data: string; mimeType: string }> => {
     return new Promise((resolve, reject) => {
@@ -154,7 +165,11 @@ const AiAssistantPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-160px)] max-h-[900px] overflow-hidden bg-white dark:bg-dm-background rounded-2xl shadow-xl border border-gray-100 dark:border-secondary-dark font-sans chat-print-container">
+    <div className={`flex flex-col overflow-hidden bg-white dark:bg-dm-background shadow-xl border border-gray-100 dark:border-secondary-dark font-sans chat-print-container transition-all duration-300 ${
+      isFullScreen 
+      ? 'fixed inset-0 z-[100] w-screen h-screen rounded-none' 
+      : 'h-[calc(100vh-160px)] max-h-[900px] rounded-2xl'
+    }`}>
       {/* Header */}
       <div className="p-4 border-b dark:border-secondary-dark flex justify-between items-center bg-gray-50/50 dark:bg-dm-card/30">
         <div className="flex items-center gap-3">
@@ -167,6 +182,9 @@ const AiAssistantPage: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setIsFullScreen(!isFullScreen)} className="text-gray-400 hover:text-primary print-hide" title={isFullScreen ? "تصغير" : "ملء الشاشة"}>
+                {isFullScreen ? <MinimizeIcon className="w-4 h-4"/> : <MaximizeIcon className="w-4 h-4"/>}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => window.print()} className="text-gray-400 hover:text-primary print-hide" title="طباعة المحادثة">
                 <PrinterIcon className="w-4 h-4"/>
             </Button>
