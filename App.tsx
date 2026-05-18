@@ -6,8 +6,9 @@ import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MainContent from './components/layout/MainContent';
 import { useCaseTask } from './components/CaseTaskContext';
+import { notificationService } from './services/notificationService';
 import { BellAlertIcon, XCircleIcon, ExclamationTriangleIcon } from './constants'; // Icons
-import { AdminTaskStatus, LeaseAgreementStatus } from './types';
+import { AdminTaskStatus, LeaseAgreementStatus, NotificationPriority, NotificationCategory } from './types';
 import { mockLeaseAgreements } from './data/propertyData';
 
 // Error Boundary Component
@@ -168,7 +169,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const checkVersion = async () => {
       try {
-        const response = await fetch('/api/version');
+        const response = await fetch(`/api/version?t=${Date.now()}`);
         if (!response.ok) return;
         const data = await response.json();
         const serverVersion = data.version;
@@ -232,109 +233,27 @@ const App: React.FC = () => {
 
   // --- GLOBAL NOTIFICATION SYSTEM LOGIC ---
   useEffect(() => {
-    const checkNotifications = () => {
-        const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
-
-        // 1. Check Hearings
-        hearings.forEach(hearing => {
-            const hearingTime = new Date(`${hearing.date}T${hearing.time}`);
-            if (isNaN(hearingTime.getTime())) return;
-
-            const diffMs = hearingTime.getTime() - now.getTime();
-            const diffHours = diffMs / (1000 * 60 * 60);
-
-            // 24 Hour Warning (Between 23.5 and 24.5 hours)
-            const id24h = `24h-${hearing.id}`;
-            if (diffHours >= 23.5 && diffHours <= 24.5 && !sentNotificationsRef.current.has(id24h)) {
+    const unsubscribe = notificationService.subscribe((notifications) => {
+        // Only show toasts for new urgent notifications that haven't been shown yet
+        notifications.forEach(notif => {
+            if (notif.priority === NotificationPriority.URGENT && !notif.isRead && !sentNotificationsRef.current.has(notif.id)) {
+                // Determine toast type
+                const toastType = notif.category === NotificationCategory.URGENT ? 'urgent' : 'info';
+                
                 addToast({
-                    id: id24h,
-                    type: 'info',
-                    title: t('hearing_reminder_tomorrow', { defaultValue: 'تذكير بجلسة غداً' }),
-                    message: t('hearing_reminder_msg', { 
-                        defaultValue: `موعد جلسة قضية "{{title}}" ({{id}}) غدًا الساعة {{time}}. (تم إرسال بريد إلكتروني)`,
-                        title: hearing.caseTitle,
-                        id: hearing.caseId,
-                        time: hearing.time
-                    })
+                    id: notif.id,
+                    type: toastType as any,
+                    title: notif.title,
+                    message: notif.message
                 });
-                console.log(`[Email System] Sending notification for urgent hearing ${hearing.id} to associated legal team.`);
-                sentNotificationsRef.current.add(id24h);
-            }
-
-            // 1 Hour Warning
-            const id1h = `1h-${hearing.id}`;
-            if (diffHours >= 0.75 && diffHours <= 1.25 && !sentNotificationsRef.current.has(id1h)) {
-                addToast({
-                    id: id1h,
-                    type: 'urgent',
-                    title: t('urgent_alert_hearing_soon', { defaultValue: 'تنبيه عاجل: جلسة قريبة جداً' }),
-                    message: t('urgent_hearing_msg', { 
-                        defaultValue: `جلسة "{{title}}" تبدأ خلال ساعة ({{time}}). تم إرسال تنبيه عاجل بالبريد.`,
-                        title: hearing.caseTitle,
-                        time: hearing.time
-                    })
-                });
-                console.log(`[Email System] URGENT: Sending high-priority alert for hearing ${hearing.id}.`);
-                sentNotificationsRef.current.add(id1h);
+                
+                sentNotificationsRef.current.add(notif.id);
             }
         });
+    });
 
-        // 2. Check Overdue Tasks
-        tasks.forEach(task => {
-            if (!task.dueDate || task.status === AdminTaskStatus.COMPLETED || task.status === AdminTaskStatus.CANCELLED) return;
-
-            const overdueId = `overdue-${task.id}`;
-            if (task.dueDate < todayStr && !sentNotificationsRef.current.has(overdueId)) {
-                addToast({
-                    id: overdueId,
-                    type: 'urgent',
-                    title: t('overdue_task', { defaultValue: 'مهمة متأخرة (Overdue)' }),
-                    message: t('overdue_task_msg', { 
-                        defaultValue: `المهمة "{{title}}" المسندة إلى {{assignedTo}} متأخرة. تم إرسال إشعار للمتابعة.`,
-                        title: task.title,
-                        assignedTo: task.assignedTo,
-                        dueDate: task.dueDate
-                    })
-                });
-                console.log(`[Email System] Overdue Task Alert: Notifying ${task.assignedTo} about task ${task.id}.`);
-                sentNotificationsRef.current.add(overdueId);
-            }
-        });
-
-        // 3. Check Expiring Leases
-        mockLeaseAgreements.forEach(lease => {
-            if (lease.status !== LeaseAgreementStatus.ACTIVE) return;
-            
-            const endDate = new Date(lease.endDate);
-            const diffMs = endDate.getTime() - now.getTime();
-            const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-            const leaseId = `lease-exp-${lease.id}`;
-            if (diffDays <= 30 && diffDays > 0 && !sentNotificationsRef.current.has(leaseId)) {
-                addToast({
-                    id: leaseId,
-                    type: 'info',
-                    title: t('lease_expiring_alert', { defaultValue: 'تنبيه: عقد إيجار قارب على الانتهاء' }),
-                    message: t('lease_expiring_msg', { 
-                        defaultValue: `العقد رقم {{contractNo}} سينتهي خلال {{days}} يوم ({{endDate}}).`,
-                        contractNo: lease.contractNumber,
-                        days: diffDays,
-                        endDate: lease.endDate
-                    })
-                });
-                sentNotificationsRef.current.add(leaseId);
-            }
-        });
-    };
-
-    // Run immediately on mount
-    checkNotifications();
-
-    // Run every 30 seconds
-    const interval = setInterval(checkNotifications, 30000); 
-    return () => clearInterval(interval);
-  }, []);
+    return unsubscribe;
+  }, [t]);
 
   const addToast = (toast: Toast) => {
       setToasts(prev => [toast, ...prev]);

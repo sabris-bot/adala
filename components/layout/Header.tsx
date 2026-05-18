@@ -1,9 +1,11 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { MenuIcon, XIcon, ArrowUturnLeftIcon } from '../../constants'; 
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import Logo from '../ui/Logo';
+import NotificationDropdown from './NotificationDropdown';
+import { notificationService } from '../../services/notificationService';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -22,11 +24,19 @@ const BellIcon = (props: React.SVGProps<SVGSVGElement>) => ( // Heroicons BellIc
   </svg>
 );
 
-
 const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = notificationService.subscribe((notifications) => {
+        setUnreadCount(notifications.filter(n => !n.isRead).length);
+    });
+    return unsubscribe;
+  }, []);
 
   const handleGoBack = () => {
     navigate(-1);
@@ -95,10 +105,22 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
            </span>
         </div>
 
-        <button className="p-2 rounded-xl text-gray-500 dark:text-dm-text hover:bg-gray-50 relative group transition-all">
-          <BellIcon className="w-5 h-5 group-hover:text-primary" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-dm-card shadow-sm" />
-        </button>
+        <div className="relative">
+            <button 
+                onClick={() => setIsNotificationOpen(!isNotificationOpen)}
+                className="p-2 rounded-xl text-gray-500 dark:text-dm-text hover:bg-gray-50 relative group transition-all"
+            >
+                <BellIcon className="w-5 h-5 group-hover:text-primary" />
+                {unreadCount > 0 && (
+                    <span className="absolute top-1.5 right-1.5 bg-rose-500 text-white text-[8px] font-black px-1 rounded-full border border-white dark:border-dm-card shadow-sm animate-bounce min-w-[14px]">
+                        {unreadCount > 9 ? '+9' : unreadCount}
+                    </span>
+                )}
+            </button>
+            {isNotificationOpen && (
+                <NotificationDropdown onClose={() => setIsNotificationOpen(false)} />
+            )}
+        </div>
 
         <div className="ms-1">
           <div className="p-0.5 rounded-2xl border-2 border-transparent hover:border-primary/30 transition-all shadow-sm bg-gray-50 group cursor-pointer">

@@ -87,7 +87,7 @@ async function startServer() {
   });
 
   app.get('/api/version', (req, res) => {
-    res.json({ version: '3.0.0-final', buildTime: new Date().toISOString() });
+    res.json({ version: '3.1.0-gold', buildTime: new Date().toISOString() });
   });
 
   // --- Vite Middleware ---

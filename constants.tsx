@@ -138,6 +138,7 @@ export const PhoneIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="
 export const BuildingStorefrontIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z" />);
 export const UserTieIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 18a6 6 0 0115 0M11 11l1 4 1-4h-2z" />);
 export const CheckCircleIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />);
+export const CheckIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />);
 export const ActivityIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l3-9 3 18 3-18 3 18 3-9h3.75" />);
 export const ShoppingCartIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />);
 export const ChartBarIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125-1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />);
@@ -735,7 +736,118 @@ export const courtLevelOptions = Object.values(CourtLevel).map(l => ({ value: l,
 // Mock lists for filtering (can be expanded or fetched from API in real app)
 export const courtDegreeOptions = courtLevelOptions; 
 export const caseGroupOptions = [{value: 'قضايا هامة', label: 'قضايا هامة'}, {value: 'مجموعة أ', label: 'مجموعة أ'}, {value: 'مجموعة ب', label: 'مجموعة ب'}];
-export const partyRoleOptions = [{value: 'مدعي', label: 'مدعي'}, {value: 'مدعى عليه', label: 'مدعى عليه'}, {value: 'مستأنف', label: 'مستأنف'}, {value: 'مستأنف ضده', label: 'مستأنف ضده'}];
+export const partyRoleGroups = [
+  {
+    label: 'التقاضي (مدني/تجاري/إداري)',
+    options: [
+      { value: 'مدعي', label: 'مدعي' },
+      { value: 'مدعى عليه', label: 'مدعى عليه' },
+      { value: 'مستأنف', label: 'مستأنف' },
+      { value: 'مستأنف ضده', label: 'مستأنف ضده' },
+      { value: 'طاعن', label: 'طاعن' },
+      { value: 'مطعون ضده', label: 'مطعون ضده' },
+      { value: 'خصم', label: 'خصم' },
+      { value: 'خصم متدخل', label: 'خصم متدخل' },
+      { value: 'متدخل انضمامي', label: 'متدخل انضمامي' },
+      { value: 'متدخل هجومي', label: 'متدخل هجومي' },
+      { value: 'معترض', label: 'معترض' },
+      { value: 'متظلم', label: 'متظلم' },
+      { value: 'متظلم ضده', label: 'متظلم ضده' },
+    ]
+  },
+  {
+    label: 'الطلبات وأوامر الأداء',
+    options: [
+      { value: 'طالب', label: 'طالب' },
+      { value: 'مطلوب ضده', label: 'مطلوب ضده' },
+      { value: 'طالب أمر', label: 'طالب أمر' },
+      { value: 'مستشكل', label: 'مستشكل' },
+    ]
+  },
+  {
+    label: 'الجنائي والجزائي',
+    options: [
+      { value: 'شاكي', label: 'شاكي' },
+      { value: 'مشكو في حقه', label: 'مشكو في حقه' },
+      { value: 'متهم', label: 'متهم' },
+      { value: 'مجني عليه', label: 'مجني عليه' },
+      { value: 'مدعي بالحق المدني', label: 'مدعي بالحق المدني' },
+      { value: 'مسؤول مدني', label: 'مسؤول مدني' },
+    ]
+  },
+  {
+    label: 'التنفيذ والإفلاس',
+    options: [
+      { value: 'طالب تنفيذ', label: 'طالب تنفيذ' },
+      { value: 'منفذ ضده', label: 'منفذ ضده' },
+      { value: 'دائن', label: 'دائن' },
+      { value: 'مدين', label: 'مدين' },
+      { value: 'كفيل', label: 'كفيل' },
+      { value: 'ضامن', label: 'ضامن' },
+      { value: 'محجوز لديه', label: 'محجوز لديه' },
+      { value: 'طالب شهر إفلاس', label: 'طالب شهر إفلاس' },
+      { value: 'مفلس', label: 'مفلس' },
+    ]
+  },
+  {
+    label: 'الأحوال الشخصية والمدني',
+    options: [
+      { value: 'وارث', label: 'وارث' },
+      { value: 'مورث', label: 'مورث' },
+      { value: 'قاصر', label: 'قاصر' },
+      { value: 'ولي طبيعي', label: 'ولي طبيعي' },
+      { value: 'وصي', label: 'وصي' },
+      { value: 'قيّم', label: 'قيّم' },
+      { value: 'حارس قضائي', label: 'حارس قضائي' },
+      { value: 'مستفيد', label: 'مستفيد' },
+    ]
+  },
+  {
+    label: 'الشركات والوظائف',
+    options: [
+      { value: 'ممثل قانوني', label: 'ممثل قانوني' },
+      { value: 'ممثل الشركة', label: 'ممثل الشركة' },
+      { value: 'المدير المسؤول', label: 'المدير المسؤول' },
+      { value: 'المصفي', label: 'المصفي' },
+      { value: 'الشريك', label: 'الشريك' },
+      { value: 'صاحب العمل', label: 'صاحب العمل' },
+      { value: 'العامل', label: 'العامل' },
+      { value: 'الموظف', label: 'الموظف' },
+      { value: 'جهة إدارية', label: 'جهة إدارية' },
+      { value: 'جهة حكومية', label: 'جهة حكومية' },
+      { value: 'شركة', label: 'شركة' },
+      { value: 'مؤسسة', label: 'مؤسسة' },
+    ]
+  },
+  {
+    label: 'العقود والالتزامات',
+    options: [
+      { value: 'المؤجر', label: 'المؤجر' },
+      { value: 'المستأجر', label: 'المستأجر' },
+      { value: 'البائع', label: 'البائع' },
+      { value: 'المشتري', label: 'المشتري' },
+      { value: 'المقاول', label: 'المقاول' },
+      { value: 'محال له', label: 'محال له' },
+      { value: 'محيل', label: 'محيل' },
+      { value: 'مؤمن', label: 'مؤمن' },
+      { value: 'شركة تأمين', label: 'شركة تأمين' },
+      { value: 'متسبب بالضرر', label: 'متسبب بالضرر' },
+      { value: 'متضرر', label: 'متضرر' },
+    ]
+  },
+  {
+    label: 'أطراف أخرى',
+    options: [
+      { value: 'خبير', label: 'خبير' },
+      { value: 'شاهد', label: 'شاهد' },
+      { value: 'محكم', label: 'محكم' },
+      { value: 'وكيل', label: 'وكيل' },
+      { value: 'موكل', label: 'موكل' },
+    ]
+  }
+];
+
+export const partyRoleOptions = partyRoleGroups.flatMap(group => group.options);
 export const hearingTypeOptions = [{value: 'جلسة أولى', label: 'جلسة أولى'}, {value: 'مرافعة', label: 'مرافعة'}, {value: 'نطق بالحكم', label: 'نطق بالحكم'}, {value: 'تقديم مستندات', label: 'تقديم مستندات'}, {value: 'تحقيق', label: 'تحقيق'}, {value: 'خبراء', label: 'خبراء'}];
 export const reportTypeOptions = [{value: 'status', label: 'حسب الحالة'}, {value: 'lawyer', label: 'حسب المحامي'}, {value: 'type', label: 'حسب النوع'}];
 export const caseFilterStatusOptions = [{value: '', label: 'الكل'}, ...caseStatusOptions];

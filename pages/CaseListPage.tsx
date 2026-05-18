@@ -8,6 +8,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import LegalRoleSelector from '../components/LegalRoleSelector';
 import SignaturePad from '../components/ui/SignaturePad';
 import PrintHeader from '../components/ui/PrintHeader';
 import { CaseStatusBadge, RiskLevelBadge, PriorityBadge, ExecutionActionStatusBadge, ExpertActionStatusBadge } from '../components/ui/Badge'; 
@@ -64,6 +65,13 @@ const initialFilters = {
     caseNumber: '',
     fromDate: '',
     toDate: '',
+};
+
+// --- Helper for role display ---
+const formatRole = (role: string | string[] | undefined) => {
+    if (!role) return '';
+    if (Array.isArray(role)) return role.join('، ');
+    return role;
 };
 
 // --- Case Details Modal Component ---
@@ -500,11 +508,11 @@ ${JSON.stringify(context, null, 2)}
                     <div className="space-y-4">
                         <div className="flex flex-col">
                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الموكل</span>
-                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.clientName} <span className="text-primary">({caseItem.clientRole || 'مدعي'})</span></span>
+                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.clientName} <span className="text-primary">({formatRole(caseItem.clientRole) || 'مدعي'})</span></span>
                         </div>
                         <div className="flex flex-col">
                             <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الخصم</span>
-                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.opposingPartyName} <span className="text-red-500">({caseItem.opponentRole || 'مدعى عليه'})</span></span>
+                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.opposingPartyName} <span className="text-red-500">({formatRole(caseItem.opponentRole) || 'مدعى عليه'})</span></span>
                         </div>
                     </div>
                 </div>
@@ -1635,17 +1643,31 @@ const CaseForm: React.FC<{
 
                 <Card title={t('parties_involved', { defaultValue: 'أطراف المنازعة' })} titleClassName="text-sm font-black italic">
                     <div className="space-y-4 pt-2">
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="md:col-span-2">
                                 <Input name="clientName" label={t('client_name_req', { defaultValue: 'اسم الموكل (*)' })} value={formData.clientName || ''} onChange={handleChange} required />
                             </div>
-                            <Select name="clientRole" label={t('role', { defaultValue: 'الصفة' })} value={formData.clientRole || ''} options={partyRoleOptions} onChange={handleChange} />
+                            <div className="md:col-span-1">
+                                <LegalRoleSelector 
+                                    label={t('role', { defaultValue: 'الصفة' })} 
+                                    value={formData.clientRole || 'مدعي'} 
+                                    isMulti={true}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, clientRole: val }))} 
+                                />
+                            </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-3">
-                            <div className="col-span-2">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="md:col-span-2">
                                 <Input name="opposingPartyName" label={t('opponent_name', { defaultValue: 'اسم الخصم' })} value={formData.opposingPartyName || ''} onChange={handleChange} />
                             </div>
-                            <Select name="opponentRole" label={t('role', { defaultValue: 'الصفة' })} value={formData.opponentRole || ''} options={partyRoleOptions} onChange={handleChange} />
+                            <div className="md:col-span-1">
+                                <LegalRoleSelector 
+                                    label={t('role', { defaultValue: 'الصفة' })} 
+                                    value={formData.opponentRole || 'مدعى عليه'} 
+                                    isMulti={true}
+                                    onChange={(val) => setFormData(prev => ({ ...prev, opponentRole: val }))} 
+                                />
+                            </div>
                         </div>
                         <Input name="opposingCounsel" label={t('opposing_lawyer', { defaultValue: 'محامي الخصم / مكتب المحاماة' })} value={formData.opposingCounsel || ''} onChange={handleChange} />
                     </div>
@@ -1766,8 +1788,8 @@ const PrintableCaseReportModal: React.FC<{ isOpen: boolean; onClose: () => void;
                 <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-10 border-b border-gray-200 pb-8 mt-8">
                     <p><strong>{t('internal_no', { defaultValue: 'الرقم الداخلي' })}:</strong> {caseItem.internalCaseNumber}</p>
                     <p><strong>{t('automated_no', { defaultValue: 'الرقم الآلي' })}:</strong> {caseItem.caseNumber || '-'}</p>
-                    <p><strong>{t('client', { defaultValue: 'الموكل' })}:</strong> {caseItem.clientName} ({caseItem.clientRole})</p>
-                    <p><strong>{t('opponent', { defaultValue: 'الخصم' })}:</strong> {caseItem.opposingPartyName} ({caseItem.opponentRole})</p>
+                    <p><strong>{t('client', { defaultValue: 'الموكل' })}:</strong> {caseItem.clientName} ({formatRole(caseItem.clientRole)})</p>
+                    <p><strong>{t('opponent', { defaultValue: 'الخصم' })}:</strong> {caseItem.opposingPartyName} ({formatRole(caseItem.opponentRole)})</p>
                     <p><strong>{t('court', { defaultValue: 'المحكمة' })}:</strong> {caseItem.courtName}</p>
                     <p><strong>{t('court_level', { defaultValue: 'درجة التقاضي' })}:</strong> {caseItem.courtLevel}</p>
                     <p><strong>{t('status', { defaultValue: 'الحالة' })}:</strong> {caseItem.status}</p>
@@ -2115,6 +2137,21 @@ const CaseListPage: React.FC = () => {
                         />
                     </div>
 
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <LegalRoleSelector 
+                            label="صفة الموكل" 
+                            value={filters.clientRole} 
+                            isMulti={false}
+                            onChange={(val) => setFilters(prev => ({ ...prev, clientRole: val as string }))} 
+                        />
+                        <LegalRoleSelector 
+                            label="صفة الخصم" 
+                            value={filters.opponentRole} 
+                            isMulti={false}
+                            onChange={(val) => setFilters(prev => ({ ...prev, opponentRole: val as string }))} 
+                        />
+                    </div>
+
                     <div className="flex flex-col md:flex-row gap-4 mt-4 items-end">
                         <div className="flex-1 grid grid-cols-2 gap-3 w-full">
                             <Input 
@@ -2229,8 +2266,8 @@ const CaseListPage: React.FC = () => {
                                                             <div className="text-[10px] text-gray-400 font-mono">#{c.caseNumber} | {c.internalCaseNumber}</div>
                                                         </td>
                                                         <td className="px-4 py-4">
-                                                            <div className="text-xs font-semibold text-gray-800">{c.clientName}</div>
-                                                            <div className="text-[10px] text-rose-500">{c.opposingPartyName}</div>
+                                                            <div className="text-xs font-semibold text-gray-800">{c.clientName} <span className="text-[10px] text-primary">({formatRole(c.clientRole)})</span></div>
+                                                            <div className="text-[10px] text-rose-500">{c.opposingPartyName} <span className="text-[9px] opacity-70">({formatRole(c.opponentRole)})</span></div>
                                                         </td>
                                                         <td className="px-4 py-4">
                                                             <div className="text-xs text-gray-700">{c.courtName}</div>

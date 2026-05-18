@@ -287,7 +287,7 @@ export interface Case {
   fileNumber?: string; // رقم الملف بالمكتب
   clientName: string;
   clientId?: string;
-  clientRole?: string; // e.g. 'مدعي', 'مدعى عليه'
+  clientRole?: string | string[]; // e.g. 'مدعي', 'مدعى عليه'
   group?: string; // e.g. 'مجموعة أ', 'قضايا هامة'
   caseMainType: CaseMainType;
   caseSubType?: string; 
@@ -302,7 +302,7 @@ export interface Case {
   circuit?: string; // Added: Circuit (الدائرة)
   judgeName?: string; // اسم القاضي
   opposingPartyName?: string;
-  opponentRole?: string; // e.g. 'مدعي', 'مدعى عليه'
+  opponentRole?: string | string[]; // e.g. 'مدعي', 'مدعى عليه'
   opposingCounsel?: string;
   plaintiffs?: string[]; 
   defendants?: string[]; 
@@ -1832,6 +1832,7 @@ export enum MindMapLayoutType {
     FLOWCHART_HORIZONTAL = 'flowchart_horizontal',
     FLOWCHART_VERTICAL = 'flowchart_vertical',
     RADIAL = 'radial',
+    MINDMAP = 'mindmap',
 }
 
 export enum MindMapShape {
@@ -1852,6 +1853,9 @@ export interface MindMapNode {
     color?: string; // e.g., 'bg-blue-500'
     iconName?: string; // Key for an icon component
     shape?: MindMapShape;
+    position?: { x: number; y: number };
+    style?: any;
+    data?: any;
 }
 export interface MindMapEdge {
     id: string;
@@ -1867,6 +1871,7 @@ export interface MindMapData {
     edges: MindMapEdge[];
     createdAt: string;
     updatedAt?: string;
+    data?: any;
 }
 export interface AISuggestedNode {
     label: string;
@@ -2159,12 +2164,29 @@ export enum NotificationChannel {
     SYSTEM = "إشعار بالنظام",
     SMS = "رسالة نصية SMS",
 }
+
 export enum SystemNotificationStatus {
     PENDING = "قيد الإرسال",
     SENT = "مرسل",
     FAILED = "فشل الإرسال",
     VIEWED = "تم الاطلاع",
 }
+
+export enum NotificationPriority {
+    LOW = "منخفض",
+    NORMAL = "عادي",
+    HIGH = "عالي",
+    URGENT = "عاجل",
+}
+
+export enum NotificationCategory {
+    REMINDER = "تذكير",
+    URGENT = "عاجل",
+    IMPORTANT = "هام",
+    ADMINISTRATIVE = "إداري",
+    INFORMATIONAL = "معلوماتي",
+}
+
 export enum NotificationType {
     // Cases
     NEW_CASE_ASSIGNED = "إسناد قضية جديدة",
@@ -2173,6 +2195,7 @@ export enum NotificationType {
     CASE_DEADLINE_APPROACHING = "اقتراب موعد هام في قضية",
     // Contracts
     CONTRACT_ANALYSIS_COMPLETED = "اكتمال تحليل عقد",
+    CONTRACT_RENEWAL_DUE = "استحقاق تجديد عقد",
     // Compliance
     COMPLIANCE_DUE_SOON = "اقتراب استحقاق متطلب امتثال",
     COMPLIANCE_OVERDUE = "تجاوز استحقاق متطلب امتثال",
@@ -2202,16 +2225,35 @@ export enum NotificationType {
     SYSTEM_MAINTENANCE_NOTICE = "إشعار صيانة للنظام",
     GENERAL_ANNOUNCEMENT = "إعلان عام",
 }
+
+export interface SystemNotification {
+    id: string;
+    type: NotificationType;
+    category: NotificationCategory;
+    priority: NotificationPriority;
+    title: string;
+    message: string;
+    timestamp: string;
+    isRead: boolean;
+    isSnoozed?: boolean;
+    snoozedUntil?: string; // ISO string
+    isMuted?: boolean;
+    relatedEntityId?: string; // e.g. caseId, taskId
+    actionUrl?: string;
+    assignedTo?: string; // User ID
+}
+
 export interface NotificationSettingItem {
     id: string; // Same as NotificationType enum key
     type: NotificationType;
     description: string;
     emailEnabled: boolean;
     whatsappEnabled: boolean;
-    smsEnabled?: boolean; // New
+    smsEnabled?: boolean;
     systemEnabled: boolean;
-    managerAlertEnabled?: boolean; // If true, a copy is sent to the manager
-    priority?: 'low' | 'normal' | 'high' | 'urgent'; // New
+    managerAlertEnabled?: boolean;
+    priority?: 'low' | 'normal' | 'high' | 'urgent';
+    reminderIntervals?: number[]; // e.g. [5, 15, 60, 1440, 10080] minutes
 }
 export interface NotificationModuleSettings {
     senderEmail: string;

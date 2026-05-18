@@ -229,7 +229,10 @@ const DebtSettlementFormModal: React.FC<DebtSettlementFormModalProps> = ({ isOpe
 };
 
 
+import { useSearchParams } from 'react-router-dom';
+
 const DebtSettlementPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [settlements, setSettlements] = useState<DebtSettlementRecord[]>(getMockSettlementRecords());
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<SettlementStatus | ''>('');
@@ -237,14 +240,7 @@ const DebtSettlementPage: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingSettlement, setEditingSettlement] = useState<Partial<DebtSettlementRecord> | null>(null);
   const [viewingSettlement, setViewingSettlement] = useState<DebtSettlementRecord | null>(null);
-  const [searchParams, setSearchParams] = useState(new URLSearchParams(window.location.hash.split('?')[1]));
-
-
   useEffect(() => {
-    const handleHashChange = () => {
-        setSearchParams(new URLSearchParams(window.location.hash.split('?')[1]));
-    };
-    window.addEventListener('hashchange', handleHashChange);
     // Initial check
     const settlementIdToView = searchParams.get('view');
     if (settlementIdToView) {
@@ -253,7 +249,6 @@ const DebtSettlementPage: React.FC = () => {
             setViewingSettlement(foundSettlement);
         }
     }
-    return () => window.removeEventListener('hashchange', handleHashChange);
   }, [searchParams]);
 
 

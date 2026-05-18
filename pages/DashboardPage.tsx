@@ -139,6 +139,7 @@ const DashboardPage: React.FC = () => {
             items: [
                 { title: 'إدارة التقاضي', desc: 'أضف القضايا، تابع الجلسات، واطلع على رول المحاكم.', icon: <BriefcaseIcon />, stats: { value: cases.length, label: 'قضية' }, link: '/cases' },
                 { title: 'الرول الآلي', desc: 'تحديثات مباشرة من بوابة العدل لجدول الجلسات.', icon: <ListBulletIcon />, stats: { value: hearingCountToday, label: 'جلسة اليوم' }, link: '/automated-docket' },
+                { title: 'الخرائط الذهنية الذكية', desc: 'تحليل استراتيجي للقضايا باستخدام الذكاء الاصطناعي.', icon: <BrainIcon />, stats: { value: 'AI', label: 'تحليل متقدم' }, link: '/smart-mind-maps' },
                 { title: 'توزيع المهام', desc: 'توزيع المهام التشغيلية ومتابعة الإنجاز اليومي.', icon: <ClipboardListCheckIcon />, stats: { value: taskCountToday, label: 'مهمة مستحقة' }, link: '/admin-tools/tasks' },
                 { title: 'البحث الموحد', desc: 'البحث الشامل برقم آلي أو ملف قضية.', icon: <MagnifyingGlassIcon />, stats: { value: 'Live', label: 'بوابة العدل' }, link: '/moj-search' },
             ]

@@ -67,23 +67,26 @@ const initialSettings: NotificationModuleSettings = {
     notificationSettings: [
         // Cases
         { id: 'NEW_CASE_ASSIGNED', type: NotificationType.NEW_CASE_ASSIGNED, description: 'إسناد قضية جديدة للدائرة/المحامي', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: true, priority: 'high' },
-        { id: 'HEARING_REMINDER', type: NotificationType.HEARING_REMINDER, description: 'تذكير بموعد جلسة قادمة', emailEnabled: true, whatsappEnabled: true, smsEnabled: true, systemEnabled: true, priority: 'urgent' },
+        { id: 'HEARING_REMINDER', type: NotificationType.HEARING_REMINDER, description: 'تذكير بموعد جلسة قادمة', emailEnabled: true, whatsappEnabled: true, smsEnabled: true, systemEnabled: true, priority: 'urgent', reminderIntervals: [15, 60, 1440] },
         { id: 'CASE_STATUS_UPDATED', type: NotificationType.CASE_STATUS_UPDATED, description: 'صدور حكم أو تحديث حالة قضية', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, managerAlertEnabled: true, priority: 'high' },
-        { id: 'CASE_DEADLINE_APPROACHING', type: NotificationType.CASE_DEADLINE_APPROACHING, description: 'اقتراب موعد تسليم مذكرات/مستندات', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: true, priority: 'high' },
+        { id: 'CASE_DEADLINE_APPROACHING', type: NotificationType.CASE_DEADLINE_APPROACHING, description: 'اقتراب موعد تسليم مذكرات/مستندات', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: true, priority: 'high', reminderIntervals: [1440, 4320] },
 
+        // Contracts
+        { id: 'CONTRACT_RENEWAL', type: NotificationType.CONTRACT_RENEWAL_DUE, description: 'تنبيه استحقاق تجديد عقد (إيجار/عمل)', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: true, priority: 'high', reminderIntervals: [10080, 43200] },
+        
         // Financial
-        { id: 'PAYMENT_DUE_REMINDER', type: NotificationType.PAYMENT_DUE_REMINDER, description: 'تذكير العميل بموعد استحقاق دفعة', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: false, managerAlertEnabled: true, priority: 'normal' },
+        { id: 'PAYMENT_DUE_REMINDER', type: NotificationType.PAYMENT_DUE_REMINDER, description: 'تذكير العميل بموعد استحقاق دفعة', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: false, managerAlertEnabled: true, priority: 'normal', reminderIntervals: [4320] },
         
         // Employee
         { id: 'NEW_LEAVE_REQUEST', type: NotificationType.NEW_LEAVE_REQUEST_FOR_APPROVAL, description: 'طلبات الإجازة الجديدة', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, managerAlertEnabled: true, priority: 'normal' },
-        { id: 'LOAN_INSTALLMENT', type: NotificationType.LOAN_INSTALLMENT_DUE, description: 'استحقاق أقساط القروض للموظفين', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, priority: 'low' },
+        { id: 'LOAN_INSTALLMENT', type: NotificationType.LOAN_INSTALLMENT_DUE, description: 'استحقاق أقساط القروض للموظفين', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, priority: 'low', reminderIntervals: [4320] },
         
         // Tasks
-        { id: 'TASK_ASSIGNED', type: NotificationType.TASK_ASSIGNED_TO_YOU, description: 'تعيين مهمة إدارية جديدة', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, priority: 'normal' },
+        { id: 'TASK_ASSIGNED', type: NotificationType.TASK_ASSIGNED_TO_YOU, description: 'تغيير مهمة أو إسناد مهمة جديدة', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, priority: 'normal' },
         { id: 'TASK_OVERDUE', type: NotificationType.TASK_OVERDUE_ALERT, description: 'تجاوز موعد استحقاق المهمة', emailEnabled: true, whatsappEnabled: true, smsEnabled: false, systemEnabled: true, managerAlertEnabled: true, priority: 'high' },
         
         // System
-        { id: 'DOC_EXPIRY', type: NotificationType.IMPORTANT_DOCUMENT_EXPIRY_WARNING, description: 'تحذيرات انتهاء التراخيص والمستندات', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, managerAlertEnabled: true, priority: 'high' },
+        { id: 'DOC_EXPIRY', type: NotificationType.IMPORTANT_DOCUMENT_EXPIRY_WARNING, description: 'تحذيرات انتهاء التراخيص والمستندات', emailEnabled: true, whatsappEnabled: false, smsEnabled: false, systemEnabled: true, managerAlertEnabled: true, priority: 'high', reminderIntervals: [43200] },
     ]
 };
 
@@ -166,6 +169,11 @@ const NotificationsManagementPage: React.FC = () => {
                     {settingsState.notificationSettings.filter(s => s.id.includes('PAYMENT')).map(s => renderSettingRow(s))}
                 </div>
 
+                <GroupHeader title="العقود والاتفاقيات" icon={<ClipboardDocumentListIcon className="w-5 h-5"/>} color="bg-rose-600" />
+                <div className="grid grid-cols-1 gap-4 mb-12">
+                    {settingsState.notificationSettings.filter(s => s.id.includes('CONTRACT')).map(s => renderSettingRow(s))}
+                </div>
+
                 <GroupHeader title="شؤون الموظفين والإدارية" icon={<UserGroupIcon className="w-5 h-5"/>} color="bg-violet-600" />
                 <div className="grid grid-cols-1 gap-4 mb-12">
                     {settingsState.notificationSettings.filter(s => s.id.includes('LEAVE') || s.id.includes('LOAN')).map(s => renderSettingRow(s))}
@@ -179,65 +187,121 @@ const NotificationsManagementPage: React.FC = () => {
         </div>
     );
 
-    const renderSettingRow = (s: NotificationSettingItem) => (
-        <div key={s.id} className="group bg-white dark:bg-dm-card p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex-grow max-w-xl">
-                <div className="flex items-center gap-2 mb-1">
-                    <p className="font-black text-gray-900 dark:text-dm-text">{s.description}</p>
-                    {s.priority && (
-                       <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
-                           s.priority === 'urgent' ? 'bg-red-100 text-red-600' : 
-                           s.priority === 'high' ? 'bg-orange-100 text-orange-600' : 
-                           'bg-blue-100 text-blue-600'
-                       }`}>
-                           {s.priority}
-                       </span>
-                    )}
+    const renderSettingRow = (s: NotificationSettingItem) => {
+        const intervals = [
+            { label: '5 د', value: 5 },
+            { label: '15 د', value: 15 },
+            { label: '1 س', value: 60 },
+            { label: '1 ي', value: 1440 },
+            { label: '3 ي', value: 4320 },
+            { label: 'أسبوع', value: 10080 },
+            { label: 'شهر', value: 43200 }
+        ];
+
+        const toggleInterval = (value: number) => {
+            setSettingsState(prev => ({
+                ...prev,
+                notificationSettings: prev.notificationSettings.map(item => 
+                    item.id === s.id 
+                    ? { 
+                        ...item, 
+                        reminderIntervals: (item.reminderIntervals || []).includes(value)
+                            ? (item.reminderIntervals || []).filter(v => v !== value)
+                            : [...(item.reminderIntervals || []), value]
+                    } 
+                    : item
+                )
+            }));
+        };
+
+        return (
+            <div key={s.id} className="group bg-white dark:bg-dm-card p-5 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl hover:border-primary/20 transition-all flex flex-col gap-6">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div className="flex-grow max-w-xl">
+                        <div className="flex items-center gap-2 mb-1">
+                            <p className="font-black text-gray-900 dark:text-dm-text">{s.description}</p>
+                            {s.priority && (
+                                <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${
+                                    s.priority === 'urgent' ? 'bg-red-100 text-red-600' : 
+                                    s.priority === 'high' ? 'bg-orange-100 text-orange-600' : 
+                                    'bg-blue-100 text-blue-600'
+                                }`}>
+                                    {s.priority}
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{s.type}</p>
+                    </div>
+                    
+                    <div className="flex flex-wrap items-center gap-2 lg:gap-4 lg:bg-gray-50/50 dark:lg:bg-dm-background/50 lg:p-2 lg:rounded-xl">
+                        <button 
+                            onClick={() => handleToggleChannel(s.id, 'systemEnabled')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.systemEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
+                        >
+                            <ComputerDesktopIcon className="w-3.5 h-3.5"/>
+                            <span>النظام</span>
+                        </button>
+                        <button 
+                            onClick={() => handleToggleChannel(s.id, 'emailEnabled')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.emailEnabled ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
+                        >
+                            <EnvelopeIcon className="w-3.5 h-3.5"/>
+                            <span>البريد</span>
+                        </button>
+                        <button 
+                            onClick={() => handleToggleChannel(s.id, 'whatsappEnabled')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.whatsappEnabled ? 'bg-green-50 border-green-200 text-green-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
+                        >
+                            <ChatBubbleLeftRightIcon className="w-3.5 h-3.5"/>
+                            <span>واتساب</span>
+                        </button>
+                        <button 
+                            onClick={() => handleToggleChannel(s.id, 'smsEnabled')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.smsEnabled ? 'bg-sky-50 border-sky-200 text-sky-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
+                        >
+                            <DevicePhoneMobileIcon className="w-3.5 h-3.5"/>
+                            <span>SMS</span>
+                        </button>
+                        <div className="w-[1px] h-6 bg-gray-200 hidden lg:block mx-2"></div>
+                        <button 
+                            onClick={() => handleToggleChannel(s.id, 'managerAlertEnabled')}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.managerAlertEnabled ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
+                            title="إرسال نسخة للمدير"
+                        >
+                            <ShieldCheckIcon className="w-3.5 h-3.5"/>
+                            <span>تنبيه المدير</span>
+                        </button>
+                    </div>
                 </div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">{s.type}</p>
+
+                {/* Interval Selection */}
+                {(s.id.includes('REMINDER') || s.id.includes('APPROACHING') || s.id.includes('EXPIRY') || s.id.includes('RENEWAL') || s.id.includes('INSTALLMENT')) && (
+                    <div className="pt-4 border-t border-gray-50 dark:border-gray-800">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                                <ClockIcon className="w-3 h-3"/> توقيت التنبيهات (قبل الموعد بـ):
+                            </span>
+                            <div className="flex flex-wrap gap-2">
+                                {intervals.map(int => (
+                                    <button
+                                        key={int.value}
+                                        onClick={() => toggleInterval(int.value)}
+                                        className={`px-3 py-1 rounded-full text-[10px] font-black border transition-all ${
+                                            (s.reminderIntervals || []).includes(int.value)
+                                                ? 'bg-primary text-white border-primary shadow-sm scale-105'
+                                                : 'bg-white dark:bg-dm-background border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'
+                                        }`}
+                                    >
+                                        {int.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-            
-            <div className="flex flex-wrap items-center gap-2 lg:gap-4 lg:bg-gray-50/50 dark:lg:bg-dm-background/50 lg:p-2 lg:rounded-xl">
-                <button 
-                  onClick={() => handleToggleChannel(s.id, 'systemEnabled')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.systemEnabled ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
-                >
-                    <ComputerDesktopIcon className="w-3.5 h-3.5"/>
-                    <span>النظام</span>
-                </button>
-                <button 
-                  onClick={() => handleToggleChannel(s.id, 'emailEnabled')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.emailEnabled ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
-                >
-                    <EnvelopeIcon className="w-3.5 h-3.5"/>
-                    <span>البريد</span>
-                </button>
-                <button 
-                  onClick={() => handleToggleChannel(s.id, 'whatsappEnabled')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.whatsappEnabled ? 'bg-green-50 border-green-200 text-green-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
-                >
-                    <ChatBubbleLeftRightIcon className="w-3.5 h-3.5"/>
-                    <span>واتساب</span>
-                </button>
-                <button 
-                  onClick={() => handleToggleChannel(s.id, 'smsEnabled')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.smsEnabled ? 'bg-sky-50 border-sky-200 text-sky-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
-                >
-                    <DevicePhoneMobileIcon className="w-3.5 h-3.5"/>
-                    <span>SMS</span>
-                </button>
-                <div className="w-[1px] h-6 bg-gray-200 hidden lg:block mx-2"></div>
-                <button 
-                  onClick={() => handleToggleChannel(s.id, 'managerAlertEnabled')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-black transition-all border ${s.managerAlertEnabled ? 'bg-amber-100 border-amber-300 text-amber-700 shadow-sm' : 'bg-white border-gray-100 text-gray-300 hover:border-gray-200'}`}
-                  title="إرسال نسخة للمدير"
-                >
-                    <ShieldCheckIcon className="w-3.5 h-3.5"/>
-                    <span>تنبيه المدير</span>
-                </button>
-            </div>
-        </div>
-    );
+        );
+    };
 
     const renderLogsTab = () => (
         <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
