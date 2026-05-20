@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useToast } from '../components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
 import Card from '../components/ui/Card';
@@ -181,9 +182,11 @@ const ComplianceRequirementRow = React.forwardRef<HTMLTableRowElement, { item: C
     );
 });
 
+
 // --- Main Component ---
 export const CompliancePage: React.FC = () => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [complianceItems, setComplianceItems] = useState<ComplianceRequirement[]>(initialComplianceData);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState<'all' | 'upcoming' | 'overdue'>('all');
@@ -224,11 +227,32 @@ export const CompliancePage: React.FC = () => {
     const handleFormSubmit = (data: ComplianceRequirement) => {
         if (editingItem?.id) {
             setComplianceItems(prev => prev.map(item => item.id === editingItem.id ? { ...data, updatedAt: new Date().toISOString() } : item));
+            addToast({
+                type: 'success',
+                title: 'تم التحديث',
+                message: 'تم تحديث متطلب الامتثال بنجاح.'
+            });
         } else {
             setComplianceItems(prev => [{ ...data, id: `comp-${Date.now()}`, createdAt: new Date().toISOString() }, ...prev]);
+            addToast({
+                type: 'success',
+                title: 'تمت الإضافة',
+                message: 'تم إضافة متطلب امتثال جديد للسجل.'
+            });
         }
         setIsModalOpen(false);
         setEditingItem(null);
+    };
+
+    const handleDeleteRequirement = (id: string) => {
+        if (window.confirm('هل أنت متأكد من حذف هذا المتطلب؟')) {
+            setComplianceItems(prev => prev.filter(x => x.id !== id));
+            addToast({
+                type: 'success',
+                title: 'تم الحذف',
+                message: 'تم إزالة المتطلب من السجل.'
+            });
+        }
     };
 
     return (
@@ -354,7 +378,7 @@ export const CompliancePage: React.FC = () => {
                                             item={item} 
                                             onView={setViewingItem} 
                                             onEdit={(i) => { setEditingItem(i); setIsModalOpen(true); }}
-                                            onDelete={(id) => setComplianceItems(prev => prev.filter(x => x.id !== id))}
+                                            onDelete={handleDeleteRequirement}
                                         />
                                     ))}
                                 </AnimatePresence>

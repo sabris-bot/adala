@@ -6,6 +6,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import { 
     FolderIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, 
     InformationCircleIcon, PaperClipIcon, ArrowRightIcon 
@@ -42,6 +43,7 @@ interface PropertyDocumentFormModalProps {
 }
 
 const PropertyDocumentFormModal: React.FC<PropertyDocumentFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, properties, cases }) => {
+  const { addToast } = useToast();
   const getInitialFormData = useCallback((): Partial<PropertyDocument> => {
     return initialData || {
       propertyId: properties.length > 0 ? properties[0].id : '',
@@ -106,7 +108,11 @@ const PropertyDocumentFormModal: React.FC<PropertyDocumentFormModalProps> = ({ i
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.documentName || !formData.propertyId || !formData.documentType) {
-      alert("يرجى ملء الحقول الإلزامية: اسم المستند، العقار المرتبط، ونوع المستند.");
+      addToast({
+        type: 'warning',
+        title: 'بيانات ناقصة',
+        message: 'يرجى ملء الحقول الإلزامية: اسم المستند، العقار المرتبط، ونوع المستند.'
+      });
       return;
     }
     onSubmit({ ...formData, uploadedAt: formData.uploadedAt || new Date().toISOString().split('T')[0] } as PropertyDocument);

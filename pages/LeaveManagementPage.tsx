@@ -8,6 +8,7 @@ import {
 } from '../constants';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import { 
     LeaveRequest, LeaveTypeKuwait
 } from '../types'; 
@@ -258,6 +259,7 @@ const PrintableLeaveRequest: React.FC<{ request: DetailedLeaveRequest }> = ({ re
 
 // --- Main Page Component ---
 const LeaveManagementPage: React.FC = () => {
+    const { addToast } = useToast();
     const { selectedJurisdiction } = useJurisdiction();
     const [requests, setRequests] = useState<DetailedLeaveRequest[]>(mockLeaveRequests);
     const [searchTerm, setSearchTerm] = useState('');
@@ -298,7 +300,11 @@ const LeaveManagementPage: React.FC = () => {
 
     const handleAddRequest = () => {
         if (!formData.employeeId || !formData.startDate || !formData.endDate) {
-            alert('يرجى استيفاء جميع الحقول المطلوبة (الموظف، التواريخ)');
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: 'يرجى استيفاء جميع الحقول المطلوبة (الموظف، التواريخ)'
+            });
             return;
         }
         const emp = initialEmployees.find(e => e.id === formData.employeeId);

@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import Button from './Button';
+import { useToast } from './Toast';
 import { PencilIcon, TrashIcon, CheckCircleIcon, XCircleIcon } from '../../constants';
 
 interface SignaturePadProps {
@@ -10,6 +11,7 @@ interface SignaturePadProps {
 }
 
 const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onCancel, title = "التوقيع الإلكتروني" }) => {
+  const { addToast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -94,7 +96,11 @@ const SignaturePad: React.FC<SignaturePadProps> = ({ onSave, onCancel, title = "
 
   const saveSignature = () => {
     if (!hasSignature) {
-        alert("يرجى التوقيع أولاً.");
+        addToast({
+            type: 'warning',
+            title: 'تنبيه',
+            message: "يرجى التوقيع أولاً."
+        });
         return;
     }
     const canvas = canvasRef.current;

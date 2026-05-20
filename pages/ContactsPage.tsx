@@ -24,6 +24,8 @@ import { mockFinancialTransactions } from './FinancialManagementPage';
 import { geminiService } from '../services/geminiService';
 import ReactMarkdown from 'react-markdown';
 
+import { useToast } from '../components/ui/Toast';
+
 // Helper to get profile color based on name
 const getAvatarColor = (name: string) => {
     const colors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500', 'bg-indigo-500'];
@@ -81,6 +83,7 @@ interface ContactFormModalProps {
 }
 
 const ContactFormModal: React.FC<ContactFormModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+  const { addToast } = useToast();
   const [formData, setFormData] = useState<Partial<Contact>>(
     initialData || { contactType: [ContactType.CLIENT], createdAt: new Date().toISOString(), tags: [], isFavorite: false }
   );
@@ -104,7 +107,11 @@ const ContactFormModal: React.FC<ContactFormModalProps> = ({ isOpen, onClose, on
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.fullName || !formData.contactType || formData.contactType.length === 0) {
-        alert("يرجى إدخال الاسم الكامل واختيار نوع جهة الاتصال على الأقل.");
+        addToast({
+            type: 'warning',
+            title: 'بيانات ناقصة',
+            message: "يرجى إدخال الاسم الكامل واختيار نوع جهة الاتصال على الأقل."
+        });
         return;
     }
     onSubmit({
@@ -412,6 +419,7 @@ interface NotificationModalProps {
     onSend: (type: 'email' | 'sms' | 'whatsapp', subject: string | undefined, message: string, recipients: Contact[]) => void;
 }
 const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, contactsToNotify, onSend }) => {
+    const { addToast } = useToast();
     const [type, setType] = useState<'email' | 'sms' | 'whatsapp'>('email');
     const [subject, setSubject] = useState('');
     const [message, setMessage] = useState('');
@@ -426,11 +434,19 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
 
     const handleSend = () => {
         if (!message.trim()) {
-            alert("محتوى الرسالة لا يمكن أن يكون فارغًا.");
+            addToast({
+                type: 'warning',
+                title: 'محتوى فارغ',
+                message: "محتوى الرسالة لا يمكن أن يكون فارغًا."
+            });
             return;
         }
         if (type === 'email' && !subject.trim()) {
-            alert("موضوع البريد الإلكتروني مطلوب.");
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: "موضوع البريد الإلكتروني مطلوب."
+            });
             return;
         }
         onSend(type, type === 'email' ? subject : undefined, message, contactsToNotify);
@@ -479,6 +495,7 @@ const NotificationModal: React.FC<NotificationModalProps> = ({ isOpen, onClose, 
 };
 
 const ContactsPage: React.FC = () => {
+  const { addToast } = useToast();
   const [contacts, setContacts] = React.useState<Contact[]>(initialMockContacts);
   const [searchTerm, setSearchTerm] = React.useState('');
   const [filterType, setFilterType] = React.useState<ContactType | ''>('');
@@ -565,7 +582,11 @@ const ContactsPage: React.FC = () => {
       }
       
       if (targets.length === 0) {
-          alert("يرجى تحديد جهة اتصال واحدة على الأقل لإرسال إشعار.");
+          addToast({
+              type: 'info',
+              title: 'تحديد جهة اتصال',
+              message: "يرجى تحديد جهة اتصال واحدة على الأقل لإرسال إشعار."
+          });
           return;
       }
       setContactsForNotification(targets);
@@ -573,7 +594,11 @@ const ContactsPage: React.FC = () => {
   };
 
   const handleNotificationSubmit = (type: string, subject: string | undefined, message: string, recipients: Contact[]) => {
-    alert(`تم إرسال ${type} إلى ${recipients.length} مستلم بنجاح!`);
+    addToast({
+        type: 'success',
+        title: 'تم الإرسال',
+        message: `تم إرسال ${type} إلى ${recipients.length} مستلم بنجاح!`
+    });
     setSelectedContacts([]); 
     setIsNotificationModalOpen(false);
   };

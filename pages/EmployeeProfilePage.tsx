@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
+import { useToast } from '../components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -733,9 +734,11 @@ const TabBtn = ({ id, icon, label, active, onClick }: { id: string, icon: any, l
     </button>
 );
 
+
 // --- Main Page Component ---
 const EmployeeProfilePage: React.FC = () => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
     const [searchTerm, setSearchTerm] = useState('');
     const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -776,7 +779,11 @@ const EmployeeProfilePage: React.FC = () => {
 
     const handleAddExample = () => {
         setEmployees(prev => [...prev, ...initialEmployees.map(e => ({...e, id: Math.random().toString(36).substr(2, 9)}))]);
-        alert("تمت إضافة موظفين نموذجيين إضافيين للسجل المحلي.");
+        addToast({
+            type: 'success',
+            title: 'تمت الإضافة',
+            message: 'تمت إضافة موظفين نموذجيين إضافيين للسجل المحلي.'
+        });
     };
 
     const handleOpenForm = (emp?: Employee) => {
@@ -809,12 +816,22 @@ const EmployeeProfilePage: React.FC = () => {
         e.preventDefault();
         if (editingEmployee) {
             setEmployees(prev => prev.map(emp => emp.id === editingEmployee.id ? { ...emp, ...formData } as Employee : emp));
+            addToast({
+                type: 'success',
+                title: 'تم التحديث',
+                message: `تم تحديث بيانات الموظف ${formData.fullNameAr} بنجاح.`
+            });
         } else {
             const newEmp: Employee = {
                 ...formData,
                 id: Math.random().toString(36).substr(2, 9),
             } as Employee;
             setEmployees(prev => [newEmp, ...prev]);
+            addToast({
+                type: 'success',
+                title: 'تمت الإضافة',
+                message: 'تم إضافة الموظف الجديد إلى النظام.'
+            });
         }
         setIsFormOpen(false);
     };
@@ -824,6 +841,11 @@ const EmployeeProfilePage: React.FC = () => {
         if (window.confirm("هل أنت متأكد من رغبتك في حذف هذا الموظف نهائياً من السجل؟")) {
             setEmployees(prev => prev.filter(emp => emp.id !== id));
             if (selectedEmployee?.id === id) setSelectedEmployee(null);
+            addToast({
+                type: 'warning',
+                title: 'تم حذف الموظف',
+                message: 'تم حذف سجل الموظف من قاعدة البيانات.'
+            });
         }
     };
 

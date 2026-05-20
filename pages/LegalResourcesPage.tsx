@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
+import { useToast } from '../components/ui/Toast';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { LegalResourceStatusBadge } from '../components/ui/Badge';
@@ -366,6 +367,7 @@ interface LegalResourceFormModalProps {
 }
 
 const LegalResourceFormModal: React.FC<LegalResourceFormModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+  const { addToast } = useToast();
   const getInitialFormData = (): Partial<LegalResource> => {
     return initialData || {
       type: LegalResourceType.LAW,
@@ -430,7 +432,11 @@ const LegalResourceFormModal: React.FC<LegalResourceFormModalProps> = ({ isOpen,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.type || !formData.country || !formData.publishDate) {
-        alert("يرجى ملء الحقول الإلزامية: العنوان، النوع، الدولة، وتاريخ النشر.");
+        addToast({
+            type: 'warning',
+            title: 'حقول ناقصة',
+            message: 'يرجى ملء الحقول الإلزامية: العنوان، النوع، الدولة، وتاريخ النشر.'
+        });
         return;
     }
     onSubmit(formData as LegalResource);

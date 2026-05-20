@@ -5,6 +5,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
+import { useToast } from '../components/ui/Toast';
 import Modal from '../components/ui/Modal';
 import TextArea from '../components/ui/TextArea';
 import { Badge } from '../components/ui/Badge';
@@ -166,6 +167,7 @@ const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'
 // --- COMPONENT ---
 
 const InheritanceCalculatorPage: React.FC = () => {
+    const { addToast } = useToast();
     const [activeTab, setActiveTab] = useState<'calculator' | 'saved' | 'info'>('calculator');
     const [deceasedName, setDeceasedName] = useState('');
     const [deceasedGender, setDeceasedGender] = useState<Gender>('M');
@@ -191,18 +193,30 @@ const InheritanceCalculatorPage: React.FC = () => {
 
         // Validation based on deceased gender
         if (typeId === 'husband' && deceasedGender === 'M') {
-            alert("لا يمكن إضافة زوج لمتوفى ذكر");
+            addToast({
+                type: 'error',
+                title: 'خطأ في الإضافة',
+                message: 'لا يمكن إضافة زوج لمتوفى ذكر'
+            });
             return;
         }
         if (typeId === 'wife' && deceasedGender === 'F') {
-            alert("لا يمكن إضافة زوجة لمتوفاة أنثى");
+            addToast({
+                type: 'error',
+                title: 'خطأ في الإضافة',
+                message: 'لا يمكن إضافة زوجة لمتوفاة أنثى'
+            });
             return;
         }
 
         // Limit validation
         const existing = heirs.find(h => h.type === typeId);
         if (existing && existing.count >= typeInfo.max) {
-            alert(`لا يمكن إضافة أكثر من ${typeInfo.max} من هذا النوع`);
+            addToast({
+                type: 'warning',
+                title: 'تجاوز الحد الأقصى',
+                message: `لا يمكن إضافة أكثر من ${typeInfo.max} من هذا النوع`
+            });
             return;
         }
 

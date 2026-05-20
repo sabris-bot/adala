@@ -6,6 +6,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import PrintHeader from '../components/ui/PrintHeader';
 import { 
     CurrencyDollarIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, 
@@ -287,6 +288,7 @@ interface LoanFormProps {
 }
 
 const LoanForm: React.FC<LoanFormProps> = ({ initialData, onSubmit, onCancel, employees, loans }) => {
+  const { addToast } = useToast();
   const [formData, setFormData] = useState<Partial<DetailedLoan>>(
     initialData || {
       employeeId: employees.length > 0 ? employees[0].id : '',
@@ -339,7 +341,11 @@ const LoanForm: React.FC<LoanFormProps> = ({ initialData, onSubmit, onCancel, em
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.employeeId || !formData.loanAmount || formData.loanAmount <= 0) {
-        alert("يرجى تعبئة كافة البيانات الإلزامية.");
+        addToast({
+            type: 'warning',
+            title: 'بيانات ناقصة',
+            message: 'يرجى تعبئة كافة البيانات الإلزامية.'
+        });
         return;
     }
     
@@ -492,6 +498,7 @@ const LoanDetailsModal: React.FC<{
     onPrint: (loan: Loan) => void;
     employees: Employee[];
 }> = ({ loan, onClose, onRecordPayment, onUpdateStatus, onPrint, employees }) => {
+    const { addToast } = useToast();
     if (!loan) return null;
     
     const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
@@ -504,7 +511,11 @@ const LoanDetailsModal: React.FC<{
             setSelectedInstallmentId(null);
             setAmountPaid('');
         } else {
-            alert("يرجى تحديد القسط وإدخال تاريخ ومبلغ الدفع بشكل صحيح.");
+            addToast({
+                type: 'warning',
+                title: 'خطأ في السداد',
+                message: 'يرجى تحديد القسط وإدخال تاريخ ومبلغ الدفع بشكل صحيح.'
+            });
         }
     };
     

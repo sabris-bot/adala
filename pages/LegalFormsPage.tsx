@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useToast } from '../components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
     PlusCircleIcon, 
@@ -284,6 +285,7 @@ const INITIAL_LEGAL_FORMS: LegalResource[] = [
 // --- COMPONENTS ---
 
 const LegalFormsPage: React.FC = () => {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<'browse' | 'generate' | 'upload'>('browse');
   const [forms, setForms] = useState<LegalResource[]>(INITIAL_LEGAL_FORMS);
   const [searchQuery, setSearchQuery] = useState('');
@@ -338,7 +340,11 @@ const LegalFormsPage: React.FC = () => {
       setGeneratedResult(result);
     } catch (error) {
       console.error(error);
-      alert("حدث خطأ أثناء التوليد. يرجى المحاولة لاحقاً.");
+      addToast({
+        type: 'error',
+        title: 'خطأ في التوليد',
+        message: "حدث خطأ أثناء التوليد. يرجى المحاولة لاحقاً."
+      });
     } finally {
       setAiLoading(false);
     }
@@ -363,17 +369,29 @@ const LegalFormsPage: React.FC = () => {
     setAiPrompt('');
     setSelectedFile(null);
     setActiveTab('browse');
-    alert("تمت إضافة النموذج إلى المكتبة بنجاح!");
+    addToast({
+      type: 'success',
+      title: 'تمت الإضافة',
+      message: "تمت إضافة النموذج إلى المكتبة بنجاح!"
+    });
   };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("تم نسخ النص للذاكرة بنجاح!");
+    addToast({
+      type: 'info',
+      title: 'نسخ النص',
+      message: "تم نسخ النص للذاكرة بنجاح!"
+    });
   };
 
   const handleManualUpload = () => {
     if (!uploadData.title || !uploadData.content) {
-      alert("يرجى إدخال العنوان والمحتوى على الأقل");
+      addToast({
+        type: 'warning',
+        title: 'بيانات ناقصة',
+        message: "يرجى إدخال العنوان والمحتوى على الأقل"
+      });
       return;
     }
 
@@ -394,14 +412,22 @@ const LegalFormsPage: React.FC = () => {
     setUploadData({ title: '', category: 'CONTRACTS', description: '', content: '' });
     setSelectedFile(null);
     setActiveTab('browse');
-    alert("تم رفع النموذج بنجاح وإضافته للمكتبة!");
+    addToast({
+      type: 'success',
+      title: 'تم الرفع',
+      message: "تم رفع النموذج بنجاح وإضافته للمكتبة!"
+    });
   };
 
   const saveChanges = () => {
     if (!selectedFormForPreview) return;
     setForms(prev => prev.map(f => f.id === selectedFormForPreview.id ? { ...f, contentTemplate: editingContent } : f));
     setSelectedFormForPreview(null);
-    alert("تم حفظ التغييرات على النموذج بنجاح!");
+    addToast({
+      type: 'success',
+      title: 'تم الحفظ',
+      message: "تم حفظ التغييرات على النموذج بنجاح!"
+    });
   };
 
   const saveAsNewTemplate = () => {
@@ -416,7 +442,11 @@ const LegalFormsPage: React.FC = () => {
     };
     setForms([newForm, ...forms]);
     setSelectedFormForPreview(null);
-    alert("تم حفظ النموذج الجديد بنجاح!");
+    addToast({
+      type: 'success',
+      title: 'تم الحفظ',
+      message: "تم حفظ النموذج الجديد بنجاح!"
+    });
   };
 
   return (
@@ -655,7 +685,11 @@ const LegalFormsPage: React.FC = () => {
                                             content: result.contentTemplate
                                         });
                                     } catch (e) {
-                                        alert("فشل استخراج البيانات من الملف.");
+                                        addToast({
+                                            type: 'error',
+                                            title: 'خطأ في الاستخراج',
+                                            message: "فشل استخراج البيانات من الملف."
+                                        });
                                     } finally {
                                         setIsUploading(false);
                                     }

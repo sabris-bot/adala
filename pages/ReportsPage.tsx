@@ -64,6 +64,7 @@ import Select from '../components/ui/Select';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { geminiService } from '../services/geminiService';
 import { Badge } from '../components/ui/Badge';
+import { useToast } from '../components/ui/Toast';
 import { useCaseTask } from '../components/CaseTaskContext';
 
 // Import constants and data
@@ -148,6 +149,7 @@ interface ReportCategoryDefinition {
 
 const ReportsPage: React.FC = () => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const { cases: mockCasesDataFromList, tasks: initialMockTasks } = useCaseTask();
     const [activeTab, setActiveTab] = useState<'dashboard' | 'generator' | 'archive' | 'ai'>('dashboard');
     const [savedReports, setSavedReports] = useState<SavedReport[]>(INITIAL_SAVED_REPORTS);
@@ -281,7 +283,11 @@ const ReportsPage: React.FC = () => {
             dataCount: reportData.chartData.length
         };
         setSavedReports([newRep, ...savedReports]);
-        alert("تم الحفظ بنجاح!");
+        addToast({
+            type: 'success',
+            title: 'تم الحفظ',
+            message: 'تم حفظ التقرير في الأرشيف بنجاح'
+        });
     };
 
     const renderChart = () => {

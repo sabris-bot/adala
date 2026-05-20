@@ -22,6 +22,7 @@ import SignaturePad from '../components/ui/SignaturePad';
 import { AdminTask, AdminTaskStatus, AdminTaskPriority, AdminTaskCategory } from '../types';
 import { adminTaskStatusOptions, adminTaskPriorityOptions, adminTaskCategoryOptions } from '../constants';
 import { AdminTaskStatusBadge, AdminTaskPriorityBadge } from '../components/ui/Badge';
+import { useToast } from '../components/ui/Toast';
 import PrintHeader from '../components/ui/PrintHeader';
 import { useCaseTask } from '../components/CaseTaskContext';
 import { initialCases } from '../data/caseData';
@@ -89,6 +90,7 @@ interface TaskFormModalProps {
 }
 
 const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+  const { addToast } = useToast();
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [assignerSignature, setAssignerSignature] = useState(initialData?.assignerSignature || '');
   const [formData, setFormData] = useState<Partial<AdminTask>>(
@@ -129,7 +131,11 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title || !formData.assignedTo) {
-      alert("يرجى إدخال عنوان المهمة والشخص المسؤول.");
+      addToast({
+        type: 'warning',
+        title: 'بيانات ناقصة',
+        message: 'يرجى إدخال عنوان المهمة والشخص المسؤول.'
+      });
       return;
     }
 

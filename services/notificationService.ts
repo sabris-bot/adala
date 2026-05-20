@@ -160,6 +160,20 @@ class NotificationService {
     this.notifyListeners();
   }
 
+  public addNotification(notif: { title: string; message: string; category: keyof typeof NotificationCategory; priority: keyof typeof NotificationPriority; relatedId?: string }) {
+    const newNotif = this.createNotification(
+        `manual-${Date.now()}`,
+        NotificationType.GENERAL_ANNOUNCEMENT, // Corrected from GENERAL_INFO
+        NotificationCategory[notif.category],
+        NotificationPriority[notif.priority],
+        notif.title,
+        notif.message,
+        notif.relatedId
+    );
+    this.notifications = [newNotif, ...this.notifications];
+    this.notifyListeners();
+  }
+
   public markAllAsRead() {
     this.notifications = this.notifications.map(n => ({ ...n, isRead: true }));
     this.notifyListeners();

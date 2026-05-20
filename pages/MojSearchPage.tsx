@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import Card from '../components/ui/Card';
+import { useToast } from '../components/ui/Toast';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Button from '../components/ui/Button';
@@ -262,6 +263,7 @@ const SearchResultModal: React.FC<{ result: MojSearchResult | null; onClose: () 
 };
 
 const MojSearchPage: React.FC = () => {
+    const { addToast } = useToast();
     const [activeTab, setActiveTab] = useState<SearchTab>('case_no');
     
     // Inputs
@@ -313,7 +315,11 @@ const MojSearchPage: React.FC = () => {
     };
 
     const handleImport = (caseData: MojSearchResult) => {
-        alert(`تم جلب بيانات القضية ${caseData.caseNumber} وحفظها في قاعدة البيانات المحلية بنجاح.`);
+        addToast({
+            type: 'success',
+            title: 'تم الاستيراد',
+            message: `تم جلب بيانات القضية ${caseData.caseNumber} وحفظها في قاعدة البيانات المحلية بنجاح.`
+        });
     };
 
     return (

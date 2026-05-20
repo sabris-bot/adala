@@ -1,5 +1,6 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useToast } from '../components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -85,6 +86,7 @@ interface DisciplinaryActionFormProps {
 }
 
 const DisciplinaryActionForm: React.FC<DisciplinaryActionFormProps> = ({ initialData, onSubmit, onCancel, employees }) => {
+  const { addToast } = useToast();
   const { t } = useTranslation();
   const { selectedJurisdiction } = useJurisdiction();
   const [formData, setFormData] = useState<Partial<DisciplinaryAction>>(
@@ -124,7 +126,11 @@ const DisciplinaryActionForm: React.FC<DisciplinaryActionFormProps> = ({ initial
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.employeeId || !formData.violationDate || !formData.violationDetails) {
-      alert(t('fill_required_fields', { defaultValue: 'يرجى ملء الحقول الإلزامية.' }));
+      addToast({
+        type: 'warning',
+        title: t('warning', { defaultValue: 'تنبيه' }),
+        message: t('fill_required_fields', { defaultValue: 'يرجى ملء الحقول الإلزامية.' })
+      });
       return;
     }
     onSubmit({ 
@@ -270,8 +276,10 @@ const PrintableDisciplinaryActionModal: React.FC<{ action: DisciplinaryAction | 
     );
 };
 
+
 const DisciplinaryActionsPage: React.FC = () => {
   const { t } = useTranslation();
+  const { addToast } = useToast();
   const { selectedJurisdiction } = useJurisdiction();
   const [actions, setActions] = useState<DisciplinaryAction[]>(initialDisciplinaryActions);
   const [searchTerm, setSearchTerm] = useState('');
@@ -305,8 +313,18 @@ const DisciplinaryActionsPage: React.FC = () => {
   const handleFormSubmit = (data: DisciplinaryAction) => {
     if (editingAction && editingAction.id) {
       setActions(prev => prev.map(a => a.id === editingAction.id ? { ...data, id: a.id, createdAt: a.createdAt } : a));
+      addToast({
+          type: 'success',
+          title: 'تم تعديل القرار',
+          message: 'تم تحديث بيانات الحكم الإداري في السجل.'
+      });
     } else {
       setActions(prev => [{ ...data, id: `da-${Date.now()}` }, ...prev]);
+      addToast({
+          type: 'success',
+          title: 'إصدار حكم إداري',
+          message: 'تم إصدار القرار الجزائي النهائي وإضافته لسجل الموظف.'
+      });
     }
     setIsFormModalOpen(false);
     setEditingAction(null);

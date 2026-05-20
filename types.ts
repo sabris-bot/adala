@@ -1871,6 +1871,7 @@ export interface MindMapData {
     edges: MindMapEdge[];
     createdAt: string;
     updatedAt?: string;
+    category?: string;
     data?: any;
 }
 export interface AISuggestedNode {

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import ReactMarkdown from 'react-markdown';
+import { useToast } from '../components/ui/Toast';
 import { 
     BanknotesIcon, 
     PlusCircleIcon, 
@@ -304,7 +305,9 @@ const mockTrustAccounts = [
   { id: 'TR-103', clientName: 'سارة عبدالرحمن', totalBalance: 8900.000, pendingDisbursements: 2500.000, lastActivity: '2024-05-05', caseId: 'CASE-2024-441' },
 ];
 
+
 const FinancialManagementPage: React.FC = () => {
+  const { addToast } = useToast();
   const [activeTab, setActiveTab] = useState<'journal' | 'analytics' | 'invoices' | 'trust' | 'banks' | 'reports' | 'documents' | 'ai'>('journal');
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
   const [searchQuery, setSearchQuery] = useState('');
@@ -401,7 +404,11 @@ const FinancialManagementPage: React.FC = () => {
   const handleDelete = (id: string) => {
     if (confirm('هل أنت متأكد من رغبتك في حذف هذا القيد المالي؟')) {
       setTransactions(prev => prev.filter(t => t.id !== id));
-      alert('تم حذف القيد بنجاح');
+      addToast({
+        type: 'success',
+        title: 'تم حذف القيد',
+        message: 'تم إزالة الحركة المالية من السجل بنجاح.'
+      });
     }
   };
 
@@ -413,13 +420,21 @@ const FinancialManagementPage: React.FC = () => {
 
   const handleSave = () => {
     if (!formData.description || !formData.amount) {
-        alert('يرجى إكمال البيانات الأساسية');
+        addToast({
+            type: 'error',
+            title: 'بيانات ناقصة',
+            message: 'يرجى إكمال البيانات الأساسية (الوصف والمبلغ) قبل الحفظ.'
+        });
         return;
     }
 
     if (editingTransaction) {
         setTransactions(prev => prev.map(t => t.id === editingTransaction.id ? { ...t, ...formData } as FinancialTransaction : t));
-        alert('تم تحديث البيانات بنجاح');
+        addToast({
+            type: 'success',
+            title: 'تم التحديث',
+            message: 'تم تحديث بيانات القيد المالي بنجاح.'
+        });
     } else {
         const newTx: FinancialTransaction = {
             ...formData,
@@ -428,7 +443,11 @@ const FinancialManagementPage: React.FC = () => {
             recordedBy: 'مدير النظام'
         } as FinancialTransaction;
         setTransactions([newTx, ...transactions]);
-        alert('تمت إضافة القيد المالي الجديد');
+        addToast({
+            type: 'success',
+            title: 'إضافة قيد',
+            message: 'تمت إضافة القيد المالي الجديد إلى السجل.'
+        });
     }
     setIsFormModalOpen(false);
     setEditingTransaction(null);

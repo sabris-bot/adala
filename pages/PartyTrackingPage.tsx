@@ -7,6 +7,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import SignaturePad from '../components/ui/SignaturePad';
 import { Badge, BadgeColor } from '../components/ui/Badge';
 import { 
@@ -132,6 +133,7 @@ interface AssignmentFormProps {
 }
 
 const AssignmentFormModal: React.FC<AssignmentFormProps> = ({ isOpen, onClose, onSubmit, initialData, parties, cases, lawyers }) => {
+    const { addToast } = useToast();
     const getInitialFormData = (): Partial<PartyAssignment> => {
         const defaultDestination: TrackingLocationDetails = { courtOrDepartmentName: '', floor: '', sectionOrOffice: '' };
         return initialData || {
@@ -173,7 +175,11 @@ const AssignmentFormModal: React.FC<AssignmentFormProps> = ({ isOpen, onClose, o
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.trackablePartyId || !formData.taskDescription || !formData.destination?.courtOrDepartmentName || !formData.assignedByLawyerId) {
-            alert("يرجى ملء حقول الطرف المتتبع، وصف المهمة، اسم المحكمة/الإدارة، والمحامي المشرف.");
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: 'يرجى ملء حقول الطرف المتتبع، وصف المهمة، اسم المحكمة/الإدارة، والمحامي المشرف.'
+            });
             return;
         }
 

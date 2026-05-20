@@ -1,5 +1,6 @@
 import React, { useState, useRef, useMemo } from 'react';
 import ReactQuill from 'react-quill';
+import { useToast } from '../components/ui/Toast';
 import { motion, AnimatePresence } from 'motion/react';
 import 'react-quill/dist/quill.snow.css';
 import Card from '../components/ui/Card';
@@ -95,6 +96,7 @@ const fileToBase64 = (file: File): Promise<{ base64Data: string; mimeType: strin
 };
 
 const ContractAnalysisPage: React.FC = () => {
+    const { addToast } = useToast();
     // Navigation State
     const [view, setView] = useState<PageView>('dashboard');
     const [selectedContract, setSelectedContract] = useState<AnalyzedContract | null>(null);
@@ -159,7 +161,11 @@ const ContractAnalysisPage: React.FC = () => {
                 const newTpl = { id: `tpl-${Date.now()}`, name, content: editorContent, category: 'شخصي' };
                 setTemplates([newTpl, ...templates]);
                 setIsSaving(false);
-                alert("تم حفظ القالب بنجاح في مكتبتك الشخصية.");
+                addToast({
+                    type: 'success',
+                    title: 'تم الحفظ',
+                    message: "تم حفظ القالب بنجاح في مكتبتك الشخصية."
+                });
             }, 1000);
         }
     };
@@ -176,7 +182,11 @@ const ContractAnalysisPage: React.FC = () => {
         });
         setEditorContent(newContent);
         setVariableValues({});
-        alert("تم استبدال المتغيرات بنجاح.");
+        addToast({
+            type: 'success',
+            title: 'تم الاستبدال',
+            message: "تم استبدال المتغيرات بنجاح."
+        });
     };
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,9 +264,17 @@ const ContractAnalysisPage: React.FC = () => {
             } else {
                 setEditorContent(`<div style="direction: rtl; text-align: right;">${correctedText.replace(/\n/g, '<br/>')}</div>`);
             }
-            alert("تم تدقيق النص وتصحيحه لغوياً بنجاح.");
+            addToast({
+                type: 'success',
+                title: 'تدقيق لغوي',
+                message: "تم تدقيق النص وتصحيحه لغوياً بنجاح."
+            });
         } catch (err) {
-            alert("حدث خطأ أثناء التدقيق اللغوي.");
+            addToast({
+                type: 'error',
+                title: 'خطأ',
+                message: "حدث خطأ أثناء التدقيق اللغوي."
+            });
         } finally {
             setIsCorrecting(false);
         }
@@ -274,7 +292,11 @@ const ContractAnalysisPage: React.FC = () => {
         `;
         setEditorContent(prev => prev + formattedClause);
         setView('editor');
-        alert("تمت إضافة البند إلى محرر الصياغة.");
+        addToast({
+            type: 'info',
+            title: 'إضافة بند',
+            message: "تمت إضافة البند إلى محرر الصياغة."
+        });
     };
 
     const handleDeepAnalyzeClause = async (clause: ExtractedClause) => {

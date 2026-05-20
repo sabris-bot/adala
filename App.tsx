@@ -51,10 +51,12 @@ class AppErrorBoundary extends Component<EBProps, EBState> {
 // Import page components using relative paths
 import DashboardPage from './pages/DashboardPage'; // Ensured this is a default import
 import CaseListPage from './pages/CaseListPage';
+import CaseDetailsPage from './pages/CaseDetailsPage';
 import ContractAnalysisPage from './pages/ContractAnalysisPage';
 import LegalResourcesPage from './pages/LegalResourcesPage'; // Added import
 import SettingsPage from './pages/SettingsPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ProfilePage from './pages/ProfilePage';
 import AiAssistantPage from './pages/AiAssistantPage';
 import CompliancePage from './pages/CompliancePage'; 
 import EmployeeAffairsPage from './pages/EmployeeAffairsPage';
@@ -96,73 +98,18 @@ import LegalDeadlinesPage from './pages/LegalDeadlinesPage';
 import LegalFinancialCalculatorPage from './pages/LegalFinancialCalculatorPage';
 import InheritanceCalculatorPage from './pages/InheritanceCalculatorPage';
 
-interface Toast {
-    id: string;
-    message: string;
-    type: 'info' | 'urgent'; // 24h = info, 1h = urgent
-    title: string;
-}
 
-const ToastNotification: React.FC<{ toast: Toast; onClose: (id: string) => void }> = ({ toast, onClose }) => {
-    useEffect(() => {
-        const timer = setTimeout(() => onClose(toast.id), 10000);
-        return () => clearTimeout(timer);
-    }, [toast.id, onClose]);
-
-    return (
-        <div className={`
-            w-85 p-5 mb-4 rounded-xl shadow-2xl border-s-8 flex items-start animate-fade-in-right transition-all
-            ${toast.type === 'urgent' 
-                ? 'border-rose-600 bg-rose-50/80 dark:bg-rose-900/20 shadow-rose-500/20 ring-1 ring-rose-200 dark:ring-rose-800' 
-                : 'border-blue-500 bg-white dark:bg-dm-card'}
-        `}>
-            <div className={`p-2.5 rounded-2xl flex-shrink-0 shadow-sm ${
-                toast.type === 'urgent' 
-                    ? 'bg-rose-600 text-white animate-bounce shadow-rose-600/40' 
-                    : 'bg-blue-100 text-blue-600 shadow-blue-500/10'
-            }`}>
-                <BellAlertIcon className="w-6 h-6" />
-            </div>
-            <div className="ms-4 flex-grow">
-                <div className="flex items-center gap-2 mb-1">
-                    <h4 className={`text-sm font-black uppercase tracking-tight ${
-                        toast.type === 'urgent' ? 'text-rose-900 dark:text-rose-100' : 'text-blue-900 dark:text-blue-100'
-                    }`}>
-                        {toast.title}
-                    </h4>
-                    {toast.type === 'urgent' && (
-                        <span className="bg-rose-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase animate-pulse">
-                            عاجل
-                        </span>
-                    )}
-                </div>
-                <p className={`text-[11px] font-medium leading-relaxed ${
-                    toast.type === 'urgent' ? 'text-rose-800 dark:text-rose-200' : 'text-gray-600 dark:text-gray-300'
-                }`}>
-                    {toast.message}
-                </p>
-            </div>
-            <button 
-                onClick={() => onClose(toast.id)} 
-                className={`p-1 rounded-lg transition-colors ${
-                    toast.type === 'urgent' 
-                        ? 'text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-800/50 hover:text-rose-600' 
-                        : 'text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600'
-                }`}
-            >
-                <XCircleIcon className="w-5 h-5" />
-            </button>
-        </div>
-    );
-};
+// Removed old manual toast components
 
 import { useTranslation } from 'react-i18next';
 
-const App: React.FC = () => {
+import { ToastProvider, useToast } from './components/ui/Toast';
+
+const AppContent: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false); 
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { addToast } = useToast();
   const sentNotificationsRef = useRef<Set<string>>(new Set());
 
   // --- AUTOMATIC UPDATE SYSTEM ---
@@ -176,13 +123,7 @@ const App: React.FC = () => {
         const lastSeenVersion = localStorage.getItem('app_version');
         
         if (lastSeenVersion && lastSeenVersion !== serverVersion) {
-          console.group('New System Version Detected');
-          console.log(`Current: ${lastSeenVersion}`);
-          console.log(`New: ${serverVersion}`);
-          console.log('Clearing local caches and reloading...');
-          console.groupEnd();
-          
-          // Clear all local storage and session storage to prevent data conflicts
+          // toast notifications for version updates
           localStorage.clear();
           sessionStorage.clear();
           
@@ -233,18 +174,23 @@ const App: React.FC = () => {
 
   // --- GLOBAL NOTIFICATION SYSTEM LOGIC ---
   useEffect(() => {
+    // Initial mount: capture existing IDs to avoid toasting backlog on load
+    const initialNotifications = notificationService.getNotifications();
+    initialNotifications.forEach(n => sentNotificationsRef.current.add(n.id));
+
     const unsubscribe = notificationService.subscribe((notifications) => {
         // Only show toasts for new urgent notifications that haven't been shown yet
         notifications.forEach(notif => {
             if (notif.priority === NotificationPriority.URGENT && !notif.isRead && !sentNotificationsRef.current.has(notif.id)) {
                 // Determine toast type
-                const toastType = notif.category === NotificationCategory.URGENT ? 'urgent' : 'info';
+                const toastType = notif.category === NotificationCategory.URGENT ? 'error' : 'info';
                 
+                // Professional Toast
                 addToast({
-                    id: notif.id,
                     type: toastType as any,
                     title: notif.title,
-                    message: notif.message
+                    message: notif.message,
+                    duration: 6000
                 });
                 
                 sentNotificationsRef.current.add(notif.id);
@@ -253,15 +199,7 @@ const App: React.FC = () => {
     });
 
     return unsubscribe;
-  }, [t]);
-
-  const addToast = (toast: Toast) => {
-      setToasts(prev => [toast, ...prev]);
-  };
-
-  const removeToast = (id: string) => {
-      setToasts(prev => prev.filter(t => t.id !== id));
-  };
+  }, [addToast]);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -286,6 +224,7 @@ const App: React.FC = () => {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/cases" element={<CaseListPage />} />
+                <Route path="/cases/:id" element={<CaseDetailsPage />} />
                 <Route path="/finance" element={<FinancialManagementPage />} />
                 <Route path="/finance/add-expense" element={<FinancialManagementPage />} /> 
                 <Route path="/finance/add-purchase" element={<FinancialManagementPage />} />
@@ -338,24 +277,25 @@ const App: React.FC = () => {
                 <Route path="/tools/inheritance" element={<InheritanceCalculatorPage />} />
 
                 <Route path="/settings" element={<SettingsPage toggleDarkMode={toggleDarkMode} isDarkMode={isDarkMode} />} /> 
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </AppErrorBoundary>
           </MainContent>
           
           <Footer />
-
-          {/* Global Notification Container (Bottom Left) */}
-          <div className="absolute bottom-4 left-4 z-50 flex flex-col-reverse max-h-screen overflow-hidden">
-              {toasts.map(toast => (
-                  <ToastNotification key={toast.id} toast={toast} onClose={removeToast} />
-              ))}
-          </div>
-
         </div>
       </div>
     </BrowserRouter>
   );
+};
+
+const App: React.FC = () => {
+    return (
+        <ToastProvider>
+            <AppContent />
+        </ToastProvider>
+    );
 };
 
 export default App;

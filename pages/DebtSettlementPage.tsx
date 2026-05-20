@@ -15,6 +15,7 @@ import { settlementStatusOptions } from '../constants';
 import { mockTenants as initialTenants, mockProperties, mockLeaseAgreements } from '../data/propertyData'; 
 import { initialCases } from '../data/caseData';
 import { SettlementStatusBadge, InstallmentStatusBadge } from '../components/ui/Badge';
+import { useToast } from '../components/ui/Toast';
 
 
 // Function to generate mock settlement records
@@ -99,7 +100,7 @@ interface DebtSettlementFormModalProps {
 }
 
 const DebtSettlementFormModal: React.FC<DebtSettlementFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, tenants, leases, cases }) => {
-    
+    const { addToast } = useToast();
     const getInitialFormData = useCallback((): Partial<DebtSettlementRecord> => {
         const baseData = {
             settlementDate: new Date().toISOString().split('T')[0],
@@ -158,8 +159,9 @@ const DebtSettlementFormModal: React.FC<DebtSettlementFormModalProps> = ({ isOpe
             } as SettlementInstallment;
             setFormData(prev => ({...prev, installmentPlan: [...(prev.installmentPlan || []), newInstallment]}));
             setCurrentInstallment({dueDate: new Date().toISOString().split('T')[0], amountDue: 0, status: InstallmentStatus.UPCOMING});
+            addToast({ type: 'info', title: 'تمت إضافة قسط', message: 'تمت إضافة قسط جديد لجدول السداد.' });
         } else {
-            alert("يرجى إدخال تاريخ استحقاق ومبلغ صحيح للقسط.");
+            addToast({ type: 'error', title: 'خطأ في الإدخال', message: 'يرجى إدخال تاريخ استحقاق ومبلغ صحيح للقسط.' });
         }
     };
     
@@ -173,7 +175,7 @@ const DebtSettlementFormModal: React.FC<DebtSettlementFormModalProps> = ({ isOpe
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.tenantId || !formData.leaseAgreementId || !formData.settlementDate || !formData.settledAmount) {
-            alert("يرجى ملء الحقول الإلزامية: المستأجر، عقد الإيجار، تاريخ التسوية، والمبلغ المتفق عليه.");
+            addToast({ type: 'error', title: 'بيانات ناقصة', message: 'يرجى ملء الحقول الإلزامية: المستأجر، عقد الإيجار، تاريخ التسوية، والمبلغ المتفق عليه.' });
             return;
         }
         const totalPaid = formData.installmentPlan?.filter(i => i.status === InstallmentStatus.PAID).reduce((sum, i) => sum + (i.amountPaid || 0), 0);
@@ -231,7 +233,9 @@ const DebtSettlementFormModal: React.FC<DebtSettlementFormModalProps> = ({ isOpe
 
 import { useSearchParams } from 'react-router-dom';
 
+
 const DebtSettlementPage: React.FC = () => {
+  const { addToast } = useToast();
   const [searchParams] = useSearchParams();
   const [settlements, setSettlements] = useState<DebtSettlementRecord[]>(getMockSettlementRecords());
   const [searchTerm, setSearchTerm] = useState('');
@@ -280,14 +284,17 @@ const DebtSettlementPage: React.FC = () => {
   const handleDeleteSettlement = useCallback((settlementId: string) => {
     if (window.confirm('هل أنت متأكد أنك تريد حذف سجل التسوية هذا؟')) {
       setSettlements(prev => prev.filter(s => s.id !== settlementId));
+      addToast({ type: 'success', title: 'حذف تسوية', message: 'تم حذف سجل التسوية بنجاح.' });
     }
-  }, []);
+  }, [addToast]);
 
   const handleFormSubmit = (data: DebtSettlementRecord) => {
     if (editingSettlement?.id) {
       setSettlements(prev => prev.map(s => (s.id === editingSettlement.id ? data : s)));
+      addToast({ type: 'success', title: 'تحديث تسوية', message: 'تم تحديث بيانات التسوية بنجاح.' });
     } else {
       setSettlements(prev => [{ ...data, id: `set-${Date.now()}` }, ...prev]);
+      addToast({ type: 'success', title: 'إنشاء تسوية', message: 'تم إنشاء سجل تسوية مديونية جديد.' });
     }
     setIsFormModalOpen(false);
     setEditingSettlement(null);

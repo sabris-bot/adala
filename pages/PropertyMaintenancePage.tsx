@@ -6,6 +6,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import { 
     MaintenanceRequest, MaintenanceCategory, MaintenancePriority, 
     MaintenanceStatus, RequestAttachment, Property, PropertyUnitStatus, 
@@ -59,6 +60,7 @@ interface MaintenanceRequestFormModalProps {
 }
 
 const MaintenanceRequestFormModal: React.FC<MaintenanceRequestFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, properties }) => {
+    const { addToast } = useToast();
     const getInitialFormData = useCallback((): Partial<MaintenanceRequest> => {
         const defaultProperty = properties.length > 0 ? properties[0] : undefined;
         return initialData || {
@@ -122,7 +124,11 @@ const MaintenanceRequestFormModal: React.FC<MaintenanceRequestFormModalProps> = 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.propertyId || !formData.reportedBy || !formData.requestDate || !formData.description || !formData.category) {
-            alert("يرجى ملء الحقول الإلزامية: العقار، المُبلغ، تاريخ الطلب، الوصف، وفئة الصيانة.");
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: 'يرجى ملء الحقول الإلزامية: العقار، المُبلغ، تاريخ الطلب، الوصف، وفئة الصيانة.'
+            });
             return;
         }
         onSubmit({ ...formData, updatedAt: new Date().toISOString() } as MaintenanceRequest);

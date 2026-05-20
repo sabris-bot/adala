@@ -27,6 +27,7 @@ import {
 } from '../constants';
 import { Badge } from '../components/ui/Badge';
 import { sampleEmployees } from '../data/employeeData';
+import { useToast } from '../components/ui/Toast';
 
 // --- Legal Summons View ---
 const SummonsModal: React.FC<{ isOpen: boolean; onClose: () => void; investigation: Investigation | null; employee: Employee | null }> = ({ isOpen, onClose, investigation, employee }) => {
@@ -278,6 +279,7 @@ interface SessionEditorProps {
 }
 
 const SessionEditor: React.FC<SessionEditorProps> = ({ session, onSave, onCancel }) => {
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<InvestigationSession>>(session);
     const [questions, setQuestions] = useState<InvestigationQuestion[]>(session.questions || []);
     const [partySignature, setPartySignature] = useState(session.partySignature || '');
@@ -325,12 +327,12 @@ const SessionEditor: React.FC<SessionEditorProps> = ({ session, onSave, onCancel
 
     const handleSave = () => {
         if (!formData.sessionDate || !formData.partyName) {
-            alert('يرجى إدخال تاريخ الجلسة واسم الطرف.');
+            addToast({ type: 'error', title: 'بيانات ناقصة', message: 'يرجى إدخال تاريخ الجلسة واسم الطرف.' });
             return;
         }
 
         if (!partySignature || !investigatorSignature) {
-            alert('يجب استكمال توقيعات الطرف والمحقق قبل حفظ المحضر.');
+            addToast({ type: 'warning', title: 'توقيعات مطلوبة', message: 'يجب استكمال توقيعات الطرف والمحقق قبل حفظ المحضر.' });
             return;
         }
 
@@ -463,6 +465,7 @@ interface InvestigationFormProps {
 }
 
 const InvestigationForm: React.FC<InvestigationFormProps> = ({ initialData, onSubmit, onCancel }) => {
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<Investigation>>(
         initialData || {
             investigationNumber: `INV-${new Date().getFullYear()}-${Math.floor(Math.random() * 1000)}`,
@@ -511,7 +514,11 @@ const InvestigationForm: React.FC<InvestigationFormProps> = ({ initialData, onSu
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.subject || !formData.investigator) {
-            alert("يرجى ملء الحقول الإلزامية.");
+            addToast({
+                type: 'warning',
+                title: 'تنبيه',
+                message: "يرجى ملء الحقول الإلزامية."
+            });
             return;
         }
         onSubmit({ ...formData, updatedAt: new Date().toISOString() } as Investigation);
@@ -772,6 +779,7 @@ const PrintableInvestigationModal: React.FC<{ investigation: Investigation | nul
 };
 
 const InvestigationsPage: React.FC = () => {
+    const { addToast } = useToast();
     const [investigations, setInvestigations] = useState<Investigation[]>(mockInvestigations);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<InvestigationStatus | ''>('');
@@ -798,9 +806,10 @@ const InvestigationsPage: React.FC = () => {
     };
 
     const handleReferral = (inv: Investigation) => {
-        if(window.confirm('هل ترغب في إحالة ملف التحقيق هذا إلى اللجنة التأديبية لإصدار قرار جزائي؟')) {
+        if (window.confirm('هل ترغب في إحالة ملف التحقيق هذا إلى اللجنة التأديبية لإصدار قرار جزائي؟')) {
             const updatedInv = { ...inv, status: 'Referred_to_Legal' as any };
             setInvestigations(prev => prev.map(i => i.id === inv.id ? updatedInv : i));
+            addToast({ type: 'info', title: 'إحالة للتحقيق', message: 'تمت إحالة الملف إلى اللجنة التأديبية بنجاح.' });
         }
     };
 
@@ -816,15 +825,18 @@ const InvestigationsPage: React.FC = () => {
     const handleAdd = () => { setEditingInvestigation(null); setIsFormModalOpen(true); };
     const handleEdit = (inv: Investigation) => { setEditingInvestigation(inv); setIsFormModalOpen(true); };
     const handleDelete = (id: string) => {
-        if(window.confirm('هل أنت متأكد من حذف ملف التحقيق هذا؟')) {
+        if (window.confirm('هل أنت متأكد من حذف ملف التحقيق هذا؟')) {
             setInvestigations(prev => prev.filter(i => i.id !== id));
+            addToast({ type: 'success', title: 'حذف ملف', message: 'تم حذف ملف التحقيق بنجاح.' });
         }
     };
     const handleFormSubmit = (data: Investigation) => {
-        if(editingInvestigation?.id) {
+        if (editingInvestigation?.id) {
             setInvestigations(prev => prev.map(i => i.id === editingInvestigation.id ? data : i));
+            addToast({ type: 'success', title: 'تحديث بيانات', message: 'تم تحديث بيانات ملف التحقيق بنجاح.' });
         } else {
             setInvestigations(prev => [{...data, id: `inv-${Date.now()}`}, ...prev]);
+            addToast({ type: 'success', title: 'إضافة تحقيق', message: 'تم فتح ملف تحقيق إداري جديد بنجاح.' });
         }
         setIsFormModalOpen(false);
     };

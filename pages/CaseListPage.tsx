@@ -45,8 +45,10 @@ import {
     notificationStatusOptions
 } from '../constants';
 
+import { useToast } from '../components/ui/Toast';
 import { initialCases } from '../data/caseData';
 import { useJurisdiction } from '../components/JurisdictionContext';
+import { useNavigate } from 'react-router-dom';
 
 const initialFilters = {
     internalCaseNumber: '',
@@ -72,6 +74,48 @@ const formatRole = (role: string | string[] | undefined) => {
     if (!role) return '';
     if (Array.isArray(role)) return role.join('، ');
     return role;
+};
+
+const renderRoleBadge = (role: string | string[] | undefined, type: 'client' | 'opponent') => {
+    if (!role) return null;
+    const roles = Array.isArray(role) ? role : [role];
+    return (
+        <div className="flex flex-wrap gap-1 mt-0.5">
+            {roles.map((r, i) => {
+                const isPlaintiff = ['مدعي', 'طالب', 'شاكي', 'طالب تنفيذ', 'طاعن', 'مستأنف', 'طالب أمر', 'دائن', 'مستفيد'].includes(r);
+                const isDefendant = ['مدعى عليه', 'مطلوب ضده', 'مشكو في حقه', 'منفذ ضده', 'متهم', 'مستأنف ضده', 'مطعون ضده', 'مدين'].includes(r);
+                
+                let badgeClass = "bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-100 dark:border-slate-700/50";
+                if (type === 'client') {
+                    if (isPlaintiff) {
+                        badgeClass = "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400 border border-emerald-100/50 dark:border-emerald-900/20";
+                    } else if (isDefendant) {
+                        badgeClass = "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400 border border-amber-100/50 dark:border-amber-900/20";
+                    } else {
+                        badgeClass = "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400 border border-indigo-100/50 dark:border-indigo-900/20";
+                    }
+                } else {
+                    // opponent
+                    if (isDefendant) {
+                        badgeClass = "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400 border border-rose-100/30 dark:border-rose-900/20";
+                    } else if (isPlaintiff) {
+                        badgeClass = "bg-sky-50 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400 border border-sky-100/30 dark:border-sky-900/20";
+                    } else {
+                        badgeClass = "bg-slate-50 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-100 dark:border-slate-700/50";
+                    }
+                }
+
+                return (
+                    <span 
+                        key={i} 
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold tracking-tight leading-none ${badgeClass}`}
+                    >
+                        {r}
+                    </span>
+                );
+            })}
+        </div>
+    );
 };
 
 // --- Case Details Modal Component ---
@@ -150,6 +194,7 @@ const ExecutionActionForm: React.FC<{
     onCancel: () => void;
 }> = ({ initialData, onSubmit, onCancel }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [showSignaturePad, setShowSignaturePad] = useState(false);
     const [formData, setFormData] = useState<Partial<ExecutionAction>>(
         initialData || {
@@ -168,7 +213,11 @@ const ExecutionActionForm: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.actionType || !formData.applicationDate) {
-            alert('يرجى تعبئة الحقول الإلزامية.');
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: 'يرجى تعبئة الحقول الإلزامية لتسجيل الإجراء.'
+            });
             return;
         }
 
@@ -237,6 +286,7 @@ const ExpertActionForm: React.FC<{
     onCancel: () => void;
 }> = ({ initialData, onSubmit, onCancel }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [showSignaturePad, setShowSignaturePad] = useState(false);
     const [formData, setFormData] = useState<Partial<ExpertAction>>(
         initialData || {
@@ -255,7 +305,11 @@ const ExpertActionForm: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.assignedTask || !formData.referralDate) {
-            alert('يرجى تعبئة الحقول الإلزامية.');
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: 'يرجى تحديد المهمة الموكلة للخبير وتاريخ الإحالة.'
+            });
             return;
         }
 
@@ -324,6 +378,7 @@ const HearingForm: React.FC<{
     onCancel: () => void;
 }> = ({ initialData, onSubmit, onCancel }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [showSignaturePad, setShowSignaturePad] = useState(false);
     const [formData, setFormData] = useState<Partial<Hearing>>(
         initialData || {
@@ -342,7 +397,11 @@ const HearingForm: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.type || !formData.date) {
-            alert('يرجى تعبئة الحقول الإلزامية.');
+            addToast({
+                type: 'warning',
+                title: 'تنبيه',
+                message: 'يجب اختيار نوع الجلسة وتاريخها.'
+            });
             return;
         }
 
@@ -458,16 +517,8 @@ const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ caseItem, onClose, 
             };
             
             const prompt = `أنت مستشار قانوني خبير متخصص في القانون الكويتي. برجاء تقديم ملخص قانوني استراتيجي وشامل للقضية التالية بناءً على البيانات المقدمة. 
-يجب أن يتضمن التقرير:
-1. تحليل الموقف القانوني الحالي.
-2. تقييم المخاطر بناءً على سير الجلسات والقرارات.
-3. توصيات إجرائية محددة (سواء في التنفيذ أو مع الخبراء).
-4. توقعات أولية للنتائج بناءً على المعطيات.
-
 بيانات القضية:
-${JSON.stringify(context, null, 2)}
-
-يرجى كتابة التقرير بلغة قانونية رصينة واحترافية.`;
+${JSON.stringify(context, null, 2)}`;
 
             const summary = await geminiService.getChatbotResponse(prompt);
             setAiCaseSummary(summary);
@@ -505,14 +556,20 @@ ${JSON.stringify(context, null, 2)}
                         </div>
                         <h4 className="font-black text-sm text-gray-800 dark:text-white uppercase tracking-tight">أطراف النزاع</h4>
                     </div>
-                    <div className="space-y-4">
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الموكل</span>
-                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.clientName} <span className="text-primary">({formatRole(caseItem.clientRole) || 'مدعي'})</span></span>
+                    <div className="space-y-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الموكل</span>
+                                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.clientName}</span>
+                            </div>
+                            <div className="shrink-0">{renderRoleBadge(caseItem.clientRole || 'مدعي', 'client')}</div>
                         </div>
-                        <div className="flex flex-col">
-                            <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الخصم</span>
-                            <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.opposingPartyName} <span className="text-red-500">({formatRole(caseItem.opponentRole) || 'مدعى عليه'})</span></span>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">الخصم</span>
+                                <span className="text-sm font-bold text-gray-700 dark:text-gray-200">{caseItem.opposingPartyName || '---'}</span>
+                            </div>
+                            <div className="shrink-0">{renderRoleBadge(caseItem.opponentRole || 'مدعى عليه', 'opponent')}</div>
                         </div>
                     </div>
                 </div>
@@ -1579,6 +1636,7 @@ const CaseForm: React.FC<{
     onCancel: () => void;
 }> = ({ initialData, onSubmit, onCancel }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<Case>>(
         initialData || {
             title: '',
@@ -1620,7 +1678,11 @@ const CaseForm: React.FC<{
         e.preventDefault();
         // Basic validation
         if (!formData.title || !formData.caseNumber || !formData.clientName) {
-            alert(t('fill_required_fields_error', { defaultValue: 'يرجى تعبئة الحقول الإلزامية: عنوان القضية، رقم القضية، واسم الموكل.' }));
+            addToast({
+                type: 'warning',
+                title: 'بيانات ناقصة',
+                message: t('fill_required_fields_error', { defaultValue: 'يرجى تعبئة الحقول الإلزامية: عنوان القضية، رقم القضية، واسم الموكل.' })
+            });
             return;
         }
         onSubmit(formData as Case);
@@ -1769,133 +1831,52 @@ const CaseForm: React.FC<{
     );
 };
 
+interface PrintableCaseReportModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    caseItem: Case | null;
+}
 
-
-const PrintableCaseReportModal: React.FC<{ isOpen: boolean; onClose: () => void; caseItem: Case | null }> = ({ isOpen, onClose, caseItem }) => {
-    if (!isOpen || !caseItem) return null;
+const PrintableCaseReportModal: React.FC<PrintableCaseReportModalProps> = ({ isOpen, onClose, caseItem }) => {
     const { t } = useTranslation();
-    const { selectedJurisdiction } = useJurisdiction();
-    
+    if (!caseItem) return null;
+
+    const handlePrint = () => {
+        window.print();
+    };
+
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={t('print_case_report', { defaultValue: 'طباعة تقرير القضية' })} size="xl">
-            <div className="printable-sheet bg-white text-black p-10 min-h-[29cm]" dir="rtl">
+        <Modal isOpen={isOpen} onClose={onClose} title={t('case_report_print', { defaultValue: 'طباعة تقرير القضية' })} size="xl">
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto p-4 printable-area">
                 <PrintHeader 
                     title={t('legal_case_report', { defaultValue: 'تقرير ملف قضية قانونية' })} 
                     subtitle={`${caseItem.title} - ${caseItem.internalCaseNumber}`} 
-                    jurisdiction={selectedJurisdiction}
                 />
-                
-                <div className="grid grid-cols-2 gap-x-8 gap-y-4 mb-10 border-b border-gray-200 pb-8 mt-8">
-                    <p><strong>{t('internal_no', { defaultValue: 'الرقم الداخلي' })}:</strong> {caseItem.internalCaseNumber}</p>
-                    <p><strong>{t('automated_no', { defaultValue: 'الرقم الآلي' })}:</strong> {caseItem.caseNumber || '-'}</p>
-                    <p><strong>{t('client', { defaultValue: 'الموكل' })}:</strong> {caseItem.clientName} ({formatRole(caseItem.clientRole)})</p>
-                    <p><strong>{t('opponent', { defaultValue: 'الخصم' })}:</strong> {caseItem.opposingPartyName} ({formatRole(caseItem.opponentRole)})</p>
-                    <p><strong>{t('court', { defaultValue: 'المحكمة' })}:</strong> {caseItem.courtName}</p>
-                    <p><strong>{t('court_level', { defaultValue: 'درجة التقاضي' })}:</strong> {caseItem.courtLevel}</p>
-                    <p><strong>{t('status', { defaultValue: 'الحالة' })}:</strong> {caseItem.status}</p>
-                    <p><strong>{t('priority', { defaultValue: 'الأولوية' })}:</strong> {caseItem.priority}</p>
-                </div>
 
-                <section className="mb-8 avoid-break">
-                    <h3 className="text-xl font-bold border-r-4 border-primary pr-3 mb-4 text-primary-dark">{t('case_description', { defaultValue: 'موضوع الدعوى' })}</h3>
-                    <p className="text-lg leading-relaxed text-justify whitespace-pre-wrap">{caseItem.description}</p>
-                </section>
-
-                <section className="mb-8 avoid-break">
-                    <h3 className="text-xl font-bold border-r-4 border-primary pr-3 mb-4 text-primary-dark">{t('hearings_history', { defaultValue: 'تاريخ الجلسات' })}</h3>
-                    <table className="min-w-full text-sm">
-                        <thead className="bg-gray-100 font-bold">
-                            <tr>
-                                <th className="px-3 py-2 text-right">{t('date', { defaultValue: 'التاريخ' })}</th>
-                                <th className="px-3 py-2 text-right">{t('type', { defaultValue: 'النوع' })}</th>
-                                <th className="px-3 py-2 text-right">{t('decision', { defaultValue: 'القرار/الإجراء' })}</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {(caseItem.hearings || []).map((h, i) => (
-                                <tr key={i} className="border-b">
-                                    <td className="px-3 py-2">{h.date}</td>
-                                    <td className="px-3 py-2">{h.type}</td>
-                                    <td className="px-3 py-2">{h.notes || '-'}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </section>
-
-                {caseItem.executionActions && caseItem.executionActions.length > 0 && (
-                    <section className="mb-8 avoid-break">
-                        <h3 className="text-xl font-bold border-r-4 border-primary pr-3 mb-4 text-primary-dark">{t('execution_actions', { defaultValue: 'إجراءات التنفيذ' })}</h3>
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-100 font-bold">
-                                <tr>
-                                    <th className="px-3 py-2 text-right">{t('action', { defaultValue: 'الإجراء' })}</th>
-                                    <th className="px-3 py-2 text-right">{t('date', { defaultValue: 'التاريخ' })}</th>
-                                    <th className="px-3 py-2 text-right">{t('status', { defaultValue: 'الحالة' })}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {caseItem.executionActions.map((a, i) => (
-                                    <tr key={i} className="border-b">
-                                        <td className="px-3 py-2">{a.actionType}</td>
-                                        <td className="px-3 py-2">{a.applicationDate}</td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center justify-between">
-                                                <span>{a.status}</span>
-                                                {a.lawyerSignature && (
-                                                    <div className="flex flex-col items-center">
-                                                        <img src={a.lawyerSignature} alt="Sig" className="h-5 opacity-60 mix-blend-multiply" />
-                                                        <span className="text-[6px] text-gray-400 italic">توقيع المعتمد</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </section>
-                )}
-                
-                {caseItem.expertActions && caseItem.expertActions.length > 0 && (
-                    <section className="mb-8 avoid-break">
-                        <h3 className="text-xl font-bold border-r-4 border-amber-500 pr-3 mb-4 text-amber-700">{t('expert_actions', { defaultValue: 'إجراءات الخبراء' })}</h3>
-                        <table className="min-w-full text-sm">
-                            <thead className="bg-gray-50 text-right">
-                                <tr>
-                                    <th className="px-3 py-2">مهمة الخبير</th>
-                                    <th className="px-3 py-2">تاريخ الإحالة</th>
-                                    <th className="px-3 py-2">الحالة</th>
-                                    <th className="px-3 py-2">توقيع المتابعة</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {caseItem.expertActions.map((a, i) => (
-                                    <tr key={i} className="border-b text-xs">
-                                        <td className="px-3 py-2">{a.assignedTask}</td>
-                                        <td className="px-3 py-2">{a.referralDate}</td>
-                                        <td className="px-3 py-2">{a.status}</td>
-                                        <td className="px-3 py-2">
-                                            {a.lawyerSignature && (
-                                                <img src={a.lawyerSignature} alt="Sig" className="h-6 mix-blend-multiply opacity-70" />
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </section>
-                )}
-
-                <div className="mt-20 flex justify-between items-end border-t pt-10 signature-area no-print-bg">
-                    <div className="text-center w-64 border p-4 rounded-xl border-dashed">
-                        <p className="font-bold mb-10">{t('in_charge_lawyer', { defaultValue: 'المحامي المسؤول' })}</p>
-                        <p className="text-xs text-gray-400">التوقيع: .....................</p>
+                <div className="grid grid-cols-2 gap-6 mb-6">
+                    <div className="space-y-2 text-right text-black">
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('case_title', { defaultValue: 'موضوع القضية' })}:</span> <span>{caseItem.title}</span></p>
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('case_number', { defaultValue: 'رقم القضية' })}:</span> <span className="tabular-nums">{caseItem.caseNumber}</span></p>
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('client_name', { defaultValue: 'الموكل' })}:</span> <span>{caseItem.clientName}</span></p>
+                    </div>
+                    <div className="space-y-2 text-right text-black">
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('opponent_name', { defaultValue: 'الخصم' })}:</span> <span>{caseItem.opposingPartyName}</span></p>
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('court_name', { defaultValue: 'المحكمة' })}:</span> <span>{caseItem.courtName}</span></p>
+                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('court_level', { defaultValue: 'درجة التقاضي' })}:</span> <span>{caseItem.courtLevel}</span></p>
                     </div>
                 </div>
-            </div>
-            <div className="flex justify-end p-4 border-t gap-3 print:hidden bg-gray-50 rounded-b-xl">
-                <Button variant="ghost" onClick={onClose}>{t('close', { defaultValue: 'إغلاق' })}</Button>
+
+                {caseItem.description && (
+                    <div className="p-4 bg-gray-50 rounded-xl text-right text-black">
+                        <h4 className="font-bold text-sm mb-2">{t('case_description', { defaultValue: 'وصف الدعوى' })}</h4>
+                        <p className="text-xs text-gray-700 leading-relaxed">{caseItem.description}</p>
+                    </div>
+                )}
+
+                <div className="flex justify-end gap-3 no-print pt-4 border-t">
+                    <Button variant="outline" onClick={onClose}>{t('close', { defaultValue: 'إغلاق' })}</Button>
+                    <Button onClick={handlePrint}>{t('print', { defaultValue: 'طباعة' })}</Button>
+                </div>
             </div>
         </Modal>
     );
@@ -1903,6 +1884,7 @@ const PrintableCaseReportModal: React.FC<{ isOpen: boolean; onClose: () => void;
 
 const CaseListPage: React.FC = () => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [cases, setCases] = useState<Case[]>(initialCases);
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState(initialFilters);
@@ -1975,15 +1957,30 @@ const CaseListPage: React.FC = () => {
     const handleDeleteCase = useCallback((caseId: string) => {
         if (window.confirm('هل أنت متأكد من حذف هذه القضية؟')) {
             setCases(prev => prev.filter(c => c.id !== caseId));
+            addToast({
+                type: 'success',
+                title: 'تم الحذف',
+                message: 'تم حذف القضية بنجاح من النظام.'
+            });
         }
-    }, []);
+    }, [addToast]);
 
     const handleFormSubmit = (caseData: Case) => {
         if (selectedCase && selectedCase.id) {
             setCases(prev => prev.map(c => c.id === selectedCase.id ? { ...c, ...caseData, lastModifiedDate: new Date().toISOString() } : c));
+            addToast({
+                type: 'success',
+                title: 'تم التحديث',
+                message: 'تم تحديث بيانات القضية بنجاح.'
+            });
         } else {
             const newCase: Case = { ...caseData, id: `case-${Date.now()}`, createdDate: new Date().toISOString() };
             setCases(prev => [newCase, ...prev]);
+            addToast({
+                type: 'success',
+                title: 'تمت الإضافة',
+                message: 'تمت إضافة القضية الجديدة بنجاح.'
+            });
         }
         setIsFormModalOpen(false);
         setSelectedCase(null);
@@ -1994,6 +1991,11 @@ const CaseListPage: React.FC = () => {
         if (viewingCase?.id === updatedCase.id) {
             setViewingCase(updatedCase);
         }
+        addToast({
+            type: 'info',
+            title: 'تحديث البيانات',
+            message: 'تم تحديث سجلات القضية.'
+        });
     };
 
     const renderBoardView = () => {
@@ -2266,8 +2268,22 @@ const CaseListPage: React.FC = () => {
                                                             <div className="text-[10px] text-gray-400 font-mono">#{c.caseNumber} | {c.internalCaseNumber}</div>
                                                         </td>
                                                         <td className="px-4 py-4">
-                                                            <div className="text-xs font-semibold text-gray-800">{c.clientName} <span className="text-[10px] text-primary">({formatRole(c.clientRole)})</span></div>
-                                                            <div className="text-[10px] text-rose-500">{c.opposingPartyName} <span className="text-[9px] opacity-70">({formatRole(c.opponentRole)})</span></div>
+                                                            <div className="flex flex-col gap-1.5 min-w-[200px]">
+                                                                <div className="flex flex-wrap items-center justify-between gap-1">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="الموكل" />
+                                                                        <span className="text-[12px] font-semibold text-slate-800 dark:text-slate-200 truncate max-w-[125px]">{c.clientName}</span>
+                                                                    </div>
+                                                                    <div className="shrink-0">{renderRoleBadge(c.clientRole, 'client')}</div>
+                                                                </div>
+                                                                <div className="flex flex-wrap items-center justify-between gap-1 pt-1 border-t border-slate-100 dark:border-slate-800/40">
+                                                                    <div className="flex items-center gap-1.5 min-w-0">
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" title="الخصم" />
+                                                                        <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate max-w-[125px]">{c.opposingPartyName || '---'}</span>
+                                                                    </div>
+                                                                    <div className="shrink-0">{renderRoleBadge(c.opponentRole, 'opponent')}</div>
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                         <td className="px-4 py-4">
                                                             <div className="text-xs text-gray-700">{c.courtName}</div>

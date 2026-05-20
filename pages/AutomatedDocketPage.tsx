@@ -48,6 +48,7 @@ import Button from '../components/ui/Button';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Badge, ExpertActionStatusBadge } from '../components/ui/Badge';
+import { useToast } from '../components/ui/Toast';
 
 // --- Types ---
 interface Appointment {
@@ -170,6 +171,7 @@ const AppointmentFormModal: React.FC<{
     initialData?: Appointment | null;
 }> = ({ isOpen, onClose, onSubmit, initialData }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<Appointment>>(
         initialData || {
             date: new Date().toISOString().split('T')[0],
@@ -191,7 +193,11 @@ const AppointmentFormModal: React.FC<{
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if(!formData.title || !formData.date || !formData.time) {
-            alert(t('fill_required_fields', { defaultValue: 'يرجى تعبئة الحقول الأساسية (العنوان، التاريخ، الوقت)' }));
+            addToast({
+                type: 'warning',
+                title: 'تنبيه',
+                message: t('fill_required_fields', { defaultValue: 'يرجى تعبئة الحقول الأساسية (العنوان، التاريخ، الوقت)' })
+            });
             return;
         }
         onSubmit({

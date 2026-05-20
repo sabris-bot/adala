@@ -6,6 +6,7 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
+import { useToast } from '../components/ui/Toast';
 import PrintHeader from '../components/ui/PrintHeader';
 import { ChatBubbleLeftEllipsisIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, InformationCircleIcon, DocumentTextIcon, PrinterIcon, CheckCircleIcon, XCircleIcon, OFFICE_NAME, ScaleIcon } from '../constants';
 import { 
@@ -175,6 +176,7 @@ interface EmployeeRequestFormProps {
 }
 
 const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, onSubmit, onCancel, employees }) => {
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<EmployeeRequest>>({});
 
     useEffect(() => {
@@ -247,7 +249,11 @@ const EmployeeRequestForm: React.FC<EmployeeRequestFormProps> = ({ initialData, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.employeeId || !formData.requestType) {
-      alert("يرجى اختيار الموظف ونوع الطلب.");
+      addToast({
+        type: 'warning',
+        title: 'بيانات ناقصة',
+        message: 'يرجى اختيار الموظف ونوع الطلب.'
+      });
       return;
     }
     const employee = employees.find(emp => emp.id === formData.employeeId);

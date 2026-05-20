@@ -82,9 +82,9 @@ const LegalRoleSelector: React.FC<LegalRoleSelectorProps> = ({
     }, []);
 
     return (
-        <div className="relative mb-6" ref={containerRef} dir="rtl">
+        <div className="relative mb-4" ref={containerRef} dir="rtl">
             {label && (
-                <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
                     {label}
                 </label>
             )}
@@ -92,29 +92,29 @@ const LegalRoleSelector: React.FC<LegalRoleSelectorProps> = ({
             <div 
                 onClick={() => setIsOpen(!isOpen)}
                 className={`
-                    min-h-[56px] w-full bg-white dark:bg-slate-900 border-2 rounded-2xl flex flex-wrap items-center gap-2 p-3 cursor-pointer transition-all duration-300
-                    ${isOpen ? 'border-primary ring-8 ring-primary/5 shadow-lg' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700'}
+                    min-h-[44px] w-full bg-white dark:bg-slate-900 border rounded-xl flex flex-wrap items-center gap-2 py-2 px-3 cursor-pointer transition-all duration-200 shadow-sm
+                    ${isOpen ? 'border-primary ring-2 ring-primary-light/50 focus:border-primary' : 'border-gray-300 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-600'}
                     ${error ? 'border-rose-500 ring-rose-500/10' : ''}
                 `}
             >
                 {selectedValues.length === 0 && !isOpen && (
-                    <span className="text-slate-400 text-sm italic px-2">{placeholder}</span>
+                    <span className="text-gray-400 text-sm px-1">{placeholder}</span>
                 )}
 
-                <div className="flex flex-wrap gap-2 flex-1">
+                <div className="flex flex-wrap gap-1.5 flex-1">
                     {selectedValues.map(val => (
                         <motion.span
-                            initial={{ scale: 0.8, opacity: 0 }}
+                            initial={{ scale: 0.9, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
                             key={val}
-                            className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold border border-slate-200/50 dark:border-slate-700/50 flex items-center gap-2 group hover:bg-slate-900 hover:text-white transition-colors"
+                            className="bg-primary/10 dark:bg-primary/20 text-primary-dark dark:text-primary px-2.5 py-1 rounded-lg text-xs font-bold border border-primary/20 flex items-center gap-1.5 group hover:bg-primary hover:text-white transition-colors"
                         >
                             {val}
                             <button 
                                 onClick={(e) => handleRemove(e, val)}
-                                className="text-slate-400 group-hover:text-white"
+                                className="text-primary-dark dark:text-primary group-hover:text-white rounded-full p-0.5 hover:bg-black/10 transition-colors"
                             >
-                                <XIcon className="w-3.5 h-3.5" />
+                                <XIcon className="w-3 h-3" />
                             </button>
                         </motion.span>
                     ))}
@@ -131,46 +131,46 @@ const LegalRoleSelector: React.FC<LegalRoleSelectorProps> = ({
                                     handleAddCustom();
                                 }
                             }}
-                            placeholder="Type to search or add..."
-                            className="bg-transparent border-none focus:ring-0 text-sm font-bold flex-1 min-w-[120px] dark:text-white h-full"
+                            placeholder="ابحث أو اكتب صفة جديدة..."
+                            className="bg-transparent border-none focus:ring-0 text-sm font-medium flex-1 min-w-[120px] dark:text-white h-full outline-none py-0.5 px-1"
                         />
                     )}
                 </div>
 
-                <div className="flex items-center gap-2 px-2 text-slate-400">
-                    {isOpen ? <SearchIcon className="w-5 h-5" /> : <ChevronDownIcon className="w-5 h-5" />}
+                <div className="flex items-center gap-2 px-1 text-gray-400">
+                    {isOpen ? <SearchIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
                 </div>
             </div>
 
             <AnimatePresence>
                 {isOpen && (
                     <motion.div
-                        initial={{ opacity: 0, y: -10 }}
+                        initial={{ opacity: 0, y: -8 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-3xl shadow-2xl z-[100] max-h-[400px] overflow-hidden flex flex-col"
+                        exit={{ opacity: 0, y: -8 }}
+                        className="absolute top-full left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-2xl shadow-xl z-[100] max-h-[300px] overflow-hidden flex flex-col"
                     >
-                        <div className="overflow-y-auto p-2 custom-scrollbar">
+                        <div className="overflow-y-auto p-1.5 custom-scrollbar">
                             {filteredGroups.length > 0 ? (
                                 filteredGroups.map(group => (
-                                    <div key={group.label} className="mb-4 last:mb-0">
-                                        <div className="px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest italic bg-slate-50 dark:bg-slate-800/50 rounded-xl mb-1">
+                                    <div key={group.label} className="mb-3 last:mb-0">
+                                        <div className="px-3 py-1.5 text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/40 rounded-lg mb-1">
                                             {group.label}
                                         </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-1 px-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 px-0.5">
                                             {group.options.map(opt => (
                                                 <button
                                                     key={opt.value}
                                                     onClick={() => handleSelect(opt.value)}
                                                     className={`
-                                                        flex items-center justify-between px-4 py-2.5 rounded-xl text-right text-sm font-bold transition-all
+                                                        flex items-center justify-between px-3 py-2 rounded-lg text-right text-xs font-semibold transition-all
                                                         ${selectedValues.includes(opt.value) 
-                                                            ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                                                            ? 'bg-primary text-white shadow-md shadow-primary/10' 
                                                             : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300'}
                                                     `}
                                                 >
                                                     <span>{opt.label}</span>
-                                                    {selectedValues.includes(opt.value) && <CheckIcon className="w-4 h-4" />}
+                                                    {selectedValues.includes(opt.value) && <CheckIcon className="w-3.5 h-3.5" />}
                                                 </button>
                                             ))}
                                         </div>

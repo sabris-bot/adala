@@ -8,6 +8,7 @@ import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
 import SignaturePad from '../components/ui/SignaturePad'; 
+import { useToast } from '../components/ui/Toast';
 import { 
     ShareIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, FolderIcon, 
     InformationCircleIcon, UsersIcon, CalendarDaysIcon, CheckCircleIcon, XCircleIcon,
@@ -141,6 +142,7 @@ interface RequestFormModalProps {
 }
 
 const RequestFormModal: React.FC<RequestFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, cases, lawyers }) => {
+    const { addToast } = useToast();
     const [formData, setFormData] = useState<Partial<LegalRepresentationRequest>>(
         initialData || {
             caseId: undefined,
@@ -222,7 +224,11 @@ const RequestFormModal: React.FC<RequestFormModalProps> = ({ isOpen, onClose, on
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.caseId || !formData.courtName?.trim() || !formData.hearingDate || !formData.sessionObjective || !formData.primaryLawyerId) {
-            alert("يرجى ملء الحقول الإلزامية: القضية، المحكمة، تاريخ الجلسة، هدف الجلسة، والمحامي الأصيل.");
+            addToast({
+                type: 'warning',
+                title: 'تنبيه',
+                message: "يرجى ملء الحقول الإلزامية: القضية، المحكمة، تاريخ الجلسة، هدف الجلسة، والمحامي الأصيل."
+            });
             return;
         }
         onSubmit({ ...formData, updatedAt: new Date().toISOString() } as LegalRepresentationRequest);
@@ -526,6 +532,7 @@ const PrintableAuthorizationModal: React.FC<{ request: LegalRepresentationReques
 };
 
 const LegalRepresentationPage: React.FC = () => {
+  const { addToast } = useToast();
   const [requests, setRequests] = useState<LegalRepresentationRequest[]>(mockLegalRepresentationRequests);
   
   // Filters
@@ -618,7 +625,11 @@ const LegalRepresentationPage: React.FC = () => {
       }
 
       // Simulate sending notification
-      alert(`تم اعتماد الطلب وتوقيعه بنجاح.\nتم إرسال إشعار للمحامي المناب.`);
+      addToast({
+          type: 'success',
+          title: 'تم الاعتماد',
+          message: "تم اعتماد الطلب وتوقيعه بنجاح.\nتم إرسال إشعار للمحامي المناب."
+      });
   };
   
   return (

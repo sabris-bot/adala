@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useMemo } from
 import { Case, AdminTask, Hearing, AdminTaskStatus } from '../types';
 import { initialCases } from '../data/caseData';
 import { initialMockTasks } from '../data/taskData';
+import { notificationService } from '../services/notificationService';
 
 interface CaseTaskContextType {
   cases: Case[];
@@ -44,7 +45,17 @@ export const CaseTaskProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const runAutomationRules = useCallback((trigger: { type: 'HEARING_COMPLETED'; caseId: string }) => {
     if (trigger.type === 'HEARING_COMPLETED') {
-      console.log(`Automation Triggered: Hearing Completed for Case ${trigger.caseId}. Updating related tasks to Pending Review.`);
+        const affectedCases = cases.filter(c => c.id === trigger.caseId);
+        const caseTitle = affectedCases.length > 0 ? affectedCases[0].title : trigger.caseId;
+        
+        notificationService.addNotification({
+            title: 'تم تفعيل الأتمتة',
+            message: `تم تحديث المهام المرتبطة بالقضية (${caseTitle}) إلى "قيد المراجعة" بعد اكتمال الجلسة.`,
+            category: 'INFORMATIONAL',
+            priority: 'NORMAL',
+            relatedId: trigger.caseId
+        });
+
       setTasks(prevTasks => prevTasks.map(task => {
         if (task.relatedCaseId === trigger.caseId && task.status !== AdminTaskStatus.COMPLETED) {
           return {

@@ -87,8 +87,11 @@ const SettingsHub = ({ tabs, activeTab, setActiveTab }: { tabs: any[], activeTab
     );
 };
 
+import { useToast } from '../components/ui/Toast';
+
 const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode }) => {
     const { t, i18n } = useTranslation();
+    const { addToast } = useToast();
     const { selectedJurisdiction, setJurisdiction, availableJurisdictions } = useJurisdiction();
     const [activeTab, setActiveTab] = useState('hub');
     const [isSaving, setIsSaving] = useState(false);
@@ -97,7 +100,11 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode 
         setIsSaving(true);
         await new Promise(resolve => setTimeout(resolve, 1500));
         setIsSaving(false);
-        alert(t('settings_saved_successfully', { defaultValue: 'تم حفظ كافة الإعدادات بنجاح' }));
+        addToast({
+            type: 'success',
+            title: 'تم الحفظ',
+            message: t('settings_saved_successfully', { defaultValue: 'تم حفظ كافة الإعدادات بنجاح للمنظومة.' })
+        });
     };
     
     // User Management State
@@ -264,8 +271,18 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode 
                     onSave={(data) => {
                         if (editingUser?.id) {
                             setUsers(prev => prev.map(u => u.id === editingUser.id ? { ...u, ...data } as User : u));
+                            addToast({
+                                type: 'success',
+                                title: 'تحديث مستخدم',
+                                message: `تم تحديث صلاحيات ${data.name || ''} بنجاح.`
+                            });
                         } else {
                             setUsers(prev => [...prev, { ...data, id: `usr${Date.now()}` } as User]);
+                            addToast({
+                                type: 'success',
+                                title: 'إضافة مستخدم',
+                                message: 'تم إنشاء حساب المستخدم وإرسال بيانات الدخول.'
+                            });
                         }
                         setIsUserModalOpen(false);
                     }}
@@ -350,6 +367,7 @@ const AppearanceSettings = ({ prefs, setPrefs, toggleDarkMode, isDarkMode }: any
 };
 
 const CommunicationSettings = ({ notifPrefs, setNotifPrefs }: any) => {
+    const { addToast } = useToast();
     const { t } = useTranslation();
     const [view, setView] = useState<'categories' | 'editor'>('categories');
     const [selectedCategory, setSelectedCategory] = useState<any>(null);
@@ -400,7 +418,11 @@ const CommunicationSettings = ({ notifPrefs, setNotifPrefs }: any) => {
                     <div className="flex justify-end gap-3 pt-6 border-t border-gray-50 dark:border-gray-800">
                         <Button variant="outline" className="rounded-2xl px-10" onClick={() => setView('categories')}>إلغاء</Button>
                         <Button variant="primary" className="rounded-2xl px-16 shadow-xl shadow-indigo-500/20" onClick={() => {
-                            alert('تم حفظ القالب بنجاح');
+                            addToast({
+                                type: 'success',
+                                title: 'تم الحفظ',
+                                message: 'تم حفظ القالب بنجاح'
+                            });
                             setView('categories');
                         }}>حفظ القالب</Button>
                     </div>
@@ -764,6 +786,7 @@ const SecuritySettings = ({ prefs, setPrefs }: any) => {
 };
 
 const IntegrationsSettings = () => {
+    const { addToast } = useToast();
     const { t } = useTranslation();
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     
@@ -798,7 +821,13 @@ const IntegrationsSettings = () => {
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="flex-1 rounded-xl border-gray-100 dark:border-gray-800 text-gray-600 hover:text-indigo-600 hover:border-indigo-100 font-black">{item.status.includes(t('connected', { defaultValue: 'متصل' })) ? t('settings', { defaultValue: 'إعدادات' }) : t('link', { defaultValue: 'ربط' })}</Button>
                         {item.status.includes(t('connected', { defaultValue: 'متصل' })) && (
-                            <button className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all" onClick={() => alert('تم إلغاء الربط بنجاح')}><TrashIcon className="w-5 h-5"/></button>
+                            <button className="p-2 text-rose-500 hover:bg-rose-50 rounded-xl transition-all" onClick={() => {
+                                addToast({
+                                    type: 'success',
+                                    title: 'تم إلغاء الربط',
+                                    message: 'تم إلغاء الربط بنجاح'
+                                });
+                            }}><TrashIcon className="w-5 h-5"/></button>
                         )}
                     </div>
                 </Card>
