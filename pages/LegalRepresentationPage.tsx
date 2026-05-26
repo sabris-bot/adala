@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import Card from '../components/ui/Card';
@@ -14,11 +13,11 @@ import {
     InformationCircleIcon, UsersIcon, CalendarDaysIcon, CheckCircleIcon, XCircleIcon,
     PrinterIcon, DocumentTextIcon, ClockIcon, EnvelopeIcon, MagnifyingGlassIcon,
     ScaleIcon, BuildingLibraryIcon, IdentificationIcon, ExclamationTriangleIcon,
-    ArrowPathIcon, HistoryIcon, ClipboardDocumentListIcon
+    ArrowPathIcon, HistoryIcon, ClipboardDocumentListIcon, SparklesIcon, ArchiveBoxIcon
 } from '../constants';
 import { 
     LegalRepresentationRequest, RepresentationRequestStatus, RepresentationPriority,
-    SubstituteLawyerProfile, Case, CaseMainType, CourtLevel, Employee 
+    Case, CaseMainType, CourtLevel, Employee 
 } from '../types';
 import { 
     representationRequestStatusOptions, 
@@ -28,163 +27,141 @@ import { RepresentationRequestStatusBadge } from '../components/ui/Badge';
 import { initialCases } from '../data/caseData';
 import { initialEmployees } from './EmployeeProfilePage';
 
+// Standardized Legal Delegation Directions & Types
+export enum DelegationDirection {
+    OUTGOING = 'صادرة بموظفينا (Outgoing)',
+    INCOMING = 'واردة لمكتبنا (Incoming)'
+}
 
-// Mock Legal Representation Requests
-export const mockLegalRepresentationRequests: LegalRepresentationRequest[] = [
-  { 
-    id: 'lr-req-001', 
-    caseId: '1', 
-    caseNumber: 'CML-2024-101', 
-    clientName: 'شركة الأمل الدولية',
-    caseType: CaseMainType.COMMERCIAL, 
-    courtName: 'مجمع محاكم الرقعي - الدائرة التجارية',
-    courtLevel: CourtLevel.FIRST_INSTANCE,
-    judgeName: 'المستشار/ عبدالله العتيبي',
-    hearingRoom: 'قاعة 5 - الطابق الأول',
-    priority: RepresentationPriority.URGENT,
-    hearingDate: new Date(new Date().setDate(new Date().getDate() + 2)).toISOString().split('T')[0], 
-    hearingTime: '10:00',
-    sessionObjective: 'تقديم مذكرة دفاع ختامية والمرافعة الشفوية.',
-    primaryLawyerId: 'emp-001',
-    primaryLawyerName: 'أ. أحمد محمود المحمد الصباح',
-    substituteLawyerId: 'emp-002', 
-    substituteLawyerName: 'أ. فاطمة علي حسين',
-    status: RepresentationRequestStatus.PENDING,
-    requestDate: new Date().toISOString().split('T')[0],
-    notesForSubstitute: 'يرجى التركيز على المادة 15 من قانون التجارة. المستندات الأصلية بحوزتكم.',
-    attachedFileNames: ['مذكرة_دفاع.pdf', 'مستند_خبرة.docx'],
-    createdAt: new Date().toISOString().split('T')[0],
-  },
-  { 
-    id: 'lr-req-002', 
-    caseId: '3', 
-    caseNumber: 'RE-APP-2024-088', 
-    clientName: 'بنك الخليج المتحد',
-    caseType: CaseMainType.REAL_ESTATE,
-    courtName: 'محكمة الاستئناف - قصر العدل',
-    courtLevel: CourtLevel.APPEALS_COURT,
-    priority: RepresentationPriority.HIGH,
-    judgeName: 'المستشار/ محمد المطيري',
-    hearingRoom: 'الدائرة الإيجارية - قاعة 12',
-    hearingDate: new Date(new Date().setDate(new Date().getDate() + 8)).toISOString().split('T')[0],
-    hearingTime: '11:30',
-    sessionObjective: 'حضور جلسة الاستماع لشهادة الخبير الفني.',
-    primaryLawyerId: 'emp-temp-kj',
-    primaryLawyerName: 'أ. خالد جاسم الأحمد',
-    substituteLawyerId: 'emp-002',
-    substituteLawyerName: 'أ. فاطمة علي حسين',
-    status: RepresentationRequestStatus.ACCEPTED,
-    requestDate: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString().split('T')[0],
-    createdAt: new Date(new Date().setDate(new Date().getDate() - 2)).toISOString().split('T')[0],
-  }
+export enum DelegationScopeType {
+    COURT_APPEARANCE = 'حضور مجمع الدوائر والمرافعة',
+    PROCEDURAL = 'صرف شيكات وصياغة تنازلات',
+    CASE_FOLLOW_UP = 'مراجعة إدارة الخبراء والمعاينة الميدانية',
+    HEARING_REPRESENTATION = 'تمثيل أمام النيابة والتحقيقات العمالية'
+}
+
+// Sub-interface expanding original Request with specific legal delegation properties.
+export interface EnhancedDelegation extends LegalRepresentationRequest {
+    direction: DelegationDirection;
+    scopeType: DelegationScopeType;
+    startDate: string;
+    endDate: string;
+    legalAuthority: string; // e.g. "محكمة الفروانية" or "إدارة التنفيذ"
+    actionLog: { id: string; date: string; action: string; actor: string; output?: string }[];
+}
+
+// Mock Enhanced Legal Delegations
+const initialDelegations: EnhancedDelegation[] = [
+    {
+        id: 'del-001',
+        caseId: '1',
+        caseNumber: 'CML-2024-101',
+        clientName: 'شركة الإيرادات المتحدة للخدمات',
+        caseType: CaseMainType.COMMERCIAL,
+        courtName: 'مجمع محاكم الرقعي – الدائرة التجارية',
+        courtLevel: CourtLevel.FIRST_INSTANCE,
+        judgeName: 'المستشار شبيب الرشيدي',
+        hearingRoom: 'قاعة 3 - الدور الثاني',
+        priority: RepresentationPriority.URGENT,
+        hearingDate: new Date(Date.now() + 4 * 24 * 3600 * 1000).toISOString().split('T')[0], // 4 days later
+        hearingTime: '09:30',
+        sessionObjective: 'حضور جلسة الاستجواب أمام الدائرة الكلية وتقديم أصل عقد النقل التأسيسي.',
+        primaryLawyerId: 'emp-001',
+        primaryLawyerName: 'أ. أحمد محمود مبارك',
+        substituteLawyerId: 'emp-002',
+        substituteLawyerName: 'أ. فاطمة علي حسين',
+        status: RepresentationRequestStatus.ACCEPTED,
+        requestDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString().split('T')[0],
+        notesForSubstitute: 'يرجى حفظ الرد على البند الثالث من تقرير خبير الإثبات المالي.',
+        direction: DelegationDirection.OUTGOING,
+        scopeType: DelegationScopeType.COURT_APPEARANCE,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 10 * 24 * 3600 * 1000).toISOString().split('T')[0],
+        legalAuthority: 'وزارة العدل – المحكمة الكلية الأهلية',
+        actionLog: [
+            { id: 'act-1', date: new Date().toISOString().split('T')[0], action: 'إنشاء وبث طلب الإنابة القضائية', actor: 'أ. أحمد محمود مبارك' },
+            { id: 'act-2', date: new Date().toISOString().split('T')[0], action: 'تأكيد وقبول التكليف والتوقيع الرقمي', actor: 'أ. فاطمة علي حسين' }
+        ]
+    },
+    {
+        id: 'del-002',
+        caseId: '3',
+        caseNumber: 'RE-APP-2024-088',
+        clientName: 'السديرة العقارية للمقاولات',
+        caseType: CaseMainType.REAL_ESTATE,
+        courtName: 'محكمة استئناف الإيجارات العاصمة',
+        courtLevel: CourtLevel.APPEALS_COURT,
+        judgeName: 'المستشار فيصل الوقيان',
+        hearingRoom: 'قاعة استئناف 14 - الدور الأرضي',
+        priority: RepresentationPriority.HIGH,
+        hearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0], // 12 days later
+        hearingTime: '11:00',
+        sessionObjective: 'إيداع صحيفة الاستئناف المتقابل وسداد التأمين لدى الصيرفة المدنية.',
+        primaryLawyerId: 'emp-temp-kj',
+        primaryLawyerName: 'أ. خالد جاسم الأحمد (مكتب متعاقد)',
+        substituteLawyerId: 'emp-001',
+        substituteLawyerName: 'أ. أحمد محمود مبارك',
+        status: RepresentationRequestStatus.PENDING,
+        requestDate: new Date().toISOString().split('T')[0],
+        createdAt: new Date().toISOString().split('T')[0],
+        direction: DelegationDirection.INCOMING,
+        scopeType: DelegationScopeType.PROCEDURAL,
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().split('T')[0],
+        legalAuthority: 'قصر العدل – إدارة الكتاب والموثقين',
+        actionLog: [
+            { id: 'act-3', date: new Date().toISOString().split('T')[0], action: 'استلام الإنابة الواردة للمكتب وجاري دراسة الأوراق والمرفقات', actor: 'أ. أحمد محمود مبارك' }
+        ]
+    }
 ];
 
-// Format Date Helper
 const formatDate = (dateString?: string, includeTime = false) => {
-  if (!dateString) return '-';
-  try {
-    const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
-    if (includeTime) {
-      options.hour = '2-digit';
-      options.minute = '2-digit';
-    }
-    return new Date(dateString).toLocaleDateString('ar-EG', options);
-  } catch (e) { return dateString; }
+    if (!dateString) return '-';
+    try {
+        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+        if (includeTime) {
+            options.hour = '2-digit';
+            options.minute = '2-digit';
+        }
+        return new Date(dateString).toLocaleDateString('ar-EG', options);
+    } catch (e) { return dateString; }
 };
 
-// --- HELPERS ---
-const StatCard = ({ label, value, icon: Icon, color, pulse }: { label: string, value: number, icon: any, color: 'blue' | 'yellow' | 'green' | 'red', pulse?: boolean }) => {
-    const colors = {
-        blue: 'bg-blue-50 text-blue-600 border-blue-100',
-        yellow: 'bg-yellow-50 text-yellow-600 border-yellow-100',
-        green: 'bg-green-50 text-green-600 border-green-100',
-        red: 'bg-red-50 text-red-600 border-red-100',
-    };
-    return (
-        <Card className={`relative overflow-hidden border ${colors[color]}`}>
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-wider opacity-70">{label}</p>
-                    <p className="text-2xl font-black mt-1">{value}</p>
-                </div>
-                <div className={`p-2 rounded-lg bg-white/50 border border-white ${pulse ? 'animate-pulse' : ''}`}>
-                    <Icon className="w-5 h-5" />
-                </div>
-            </div>
-            <div className={`absolute -right-2 -bottom-2 opacity-5`}>
-                <Icon className="w-16 h-16" />
-            </div>
-        </Card>
-    );
-};
-
-const PriorityBadge = ({ priority }: { priority: RepresentationPriority }) => {
-    const config = {
-        [RepresentationPriority.URGENT]: { label: 'عاجل جداً', class: 'bg-red-100 text-red-700 border-red-200' },
-        [RepresentationPriority.HIGH]: { label: 'عالية', class: 'bg-orange-100 text-orange-700 border-orange-200' },
-        [RepresentationPriority.NORMAL]: { label: 'عادية', class: 'bg-blue-100 text-blue-700 border-blue-200' },
-    };
-    const c = config[priority] || config[RepresentationPriority.NORMAL];
-    return (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.class}`}>
-            {c.label}
-        </span>
-    );
-};
-
-interface RequestFormModalProps {
+// --- Sub-Modals & Custom Views ---
+interface DelegationFormModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (request: LegalRepresentationRequest) => void;
-    initialData?: Partial<LegalRepresentationRequest> | null;
+    onSubmit: (delegation: EnhancedDelegation) => void;
+    initialData?: Partial<EnhancedDelegation> | null;
     cases: Pick<Case, 'id' | 'caseNumber' | 'title' | 'clientName' | 'caseMainType' | 'courtLevel' | 'courtName'>[];
     lawyers: Pick<Employee, 'id' | 'fullNameAr'>[];
 }
 
-const RequestFormModal: React.FC<RequestFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, cases, lawyers }) => {
+const DelegationFormModal: React.FC<DelegationFormModalProps> = ({ isOpen, onClose, onSubmit, initialData, cases, lawyers }) => {
     const { addToast } = useToast();
-    const [formData, setFormData] = useState<Partial<LegalRepresentationRequest>>(
-        initialData || {
-            caseId: undefined,
-            courtName: undefined,
-            status: RepresentationRequestStatus.PENDING,
-            priority: RepresentationPriority.NORMAL,
-            requestDate: new Date().toISOString().split('T')[0],
-            hearingDate: new Date().toISOString().split('T')[0],
-            createdAt: new Date().toISOString().split('T')[0],
-            attachedFileNames: [],
-        }
-    );
+    const [formData, setFormData] = useState<Partial<EnhancedDelegation>>({});
 
     useEffect(() => {
         if (isOpen) {
-            const defaultData: Partial<LegalRepresentationRequest> = {
-                caseId: undefined,
-                courtName: undefined,
-                status: RepresentationRequestStatus.PENDING,
-                requestDate: new Date().toISOString().split('T')[0],
-                hearingDate: new Date().toISOString().split('T')[0],
-                createdAt: new Date().toISOString().split('T')[0],
-                attachedFileNames: [],
-            };
-             const currentInitialData = initialData || defaultData;
-            setFormData(currentInitialData);
-
-            if (currentInitialData.caseId && !currentInitialData.courtName) {
-                const selectedCase = cases.find(c => c.id === currentInitialData.caseId);
-                if (selectedCase) {
-                    setFormData(prev => ({
-                        ...prev,
-                        caseNumber: selectedCase.caseNumber,
-                        clientName: selectedCase.clientName,
-                        caseType: selectedCase.caseMainType,
-                        courtLevel: selectedCase.courtLevel,
-                        courtName: selectedCase.courtName || '',
-                    }));
-                }
+            if (initialData) {
+                setFormData(initialData);
+            } else {
+                setFormData({
+                    direction: DelegationDirection.OUTGOING,
+                    scopeType: DelegationScopeType.COURT_APPEARANCE,
+                    priority: RepresentationPriority.NORMAL,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString().split('T')[0],
+                    status: RepresentationRequestStatus.PENDING,
+                    legalAuthority: 'قصر العدل ورئاسة المحاكم',
+                    hearingDate: new Date().toISOString().split('T')[0],
+                    attachedFileNames: [],
+                    actionLog: []
+                });
             }
         }
-    }, [isOpen, initialData, cases]);
+    }, [isOpen, initialData]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -199,7 +176,7 @@ const RequestFormModal: React.FC<RequestFormModalProps> = ({ isOpen, onClose, on
                     clientName: selectedCase.clientName,
                     caseType: selectedCase.caseMainType,
                     courtLevel: selectedCase.courtLevel,
-                    courtName: prev?.courtName || selectedCase.courtName || '',
+                    courtName: selectedCase.courtName || 'مجمع محاكم الكويت',
                 }));
             }
         }
@@ -216,589 +193,702 @@ const RequestFormModal: React.FC<RequestFormModalProps> = ({ isOpen, onClose, on
             }
         }
     };
-    
-    const handleAttachedFilesChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setFormData(prev => ({...prev, attachedFileNames: e.target.value.split('\n').map(f => f.trim()).filter(f => f)}));
-    };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.caseId || !formData.courtName?.trim() || !formData.hearingDate || !formData.sessionObjective || !formData.primaryLawyerId) {
+        if (!formData.caseId || !formData.courtName || !formData.startDate || !formData.endDate || !formData.primaryLawyerId || !formData.sessionObjective) {
             addToast({
                 type: 'warning',
-                title: 'تنبيه',
-                message: "يرجى ملء الحقول الإلزامية: القضية، المحكمة، تاريخ الجلسة، هدف الجلسة، والمحامي الأصيل."
+                title: 'بيانات ناقصة',
+                message: 'يرجى استيفاء الحقول الأساسية: ملف القضية، الدائرة والجهة القانونية، مدة الإنابة، وهدف التكليف.'
             });
             return;
         }
-        onSubmit({ ...formData, updatedAt: new Date().toISOString() } as LegalRepresentationRequest);
+
+        const dateCheckStart = new Date(formData.startDate).getTime();
+        const dateCheckEnd = new Date(formData.endDate).getTime();
+        if (dateCheckEnd < dateCheckStart) {
+            addToast({
+                type: 'warning',
+                title: 'تناقض في المواعيد',
+                message: 'تاريخ انتهاء الإنابة أو صلاحية التفويض لا يعتمد صياغة سابقة لتاريخ البدء.'
+            });
+            return;
+        }
+
+        const newlyCreated: EnhancedDelegation = {
+            ...(formData as EnhancedDelegation),
+            id: formData.id || `del-${Date.now()}`,
+            createdAt: formData.createdAt || new Date().toISOString().split('T')[0],
+            updatedAt: new Date().toISOString(),
+            actionLog: formData.actionLog || [
+                { id: `act-${Date.now()}`, date: new Date().toISOString().split('T')[0], action: 'تحرير التكليف وبدء فترة المتابعة ومراقبة النفاذ', actor: formData.primaryLawyerName || 'النظام الإداري' }
+            ]
+        };
+
+        onSubmit(newlyCreated);
         onClose();
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={formData.id ? "تعديل طلب إنابة" : "إنشاء طلب إنابة قانونية جديد"} size="xl">
-            <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto p-1">
-                <Card title="بيانات القضية والجلسة" titleClassName="text-sm">
+        <Modal isOpen={isOpen} onClose={onClose} title={formData.id ? "تعديل حوكمة الإنابة القانونية" : "تقييد وتصدير إنابة بملف الخصام"} size="lg">
+            <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select label="جاهة وتوجيه التفويض (*)" name="direction" value={formData.direction} options={Object.values(DelegationDirection).map(d=>({value:d, label:d}))} onChange={handleChange} required />
+                    <Select label="نوع ونطاق الإنابة (*)" name="scopeType" value={formData.scopeType} options={Object.values(DelegationScopeType).map(s=>({value:s, label:s}))} onChange={handleChange} required />
+                </div>
+
+                <div className="p-4 bg-gray-50 dark:bg-dm-background rounded-2xl border dark:border-gray-800 space-y-3">
+                    <h4 className="text-xs font-black text-gray-700 dark:text-gray-300">سند الارتباط بملف القضية المستهدفة</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <Select label="القضية (*)" name="caseId" value={formData.caseId || ''}
-                            options={[{value: '', label: 'اختر قضية'}, ...cases.map(c => ({value: c.id, label: `${c.caseNumber} - ${c.title}`}))]}
-                            onChange={handleChange} required />
-                        <Select label="الأولوية" name="priority" value={formData.priority || RepresentationPriority.NORMAL} options={representationPriorityOptions} onChange={handleChange} />
+                        <Select label="القضية المرتبطة (*)" name="caseId" value={formData.caseId || ''} options={[{value: '', label: 'اختر قضية بالتسمية'}, ...cases.map(c => ({value: c.id, label: `${c.caseNumber} - ${c.title}`}))]} onChange={handleChange} required />
+                        <Select label="درجة الأولوية" name="priority" value={formData.priority || RepresentationPriority.NORMAL} options={representationPriorityOptions} onChange={handleChange} />
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-2">
-                        <Input label="نوع القضية" value={formData.caseType || ''} readOnly disabled className="bg-gray-100"/>
-                        <Input label="مستوى المحكمة" value={formData.courtLevel || ''} readOnly disabled className="bg-gray-100"/>
-                        <Input label="الموكل" value={formData.clientName || ''} readOnly disabled className="bg-gray-100"/>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs text-slate-500 font-bold">
+                        <p>🔹 الموكل: {formData.clientName || 'غير مكتمل'}</p>
+                        <p>🔹 التصنيف: {formData.caseType || '-'}</p>
+                        <p>🔹 درجة المحاكمة: {formData.courtLevel || '-'}</p>
                     </div>
-                </Card>
-                <Card title="تفاصيل الانعقاد" titleClassName="text-sm">
-                     <Input label="المحكمة/المبنى (*)" name="courtName" value={formData.courtName || ''} onChange={handleChange} required placeholder="مثال: قصر العدل" />
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1">
-                        <Input label="القاعة/الغرفة" name="hearingRoom" value={formData.hearingRoom || ''} onChange={handleChange} placeholder="مثال: قاعة 3 - الطابق الثاني" />
-                        <Input label="اسم القاضي (اختياري)" name="judgeName" value={formData.judgeName || ''} onChange={handleChange} placeholder="مثال: المستشار محمد ..." />
-                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                        <Input label="تاريخ الجلسة/المهمة (*)" name="hearingDate" type="date" value={formData.hearingDate} onChange={handleChange} required />
-                        <Input label="وقت الجلسة (اختياري)" name="hearingTime" type="time" value={formData.hearingTime || ''} onChange={handleChange} />
-                    </div>
-                    <TextArea label="الهدف من الجلسة/المهمة (*)" name="sessionObjective" value={formData.sessionObjective || ''} onChange={handleChange} required rows={2} placeholder="مثال: تقديم مذكرة دفاع، حضور مرافعة، استلام صورة حكم، طلب تأجيل..." />
-                </Card>
-                <Card title="المحامون والملاحظات" titleClassName="text-sm">
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input label="سلطة أو جهة الإحالة (المحكمة المعنية)" name="courtName" value={formData.courtName || ''} onChange={handleChange} required />
+                    <Input label="سلطة ترخيص الإنابة (الإدارة المختصة)" name="legalAuthority" value={formData.legalAuthority || ''} onChange={handleChange} />
+                </div>
+
+                <div className="p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10 space-y-3">
+                    <h4 className="text-xs font-black text-amber-800 dark:text-amber-400">مدة فعالية التفويض الزمني (صلاحية الإنابة)</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <Select label="المحامي الأصيل (صاحب الطلب) (*)" name="primaryLawyerId" value={formData.primaryLawyerId || ''}
-                            options={[{value: '', label: 'اختر المحامي الأصيل'}, ...lawyers.map(l => ({value: l.id, label: l.fullNameAr}))]}
-                            onChange={handleChange} required />
-                        <Select label="المحامي المناب (المطلوب منه الحضور)" name="substituteLawyerId" value={formData.substituteLawyerId || ''}
-                            options={[{value: '', label: 'اختر المحامي المناب (اختياري الآن)'}, ...lawyers.filter(l => l.id !== formData.primaryLawyerId).map(l => ({value: l.id, label: l.fullNameAr}))]}
-                            onChange={handleChange} />
+                        <Input label="الحظر والبدء الزمني (*)" name="startDate" type="date" value={formData.startDate || ''} onChange={handleChange} required />
+                        <Input label="نهاية التفويض (تاريخ القفل) (*)" name="endDate" type="date" value={formData.endDate || ''} onChange={handleChange} required />
                     </div>
-                     <TextArea label="ملاحظات/تعليمات للمحامي المناب" name="notesForSubstitute" value={formData.notesForSubstitute || ''} onChange={handleChange} rows={3} placeholder="أية نقاط هامة، مستندات مطلوبة، استراتيجية معينة..." />
-                     <TextArea label="أسماء الملفات المرفقة (كل ملف في سطر)" value={formData.attachedFileNames?.join('\n') || ''} onChange={handleAttachedFilesChange} rows={2} placeholder="مذكرة_دفاع.pdf\nصورة_من_الإعلان.docx"/>
-                </Card>
-                { initialData?.id && // Show status only when editing
-                    <Select label="حالة الطلب" name="status" value={formData.status} options={representationRequestStatusOptions} onChange={handleChange} />
-                }
-                 { (formData.status === RepresentationRequestStatus.REJECTED || formData.status === RepresentationRequestStatus.COMPLETED) &&
-                    <TextArea label="ملاحظات/رد المحامي المناب" name="feedbackFromSubstitute" value={formData.feedbackFromSubstitute || ''} onChange={handleChange} rows={3} placeholder="سبب الرفض، أو نتيجة الحضور، أو ملاحظات بعد الجلسة."/>
-                }
-                <div className="flex justify-end space-x-3 space-x-reverse pt-3">
-                    <Button type="button" variant="outline" onClick={onClose}>إلغاء</Button>
-                    <Button type="submit">{formData.id ? "حفظ التعديلات" : "إرسال الطلب"}</Button>
+                </div>
+
+                <TextArea label="مسؤوليات المحامي وهدف التفويض بالتفصيل (*)" name="sessionObjective" value={formData.sessionObjective || ''} onChange={handleChange} required rows={3} placeholder="يرجى صياغة النطاق مثل: يحضر جلسة المرافعة، ويقدم مستند مضاهاة الخطوط ويقر بصحة التوقيعات ومحاضر المصالحة الفنية..."/>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select label="المحامي الأصيل (طالب التفويض) (*)" name="primaryLawyerId" value={formData.primaryLawyerId || ''} options={[{value: '', label: 'اختر المحامي المشرف'}, ...lawyers.map(l=>({value:l.id, label:l.fullNameAr}))]} onChange={handleChange} required />
+                    <Select label="المحامي المناب (المكلف بالإجراء) (*)" name="substituteLawyerId" value={formData.substituteLawyerId || ''} options={[{value: '', label: 'اختر المحامي المساند'}, ...lawyers.map(l=>({value:l.id, label:l.fullNameAr}))]} onChange={handleChange} required />
+                </div>
+
+                <TextArea label="توجيهات فنية ومرفقات مطلوبة" name="notesForSubstitute" value={formData.notesForSubstitute || ''} onChange={handleChange} rows={2} placeholder="نصوص تشريعية، أحكام تمييز سابقة، عينات تسليم، إلخ..." />
+
+                <div className="flex justify-end gap-2 pt-4 border-t dark:border-gray-800">
+                    <Button type="button" variant="outline" onClick={onClose} className="rounded-xl">إلغاء</Button>
+                    <Button type="submit" className="rounded-xl px-6">حفظ وبدء حوكمة الصلاحية</Button>
                 </div>
             </form>
         </Modal>
     );
 };
 
-const ViewRepresentationRequestModal: React.FC<{ 
-    request: LegalRepresentationRequest | null; 
-    onClose: () => void; 
-    onPrintAuthorization: (req: LegalRepresentationRequest) => void; 
-    onUpdateStatus: (id: string, status: RepresentationRequestStatus, feedback?: string) => void;
-    onSignAndApprove: (id: string, signatureUrl: string) => void;
-}> = ({ request, onClose, onPrintAuthorization, onUpdateStatus, onSignAndApprove }) => {
-    if (!request) return null;
+interface DelegationDetailModalProps {
+    delegation: EnhancedDelegation | null;
+    onClose: () => void;
+    onUpdateStatus: (id: string, status: RepresentationRequestStatus, remarks: string) => void;
+    onPerformAction: (id: string, actionDesc: string) => void;
+    onPrintLetter: (delegation: EnhancedDelegation) => void;
+    onSignApproved: (id: string, signUrl: string) => void;
+}
 
-    const [feedback, setFeedback] = useState(request.feedbackFromSubstitute || '');
+const DelegationDetailModal: React.FC<DelegationDetailModalProps> = ({ delegation, onClose, onUpdateStatus, onPerformAction, onPrintLetter, onSignApproved }) => {
+    const [actionInput, setActionInput] = useState('');
+    const [remarksInput, setRemarksInput] = useState('');
     const [isSigning, setIsSigning] = useState(false);
 
+    if (!delegation) return null;
+
+    // Check if delegation is currently expired
+    const isExpired = new Date(delegation.endDate).getTime() < Date.now();
+    const isExpiringSoon = !isExpired && (new Date(delegation.endDate).getTime() - Date.now() < 3 * 24 * 3600 * 1000); // 3 days
+
+    const handleActionSubmit = () => {
+        if (!actionInput.trim()) return;
+        onPerformAction(delegation.id, actionInput);
+        setActionInput('');
+    };
+
     const handleSignatureSave = (dataUrl: string) => {
-        onSignAndApprove(request.id, dataUrl);
+        onSignApproved(delegation.id, dataUrl);
         setIsSigning(false);
     };
 
     return (
-        <Modal isOpen={!!request} onClose={onClose} title={`تفاصيل طلب إنابة: ${request.caseNumber}`} size="lg">
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto p-2">
+        <Modal isOpen={!!delegation} onClose={onClose} title={`تفويض الإنابة القضائية: ${delegation.caseNumber}`} size="lg">
+            <div className="space-y-6 max-h-[72vh] overflow-y-auto p-1">
+                
+                {/* Expiration warnings alerts */}
+                {isExpired && (
+                    <div className="p-4 bg-red-50 rounded-2xl border border-red-200 text-red-700 text-xs font-bold leading-relaxed flex items-center gap-2">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-red-500 animate-bounce" />
+                        <span>منتهية الفعالية والولاية الزمنية! انتهت الإنابة بصلاحيتها القانونية في تاريخ {formatDate(delegation.endDate)} ولا يجوز الاعتماد عليها بالجلسة.</span>
+                    </div>
+                )}
+                {isExpiringSoon && (
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 text-amber-700 text-xs font-bold leading-relaxed flex items-center gap-2">
+                        <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" />
+                        <span>تحذير اقتراب انتهاء الفعالية: الإنابة سوف تفقد الحماية والصلاحية القانونية خلال أقل من 72 ساعة في {formatDate(delegation.endDate)}.</span>
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card title="بيانات الجلسة" className="bg-gray-50/50" titleClassName="text-[10px] font-bold text-primary">
-                        <div className="space-y-2 text-xs">
-                            <div className="flex justify-between border-b border-gray-100 pb-1">
-                                <span className="text-gray-500">القضية:</span>
-                                <span className="font-bold">{request.caseNumber}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-gray-100 pb-1">
-                                <span className="text-gray-500">الموكل:</span>
-                                <span className="font-bold">{request.clientName}</span>
-                            </div>
-                            <div className="flex justify-between border-b border-gray-100 pb-1">
-                                <span className="text-gray-500">المحكمة:</span>
-                                <span className="font-bold text-gray-700 text-right">{request.courtName}</span>
-                            </div>
-                            {request.hearingRoom && (
-                                <div className="flex justify-between border-b border-gray-100 pb-1">
-                                    <span className="text-gray-500">القاعة:</span>
-                                    <span className="font-bold">{request.hearingRoom}</span>
-                                </div>
-                            )}
-                            {request.judgeName && (
-                                <div className="flex justify-between border-b border-gray-100 pb-1">
-                                    <span className="text-gray-500">القاضي:</span>
-                                    <span className="font-bold">{request.judgeName}</span>
-                                </div>
-                            )}
-                        </div>
-                    </Card>
-                    
-                    <Card title="التوقيت والأولوية" className="bg-gray-50/50" titleClassName="text-[10px] font-bold text-primary">
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <CalendarDaysIcon className="w-5 h-5 text-gray-400" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-gray-500">تاريخ الجلسة</p>
-                                    <p className="text-sm font-bold">{formatDate(request.hearingDate)}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <ClockIcon className="w-5 h-5 text-gray-400" />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-gray-500">وقت الانعقاد</p>
-                                    <p className="text-sm font-bold">{request.hearingTime || 'غير محدد'}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-white rounded-lg shadow-sm border border-gray-100">
-                                    <ExclamationTriangleIcon className={`w-5 h-5 ${request.priority === RepresentationPriority.URGENT ? 'text-red-500' : 'text-gray-400'}`} />
-                                </div>
-                                <div>
-                                    <p className="text-[10px] text-gray-500">درجة الأهمية</p>
-                                    <PriorityBadge priority={request.priority} />
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
+                    <div className="space-y-2">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">توجيه وجاهة التفويض</h4>
+                        <p className="text-sm font-extrabold text-gray-800 dark:text-white">{delegation.direction}</p>
+                    </div>
+                    <div className="space-y-2">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">نطاق عمل الإنابة</h4>
+                        <p className="text-sm font-extrabold text-[#4f46e5]">{delegation.scopeType}</p>
+                    </div>
                 </div>
 
-                <Card title="الهدف من الحضور والمهمة" titleClassName="text-[10px] font-bold text-gray-500">
-                    <p className="text-sm text-gray-800 leading-relaxed font-semibold">
-                        {request.sessionObjective}
+                <div className="p-4 bg-gray-50 dark:bg-dm-background rounded-2xl border dark:border-gray-850 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-bold">
+                    <div>
+                        <span className="text-gray-400 block text-[9px] mb-0.5">الملف والسند</span>
+                        <span className="text-gray-950 dark:text-gray-200">{delegation.caseNumber}</span>
+                    </div>
+                    <div>
+                        <span className="text-gray-400 block text-[9px] mb-0.5">درجة الأهمية</span>
+                        <span className="text-red-650">{delegation.priority}</span>
+                    </div>
+                    <div>
+                        <span className="text-gray-400 block text-[9px] mb-0.5">البدء الفعلي</span>
+                        <span className="text-gray-950 dark:text-gray-200 font-mono">{formatDate(delegation.startDate)}</span>
+                    </div>
+                    <div>
+                        <span className="text-gray-400 block text-[9px] mb-0.5">القفل الزمني</span>
+                        <span className="text-gray-950 dark:text-gray-200 font-mono text-red-600">{formatDate(delegation.endDate)}</span>
+                    </div>
+                </div>
+
+                <div className="space-y-2.5">
+                    <h4 className="text-xs font-black text-gray-800 dark:text-white">الولاية والمهمة المستهدفة بمجمع المحاكم:</h4>
+                    <p className="p-4 bg-blue-500/5 text-xs text-primary font-bold rounded-2xl border border-primary/10 leading-relaxed">
+                        {delegation.sessionObjective}
                     </p>
-                </Card>
-                
-                <Card title="أطراف الإنابة" className="bg-gray-50" titleClassName="text-sm">
-                    <div className="flex justify-between items-center text-sm">
-                        <div>
-                            <p className="text-gray-500">المحامي الأصيل</p>
-                            <p className="font-semibold">{request.primaryLawyerName}</p>
-                        </div>
-                        <div className="text-2xl text-gray-400">←</div>
-                        <div>
-                            <p className="text-gray-500">المحامي المناب</p>
-                            <p className="font-semibold">{request.substituteLawyerName || 'لم يحدد'}</p>
-                        </div>
-                    </div>
-                </Card>
+                </div>
 
-                {request.notesForSubstitute && (
-                    <div className="bg-blue-50 border border-blue-200 p-3 rounded text-sm text-blue-800">
-                        <strong>تعليمات/ملاحظات:</strong> {request.notesForSubstitute}
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                    <div className="p-3 bg-white dark:bg-dm-card border dark:border-gray-800 rounded-xl">
+                        <span className="text-[10px] text-gray-400 font-bold block mb-1">المحامي المفوض (الأصيل)</span>
+                        <p className="font-black text-gray-800 dark:text-gray-200">{delegation.primaryLawyerName}</p>
+                    </div>
+                    <div className="p-3 bg-white dark:bg-dm-card border dark:border-gray-800 rounded-xl">
+                        <span className="text-[10px] text-gray-400 font-bold block mb-1">المحامي المفوض إليه (المناب)</span>
+                        <p className="font-black text-gray-800 dark:text-gray-200">{delegation.substituteLawyerName || 'لم يحدد'}</p>
+                    </div>
+                </div>
+
+                {/* Attachments Section */}
+                {delegation.signatureUrl && (
+                    <div className="p-4 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 text-center">
+                        <span className="text-[10px] text-slate-400 block mb-1.5 font-bold">توقيع اعتماد مكتب العدالة الفني</span>
+                        <img src={delegation.signatureUrl} alt="Official Signing" className="max-h-16 mx-auto dark:invert bg-white p-1 rounded-lg" />
+                        <span className="text-[9px] font-mono text-emerald-600 block mt-1.5">موقع إلكترونياً ومتصل بقفل الخادم الفني</span>
                     </div>
                 )}
 
-                {request.attachedFileNames && request.attachedFileNames.length > 0 && (
-                    <div className="bg-white border p-3 rounded text-sm">
-                        <strong>المرفقات:</strong>
-                        <ul className="list-disc ps-5 mt-1 text-gray-600">
-                            {request.attachedFileNames.map((f, i) => <li key={i}>{f}</li>)}
-                        </ul>
+                {/* Submitting Actions Logs checklist */}
+                <div className="space-y-3 pt-4 border-t dark:border-gray-850">
+                    <h4 className="text-xs font-bold text-gray-800 dark:text-white flex items-center gap-1.5">
+                        <HistoryIcon className="w-4 h-4 text-primary" />
+                        سجل الحضور والمتابعة القانونية (Action Trails)
+                    </h4>
+
+                    <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                        {delegation.actionLog.map(action => (
+                            <div key={action.id} className="p-3 bg-gray-50 dark:bg-dm-background rounded-xl text-[10px] leading-relaxed border dark:border-gray-850">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-bold text-gray-800 dark:text-white">{action.action}</span>
+                                    <span className="text-gray-400 font-mono font-bold">{action.date}</span>
+                                </div>
+                                <span className="text-primary block text-[9px] font-bold">بواسطة: {action.actor}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            placeholder="تدوين إجراء قضائي تم اتخاذه بموجب التفويض..."
+                            value={actionInput}
+                            onChange={(e)=>setActionInput(e.target.value)}
+                            className="flex-grow text-xs rounded-xl px-3.5 py-2.5 bg-gray-50 dark:bg-dm-background border-none text-gray-800"
+                        />
+                        <Button size="sm" onClick={handleActionSubmit} className="rounded-xl font-bold">تسجيل إجراء</Button>
+                    </div>
+                </div>
+
+                {/* Signing Canvas component if activated */}
+                {isSigning && (
+                    <div className="p-4 bg-gray-55/40 dark:bg-dm-card border rounded-2xl">
+                        <SignaturePad 
+                            title="التوقيع بالقلم للاعتماد النهائي للجلسة"
+                            onSave={handleSignatureSave}
+                            onCancel={() => setIsSigning(false)}
+                        />
                     </div>
                 )}
 
-                {/* Digital Signature Display */}
-                {request.signatureUrl && (
-                    <div className="border p-3 rounded bg-gray-50 text-center">
-                        <p className="text-xs text-gray-500 mb-2">التوقيع الإلكتروني المعتمد</p>
-                        <img src={request.signatureUrl} alt="Signature" className="h-16 mx-auto border-b-2 border-gray-300"/>
-                        <p className="text-xs text-gray-400 mt-1">
-                            بواسطة: {request.signedBy} في {new Date(request.signedAt || '').toLocaleDateString('ar-EG')}
-                        </p>
-                    </div>
-                )}
-
-                <Card title="الحالة والإجراءات" titleClassName="text-sm">
-                    <div className="flex items-center gap-2 mb-3">
-                        <span>الحالة الحالية:</span>
-                        <RepresentationRequestStatusBadge status={request.status} />
-                    </div>
-                    {request.status !== RepresentationRequestStatus.PENDING && request.feedbackFromSubstitute && (
-                        <div className="bg-gray-100 p-2 rounded mb-3 text-sm">
-                            <strong>رد المحامي المناب:</strong> {request.feedbackFromSubstitute}
-                        </div>
-                    )}
-                    
-                    {!isSigning && (
-                        <div className="border-t pt-3">
-                            <label className="block text-sm font-medium mb-1">تحديث الحالة / الرد:</label>
-                            <TextArea value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={2} placeholder="أضف ملاحظات عند تغيير الحالة (مثل: سبب الرفض أو تقرير الجلسة)"/>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                                {/* Only show approve if not already accepted/completed */}
-                                {request.status === RepresentationRequestStatus.PENDING && (
-                                    <Button size="sm" variant="primary" onClick={() => setIsSigning(true)} leftIcon={<PencilIcon className="w-4"/>}>
-                                        توقيع وقبول واعتماد
-                                    </Button>
-                                )}
-                                <Button size="sm" variant="outline" className="text-blue-600 border-blue-600 hover:bg-blue-50" onClick={() => onUpdateStatus(request.id, RepresentationRequestStatus.COMPLETED, feedback)}>إكمال المهمة</Button>
-                                <Button size="sm" variant="outline" className="text-red-600 border-red-600 hover:bg-red-50" onClick={() => onUpdateStatus(request.id, RepresentationRequestStatus.REJECTED, feedback)}>رفض</Button>
+                {/* Updating Status workflow */}
+                {!isSigning && (
+                    <div className="p-4 bg-gray-50 dark:bg-dm-background rounded-2xl border dark:border-gray-850 space-y-3">
+                        <h4 className="text-xs font-bold text-gray-700 dark:text-gray-300">أدوات إشراف وحوكمة الإنابة القانونية</h4>
+                        <div className="flex items-center gap-3">
+                            <Select label="تحديث حالة التفويض" value={delegation.status} options={representationRequestStatusOptions} onChange={(e)=>onUpdateStatus(delegation.id, e.target.value as RepresentationRequestStatus, remarksInput)} />
+                            <div className="flex gap-1.5 mt-5">
+                                <Button size="sm" variant="outline" className="border-primary/20 text-primary hover:bg-primary/10 rounded-xl" onClick={()=>setIsSigning(true)}>توقيع فوري</Button>
+                                <Button size="sm" onClick={() => onPrintLetter(delegation)} className="rounded-xl" leftIcon={<PrinterIcon className="w-4 h-4"/>}>طباعة كتاب التفويض</Button>
                             </div>
                         </div>
-                    )}
-
-                    {isSigning && (
-                        <div className="mt-4 animate-fade-in-right">
-                            <SignaturePad 
-                                title="توقيع المحامي الأصيل للاعتماد"
-                                onSave={handleSignatureSave}
-                                onCancel={() => setIsSigning(false)}
-                            />
-                        </div>
-                    )}
-                </Card>
+                    </div>
+                )}
             </div>
-            <div className="flex justify-end gap-2 pt-3 border-t mt-2">
-                <Button variant="outline" onClick={onClose}>إغلاق</Button>
-                {request.status === RepresentationRequestStatus.ACCEPTED && 
-                    <Button onClick={() => onPrintAuthorization(request)} leftIcon={<PrinterIcon className="w-4"/>}>طباعة كتاب التفويض</Button>
-                }
+            
+            <div className="flex justify-end pt-4 border-t dark:border-gray-850">
+                <Button variant="outline" className="rounded-xl" onClick={onClose}>إغلاق النافذة</Button>
             </div>
         </Modal>
     );
 };
 
-const PrintableAuthorizationModal: React.FC<{ request: LegalRepresentationRequest | null; onClose: () => void }> = ({ request, onClose }) => {
-    if (!request) return null;
+// Printable Authorization Letter Component
+const OfficialAuthLetterModal: React.FC<{ delegation: EnhancedDelegation | null, onClose: () => void }> = ({ delegation, onClose }) => {
+    if (!delegation) return null;
     const today = new Date().toLocaleDateString('ar-EG');
+    const hasAuditLog = delegation.actionLog && delegation.actionLog.length > 0;
 
     return (
-        <Modal isOpen={!!request} onClose={onClose} title="معاينة كتاب التفويض" size="lg">
-            <div id="printable-auth-letter" className="p-8 bg-white text-black font-serif leading-relaxed">
-                <div className="text-center border-b-2 border-black pb-4 mb-6">
-                    <h2 className="text-2xl font-bold mb-1">مكتب العدالة للمحاماة والاستشارات القانونية</h2>
-                    <p className="text-sm">دولة الكويت</p>
-                </div>
-                
-                <div className="text-left mb-6">
-                    <p>التاريخ: {today}</p>
-                    <p>الموافق: ....................</p>
-                </div>
-
-                <h3 className="text-xl font-bold text-center mb-8 underline">كتاب تفويض وإنابة للحضور</h3>
-
-                <p className="mb-4 text-justify">
-                    أنا الموقع أدناه، المحامي/ <strong>{request.primaryLawyerName}</strong>، بصفتي وكيلاً عن {request.clientName} في القضية رقم <strong>({request.caseNumber})</strong> المنظورة أمام <strong>{request.courtName}</strong>.
-                </p>
-
-                <p className="mb-4 text-justify">
-                    أفوض وأنيب الزميل المحامي/ <strong>{request.substituteLawyerName}</strong>، للحضور نيابة عني في الجلسة المحدد لها يوم <strong>{new Date(request.hearingDate).toLocaleDateString('ar-EG', {weekday: 'long'})}</strong> الموافق <strong>{formatDate(request.hearingDate)}</strong>، وذلك للقيام بـ:
-                </p>
-
-                <div className="bg-gray-100 p-4 rounded mb-6 border border-gray-300">
-                    <strong>{request.sessionObjective}</strong>
-                </div>
-
-                <p className="mb-8 text-justify">
-                    وهذا تفويض مني بذلك، وله الحق في اتخاذ كافة الإجراءات القانونية اللازمة لحسن سير الدعوى في هذه الجلسة، والتوقيع نيابة عني على ما يلزم.
-                </p>
-
-                <div className="flex justify-between mt-12 px-8 align-bottom">
-                    <div className="text-center">
-                        <p className="font-bold mb-4">المحامي المفوض (الأصيل)</p>
-                        {request.signatureUrl ? (
-                            <img src={request.signatureUrl} alt="Signature" className="h-16 mx-auto"/>
-                        ) : (
-                            <p className="mt-8 text-gray-400 text-sm">(بانتظار التوقيع)</p>
-                        )}
-                        <p className="mt-2">{request.primaryLawyerName}</p>
+        <Modal isOpen={!!delegation} onClose={onClose} title="معاينة وطباعة كتاب إنابة الحضور المعتمد" size="lg">
+            <div className="flex flex-col space-y-4">
+                <div id="auth-letter-page" className="p-10 bg-white text-black font-serif leading-relaxed border aspect-[1/1.414] max-w-full relative shadow-md">
+                    <div className="text-center border-b-2 border-black pb-4 mb-8">
+                        <h2 className="text-xl font-extrabold tracking-tight">مكتب العدالة للمحاماة والاستشارات القانونية والمطالبات</h2>
+                        <p className="text-[10px] font-mono mt-1 font-bold">عدالة – منظومة الإدارة القانونية والتشريعية المتكاملة (v3)</p>
                     </div>
-                    <div className="text-center">
-                        <p className="font-bold mb-4">المحامي المفوض إليه (المناب)</p>
-                        <p className="mt-16">{request.substituteLawyerName}</p>
+
+                    <div className="flex justify-between text-xs mb-8">
+                        <p>تاريخ المعاينة: {today}</p>
+                        <p>الرقم المسلسل: {delegation.id}</p>
+                    </div>
+
+                    <h3 className="text-lg font-black text-center underline mb-8">كـتـاب إنـابـة ومـرافـعـة فـنـيـة مـعـتـمـدة</h3>
+
+                    <p className="text-xs text-justify mb-5 font-medium leading-relaxed">
+                        أنا الموقع أدناه المحامي/ <strong>{delegation.primaryLawyerName}</strong>، بصفتي المقيد كحاضر قضائي فني عن الموكل <strong>{delegation.clientName}</strong> في ملف القضية الجنائي/المدني المقيد برقم <strong>({delegation.caseNumber})</strong> المنظور بصفة رسمية أمام <strong>{delegation.courtName}</strong>.
+                    </p>
+
+                    <p className="text-xs text-justify mb-5 font-medium leading-relaxed">
+                        أفوض وأنيب بموجب هذا الزميل المحامي/ <strong>{delegation.substituteLawyerName}</strong>، للحضور نيابة عني ومباشرة كافة أوجه الدفاع الحركي، وسلوك المرافعة الشفوية والإقرار أمام الهيئات الموقرة في الجلسات والنفقات المقررة برابط تاريخ البدء <strong>{formatDate(delegation.startDate)}</strong> والممتدة حتى قفل التفويض بتاريخ <strong>{formatDate(delegation.endDate)}</strong> متمسكين بما آلت إليه الصلاحيات، وله حق تقديم مذكرات الرد والطعن القانوني المقررة.
+                    </p>
+
+                    <div className="my-6 p-4 bg-gray-50 border border-gray-200 text-xs font-sans rounded-xl text-slate-700 leading-relaxed">
+                        <strong>نطاق الولاية موضوع التفويض القضائي:</strong>
+                        <p className="mt-1 font-semibold text-gray-900">{delegation.sessionObjective}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-12 mt-12 text-center text-xs">
+                        <div>
+                            <p className="font-bold underline mb-4">توقيع المحامي المفوِّض (الأصيل)</p>
+                            {delegation.signatureUrl ? (
+                                <img src={delegation.signatureUrl} alt="Signature Badge" className="h-14 mx-auto dark:invert bg-white border p-1 rounded-md" />
+                            ) : (
+                                <div className="h-10 mt-2 border-2 border-dashed border-gray-300 rounded-md flex items-center justify-center text-gray-400 text-[10px]">بانتظار الإمضاء القلمي</div>
+                            )}
+                            <p className="mt-2 text-[10px] font-bold">{delegation.primaryLawyerName}</p>
+                        </div>
+                        <div>
+                            <p className="font-bold underline mb-4">إمضاء وقبول المحامي المناب</p>
+                            <p className="mt-16 text-[10px] font-bold">{delegation.substituteLawyerName}</p>
+                        </div>
+                    </div>
+
+                    {/* QR and official digital stamp footer */}
+                    <div className="absolute bottom-10 left-10 right-10 flex justify-between items-center text-[9px] text-gray-450 border-t pt-4 font-mono font-bold">
+                        <span>تم الصدور والاستخراج الفني عبر خادم العدالة الآمن - الكويت</span>
+                        <span>شفرة التحقق: AUTH-{delegation.id.slice(-6)}</span>
                     </div>
                 </div>
-                
-                <div className="mt-16 text-center text-xs border-t pt-4">
-                    <p>تم تحرير هذا التفويض إلكترونيًا عبر نظام إدارة القضايا {request.signedAt ? `بتاريخ ${new Date(request.signedAt).toLocaleDateString('ar-EG')}` : ''}</p>
+
+                <div className="flex justify-end gap-2 bg-gray-50 p-4 rounded-b-2xl">
+                    <Button variant="outline" className="rounded-xl" onClick={onClose}>إلغاء</Button>
+                    <Button onClick={() => window.print()} className="rounded-xl px-6" leftIcon={<PrinterIcon className="w-4 h-4"/>}>اطبع المستند كـ PDF</Button>
                 </div>
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t bg-gray-50 px-4 py-3 print-hide-in-modal">
-                <Button variant="outline" onClick={onClose}>إغلاق</Button>
-                <Button onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4"/>}>طباعة</Button>
             </div>
         </Modal>
     );
 };
 
+// --- MAIN PAGE LAYOUT ---
 const LegalRepresentationPage: React.FC = () => {
-  const { addToast } = useToast();
-  const [requests, setRequests] = useState<LegalRepresentationRequest[]>(mockLegalRepresentationRequests);
-  
-  // Filters
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<RepresentationRequestStatus | ''>('');
-  const [filterPriority, setFilterPriority] = useState<RepresentationPriority | ''>('');
-  const [filterPrimaryLawyer, setFilterPrimaryLawyer] = useState('');
-  const [filterSubstituteLawyer, setFilterSubstituteLawyer] = useState('');
-  
-  // Modals
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [editingRequest, setEditingRequest] = useState<Partial<LegalRepresentationRequest> | null>(null);
-  const [viewingRequest, setViewingRequest] = useState<LegalRepresentationRequest | null>(null);
-  const [printingRequest, setPrintingRequest] = useState<LegalRepresentationRequest | null>(null);
+    const { addToast } = useToast();
+    
+    // Delegation state list
+    const [delegations, setDelegations] = useState<EnhancedDelegation[]>(initialDelegations);
 
-  const filteredRequests = useMemo(() => {
-    return requests.filter(req =>
-      (req.caseNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       req.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       req.courtName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-       req.sessionObjective?.toLowerCase().includes(searchTerm.toLowerCase())
-      ) &&
-      (filterStatus ? req.status === filterStatus : true) &&
-      (filterPriority ? req.priority === filterPriority : true) &&
-      (filterPrimaryLawyer ? req.primaryLawyerId === filterPrimaryLawyer : true) &&
-      (filterSubstituteLawyer ? req.substituteLawyerId === filterSubstituteLawyer : true)
-    ).sort((a,b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime());
-  }, [requests, searchTerm, filterStatus, filterPriority, filterPrimaryLawyer, filterSubstituteLawyer]);
+    // Filters and search states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [directionFilter, setDirectionFilter] = useState<'all' | DelegationDirection>('all');
+    const [scopeFilter, setScopeFilter] = useState<'all' | DelegationScopeType>('all');
+    const [statusFilter, setStatusFilter] = useState<'all' | RepresentationRequestStatus>('all');
 
-  const stats = useMemo(() => {
-    return {
-        total: requests.length,
-        pending: requests.filter(r => r.status === RepresentationRequestStatus.PENDING).length,
-        accepted: requests.filter(r => r.status === RepresentationRequestStatus.ACCEPTED).length,
-        completed: requests.filter(r => r.status === RepresentationRequestStatus.COMPLETED).length,
-        urgent: requests.filter(r => r.priority === RepresentationPriority.URGENT && r.status !== RepresentationRequestStatus.COMPLETED).length
+    // Modals control
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingDelegation, setEditingDelegation] = useState<EnhancedDelegation | null>(null);
+    const [viewingDelegation, setViewingDelegation] = useState<EnhancedDelegation | null>(null);
+    const [printingDelegation, setPrintingDelegation] = useState<EnhancedDelegation | null>(null);
+
+    // Statistics counts
+    const statistics = useMemo(() => {
+        const total = delegations.length;
+        const active = delegations.filter(d => d.status === RepresentationRequestStatus.ACCEPTED && new Date(d.endDate).getTime() >= Date.now()).length;
+        const incoming = delegations.filter(d => d.direction === DelegationDirection.INCOMING).length;
+        const expired = delegations.filter(d => new Date(d.endDate).getTime() < Date.now()).length;
+        return { total, active, incoming, expired };
+    }, [delegations]);
+
+    const handleFormSubmit = (delegation: EnhancedDelegation) => {
+        const isEditing = delegations.some(d => d.id === delegation.id);
+        if (isEditing) {
+            setDelegations(prev => prev.map(d => d.id === delegation.id ? delegation : d));
+            addToast({ type: 'success', title: 'تم وتحديث الإنابة', message: 'جرى تعديل تعليمات ومستويات الإنابة القضائية بنجاح.' });
+        } else {
+            setDelegations(prev => [delegation, ...prev]);
+            addToast({ type: 'success', title: 'تصدير ناجح', message: 'تم فتح ملف الإنابة وتعميم التنبيه قبل تاريخ انتهاء الصلاحية.' });
+        }
+        setIsFormOpen(false);
+        setEditingDelegation(null);
     };
-  }, [requests]);
 
-  const handleAddRequest = () => { setEditingRequest(null); setIsFormModalOpen(true); };
-  const handleEditRequest = (req: LegalRepresentationRequest) => { setEditingRequest(req); setIsFormModalOpen(true); };
-  const handleViewRequest = (req: LegalRepresentationRequest) => { setViewingRequest(req); };
-  const handlePrintRequest = (req: LegalRepresentationRequest) => { setPrintingRequest(req); };
-  
-  const handleDeleteRequest = useCallback((requestId: string) => {
-    if (window.confirm('هل أنت متأكد أنك تريد حذف طلب الإنابة هذا؟')) {
-        setRequests(prev => prev.filter(r => r.id !== requestId));
-    }
-  }, []);
+    const handleUpdateStatus = (id: string, newStatus: RepresentationRequestStatus, remarks: string) => {
+        setDelegations(prev => prev.map(d => {
+            if (d.id === id) {
+                const newLog = {
+                    id: `act-${Date.now()}`,
+                    date: new Date().toISOString().split('T')[0],
+                    action: `تغيير حالة الإنابة إلى [${newStatus}] ملاحظات: ${remarks || 'لا يوجد'}`,
+                    actor: 'صحة التوقيع / الشؤون القلمية'
+                };
+                return {
+                    ...d,
+                    status: newStatus,
+                    feedbackFromSubstitute: remarks,
+                    actionLog: [...d.actionLog, newLog],
+                    updatedAt: new Date().toISOString()
+                };
+            }
+            return d;
+        }));
+        setViewingDelegation(null);
+        addToast({ type: 'success', title: 'تم تعديل الرتبة الإدارية', message: 'جرى تدوين تحديث الحضور بملفات القضية بنجاح.' });
+    };
 
-  const handleFormSubmit = (data: LegalRepresentationRequest) => {
-    if (editingRequest && editingRequest.id) {
-      setRequests(prev => prev.map(r => (r.id === editingRequest.id ? data : r)));
-    } else {
-      setRequests(prev => [{ ...data, id: `lr-req-${Date.now()}` }, ...prev]);
-    }
-    setIsFormModalOpen(false);
-    setEditingRequest(null);
-  };
+    const handlePerformAction = (id: string, actionDesc: string) => {
+        setDelegations(prev => prev.map(d => {
+            if (d.id === id) {
+                const newLog = {
+                    id: `act-${Date.now()}`,
+                    date: new Date().toISOString().split('T')[0],
+                    action: actionDesc,
+                    actor: d.substituteLawyerName || 'المحامي المكلف بالملف'
+                };
+                return {
+                    ...d,
+                    actionLog: [...d.actionLog, newLog],
+                    updatedAt: new Date().toISOString()
+                };
+            }
+            return d;
+        }));
+        // Update viewing element to avoid stale content
+        setViewingDelegation(prev => prev && prev.id === id ? { ...prev, actionLog: [...prev.actionLog, { id: `act-${Date.now()}`, date: new Date().toISOString().split('T')[0], action: actionDesc, actor: prev.substituteLawyerName }] } as EnhancedDelegation : prev);
+        addToast({ type: 'success', title: 'تم تقييد الإجراء الفعلي', message: 'سُجلت المحاضرة والملاحظة بسلسلة المتابعة بنجاح.' });
+    };
 
-  const handleStatusUpdate = (id: string, status: RepresentationRequestStatus, feedback?: string) => {
-      setRequests(prev => prev.map(r => r.id === id ? { ...r, status, feedbackFromSubstitute: feedback || r.feedbackFromSubstitute } : r));
-      if (viewingRequest && viewingRequest.id === id) {
-          setViewingRequest(prev => prev ? { ...prev, status, feedbackFromSubstitute: feedback || prev.feedbackFromSubstitute } : null);
-      }
-  };
+    const handleSignApproved = (id: string, signatureUrl: string) => {
+        setDelegations(prev => prev.map(d => {
+            if (d.id === id) {
+                const newLog = {
+                    id: `act-${Date.now()}`,
+                    date: new Date().toISOString().split('T')[0],
+                    action: 'توقيع واعتماد التفويض القلمي والمرافعة رقمياً',
+                    actor: 'رئاسة القسم فني'
+                };
+                return {
+                    ...d,
+                    signatureUrl,
+                    signedBy: 'المحامي المفوض (المشرف القانوني العام)',
+                    signedAt: new Date().toISOString(),
+                    status: RepresentationRequestStatus.ACCEPTED,
+                    actionLog: [...d.actionLog, newLog]
+                };
+            }
+            return d;
+        }));
+        // Update model view immediately
+        setViewingDelegation(prev => prev ? { ...prev, signatureUrl, signedBy: 'المفوض الفني العام', signedAt: new Date().toISOString(), status: RepresentationRequestStatus.ACCEPTED } as EnhancedDelegation : null);
+        addToast({ type: 'success', title: 'توقيع ناجح', message: 'تم اعتماد وصرف التفويض للزميل لحين موعد الجلسة.' });
+    };
 
-  const handleSignAndApprove = (id: string, signatureUrl: string) => {
-      const timestamp = new Date().toISOString();
-      const signerName = "المحامي الأصيل"; // Ideally from current user context
+    const handleDeleteDelegation = (id: string) => {
+        if (confirm('هل ترغب في شطب ملف الإنابة القضائية وإلغاء ترخيص تفويض المرافعة؟')) {
+            setDelegations(prev => prev.filter(d => d.id !== id));
+            addToast({ type: 'success', title: 'شطب وإبطال', message: 'تم إنهاء العمل بملف التفويض نهائياً وبأثر رجعي.' });
+        }
+    };
 
-      setRequests(prev => prev.map(r => 
-          r.id === id ? { 
-              ...r, 
-              status: RepresentationRequestStatus.ACCEPTED, 
-              signatureUrl, 
-              signedBy: signerName, 
-              signedAt: timestamp 
-          } : r
-      ));
+    const handleEditDelegation = (delegation: EnhancedDelegation) => {
+        setEditingDelegation(delegation);
+        setIsFormOpen(true);
+    };
 
-      if (viewingRequest && viewingRequest.id === id) {
-          setViewingRequest(prev => prev ? { 
-              ...prev, 
-              status: RepresentationRequestStatus.ACCEPTED, 
-              signatureUrl, 
-              signedBy: signerName, 
-              signedAt: timestamp 
-          } : null);
-      }
+    const handlePrintLetter = (delegation: EnhancedDelegation) => {
+        setPrintingDelegation(delegation);
+    };
 
-      // Simulate sending notification
-      addToast({
-          type: 'success',
-          title: 'تم الاعتماد',
-          message: "تم اعتماد الطلب وتوقيعه بنجاح.\nتم إرسال إشعار للمحامي المناب."
-      });
-  };
-  
-  return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <motion.div 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col md:flex-row justify-between items-center gap-4"
-      >
-        <div className="flex items-center">
-            <div className="p-3 bg-primary/10 rounded-xl me-4">
-                <ScaleIcon className="w-8 h-8 text-primary" />
-            </div>
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900 font-sans tracking-tight">إدارة الإنابات القضائية</h1>
-                <p className="text-sm text-gray-500">تفويض الزملاء للحضور ومعالجة طلبات التمثيل القانوني</p>
-            </div>
-        </div>
-        <Button 
-            onClick={handleAddRequest} 
-            className="w-full md:w-auto shadow-lg shadow-primary/20"
-            leftIcon={<PlusCircleIcon className="w-5 h-5" />}
-        >
-            إنشاء طلب إنابة جديد
-        </Button>
-      </motion.div>
+    // Filtered Delegations lists
+    const filteredDelegations = useMemo(() => {
+        return delegations.filter(del => {
+            const matchesSearch = del.caseNumber.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                del.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                del.courtName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                del.primaryLawyerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (del.substituteLawyerName && del.substituteLawyerName.toLowerCase().includes(searchQuery.toLowerCase()));
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="إجمالي الإنابات" value={stats.total} icon={ClipboardDocumentListIcon} color="blue" />
-          <StatCard label="بانتظار الاعتماد" value={stats.pending} icon={ClockIcon} color="yellow" pulse />
-          <StatCard label="مهام نشطة" value={stats.accepted} icon={ArrowPathIcon} color="green" />
-          <StatCard label="عاجل جداً" value={stats.urgent} icon={ExclamationTriangleIcon} color="red" />
-      </div>
-      
-      <Card>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end mb-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
-            <div className="lg:col-span-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase mb-1 block">بحث نصي</label>
-                <div className="relative">
-                    <Input placeholder="رقم القضية، الموكل..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="pr-9" />
-                    <MagnifyingGlassIcon className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            const matchesDirection = directionFilter === 'all' || del.direction === directionFilter;
+            const matchesScope = scopeFilter === 'all' || del.scopeType === scopeFilter;
+            const matchesStatus = statusFilter === 'all' || del.status === statusFilter;
+
+            return matchesSearch && matchesDirection && matchesScope && matchesStatus;
+        });
+    }, [delegations, searchQuery, directionFilter, scopeFilter, statusFilter]);
+
+    return (
+        <div className="space-y-8 max-w-7xl mx-auto pb-32">
+            
+            {/* Executive Cover page widget */}
+            <div className="relative overflow-hidden bg-[#1e293b] rounded-[2.5rem] p-8 md:p-10 text-white shadow-2xl">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-primary/15 rounded-full -translate-y-1/2 translate-x-1/4 blur-3xl animate-pulse" />
+                <div className="relative z-10 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex items-center gap-6 text-center md:text-right">
+                        <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                            <ScaleIcon className="w-9 h-9 text-amber-400" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-black tracking-tight flex items-center justify-center md:justify-start gap-2">
+                                نظام الإنابات والتوكيلات القضائية
+                                <span className="text-[10px] bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full font-black font-sans uppercase">Lawyer POA Scope</span>
+                            </h1>
+                            <p className="text-xs text-slate-400 mt-1 font-bold">صياغة وتعميم إنابات المرافعة وحضور كتاب المحاكم والخبراء مع مراقبة النفاذ والتواقيع الرقمية الفورية</p>
+                        </div>
+                    </div>
+
+                    <Button 
+                        onClick={() => { setEditingDelegation(null); setIsFormOpen(true); }} 
+                        className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-extrabold px-6 rounded-2xl shadow-xl border-none"
+                    >
+                        تحرير كتاب إنابة جديدة +
+                    </Button>
                 </div>
             </div>
-            <Select label="الحالة" options={[{value: '', label: 'الكل'}, ...representationRequestStatusOptions]} value={filterStatus} onChange={e => setFilterStatus(e.target.value as RepresentationRequestStatus | '')} />
-            <Select label="الأولوية" options={[{value: '', label: 'الكل'}, ...representationPriorityOptions]} value={filterPriority} onChange={e => setFilterPriority(e.target.value as RepresentationPriority | '')} />
-            <Select label="المحامي الأصيل" options={[{value: '', label: 'الكل'}, ...initialEmployees.map(e => ({value: e.id, label: e.fullNameAr}))]} value={filterPrimaryLawyer} onChange={e => setFilterPrimaryLawyer(e.target.value)} />
-            <Select label="المحامي المناب" options={[{value: '', label: 'الكل'}, ...initialEmployees.map(e => ({value: e.id, label: e.fullNameAr}))]} value={filterSubstituteLawyer} onChange={e => setFilterSubstituteLawyer(e.target.value)} />
-        </div>
-        
-        <div className="overflow-x-auto min-h-[400px]">
-            <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                    <tr>
-                        {['بيانات القضية', 'الجلسة والمكان', 'المهمة', 'المحامون', 'الحالة', 'الأولوية', 'الإجراءات'].map(h=><th key={h} className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">{h}</th>)}
-                    </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                    <AnimatePresence mode="popLayout">
-                        {filteredRequests.map((req, idx) => (
-                            <motion.tr 
-                                key={req.id}
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 10 }}
-                                transition={{ delay: idx * 0.05 }}
-                                className="group hover:bg-primary/5 transition-colors"
-                            >
-                                <td className="px-4 py-4">
-                                    <div className="flex items-center">
-                                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center me-3 group-hover:bg-primary/10 transition-colors">
-                                            <FolderIcon className="w-4 h-4 text-gray-400 group-hover:text-primary" />
-                                        </div>
-                                        <div>
-                                            <div className="font-bold text-gray-900 group-hover:text-primary transition-colors">{req.caseNumber}</div>
-                                            <div className="text-[10px] text-gray-500 font-mono">{req.clientName}</div>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center text-xs font-bold text-gray-700">
-                                            <CalendarDaysIcon className="w-3 h-3 me-1 text-primary" />
-                                            {formatDate(req.hearingDate)}
-                                        </div>
-                                        <div className="text-[10px] text-gray-500 flex items-center mt-1">
-                                            <BuildingLibraryIcon className="w-3 h-3 me-1" />
-                                            {req.courtName}
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div className="text-xs text-gray-600 line-clamp-2 max-w-[180px]" title={req.sessionObjective}>
-                                        {req.sessionObjective}
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <div className="flex flex-col gap-1">
-                                        <div className="flex items-center text-[10px]">
-                                            <span className="w-2 h-2 rounded-full bg-blue-400 me-1"></span>
-                                            <span className="text-gray-500">أصيل: </span>
-                                            <span className="font-bold text-gray-700 ms-1">{req.primaryLawyerName}</span>
-                                        </div>
-                                        <div className="flex items-center text-[10px]">
-                                            <span className="w-2 h-2 rounded-full bg-green-400 me-1"></span>
-                                            <span className="text-gray-500">مناب: </span>
-                                            <span className="font-bold text-gray-700 ms-1">{req.substituteLawyerName || 'بانتظار التحديد'}</span>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <RepresentationRequestStatusBadge status={req.status}/>
-                                </td>
-                                <td className="px-4 py-4">
-                                    <PriorityBadge priority={req.priority} />
-                                </td>
-                                <td className="px-4 py-4 whitespace-nowrap">
-                                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Button variant="outline" size="sm" onClick={() => handleViewRequest(req)} title="عرض وإجراء" className="h-8 w-8 !p-0 flex items-center justify-center rounded-lg border-primary/20 text-primary hover:bg-primary hover:text-white">
-                                            <EyeIcon className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="ghost" size="sm" onClick={() => handleEditRequest(req)} title="تعديل" className="h-8 w-8 !p-0 flex items-center justify-center rounded-lg"><PencilIcon className="w-4 h-4 text-yellow-600" /></Button>
-                                        {req.status === RepresentationRequestStatus.ACCEPTED && 
-                                            <Button variant="ghost" size="sm" onClick={() => handlePrintRequest(req)} title="طباعة التفويض" className="h-8 w-8 !p-0 flex items-center justify-center rounded-lg"><PrinterIcon className="w-4 h-4 text-gray-600" /></Button>
-                                        }
-                                        <Button variant="ghost" size="sm" onClick={() => handleDeleteRequest(req.id)} className="h-8 w-8 !p-0 flex items-center justify-center text-red-500 hover:bg-red-50 rounded-lg"><TrashIcon className="w-4 h-4" /></Button>
-                                    </div>
-                                </td>
-                            </motion.tr>
-                        ))}
-                    </AnimatePresence>
-                    {filteredRequests.length === 0 && (
-                        <tr>
-                            <td colSpan={7} className="text-center py-20 text-gray-500">
-                                <div className="bg-gray-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 border-2 border-dashed border-gray-200">
-                                    <ScaleIcon className="w-10 h-10 text-gray-300"/>
-                                </div>
-                                <p className="font-bold text-lg">لا توجد طلبات إنابة</p>
-                                <p className="text-sm">لم يتم العثور على أية طلبات تطابق معايير البحث الحالية.</p>
-                            </td>
-                        </tr>
-                    )}
-                </tbody>
-            </table>
-        </div>
-      </Card>
 
-      <RequestFormModal 
-        isOpen={isFormModalOpen}
-        onClose={() => setIsFormModalOpen(false)}
-        onSubmit={handleFormSubmit}
-        initialData={editingRequest}
-        cases={initialCases}
-        lawyers={initialEmployees}
-      />
-      
-      <ViewRepresentationRequestModal 
-        request={viewingRequest} 
-        onClose={() => setViewingRequest(null)}
-        onPrintAuthorization={handlePrintRequest}
-        onUpdateStatus={handleStatusUpdate}
-        onSignAndApprove={handleSignAndApprove}
-      />
+            {/* Smart Stats indicators */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <StatCard label="إجمالي ملفات التراخيص" value={statistics.total} icon={FolderIcon} color="blue" />
+                <StatCard label="التفويضات السارية المعتمدة" value={statistics.active} icon={CheckCircleIcon} color="green" />
+                <StatCard label="إنابات واردة (مكتب خارجي)" value={statistics.incoming} icon={UsersIcon} color="yellow" />
+                <StatCard label="ملفات متقادمة / منتهية" value={statistics.expired} icon={ExclamationTriangleIcon} color="red" pulse />
+            </div>
 
-      <PrintableAuthorizationModal 
-        request={printingRequest} 
-        onClose={() => setPrintingRequest(null)} 
-      />
-    </div>
-  );
+            {/* Main Desk layout with filtering panel */}
+            <Card className="p-6 md:p-8 rounded-[2rem] border-none shadow-xl">
+                
+                {/* Custom multi-filter rows panel */}
+                <div className="p-5 bg-gray-50 dark:bg-dm-background rounded-2xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 text-xs font-bold border dark:border-gray-850">
+                    <div>
+                        <label className="text-slate-400 mb-1.5 block">تصنيف وتوجيه الطلب:</label>
+                        <select 
+                            value={directionFilter} 
+                            onChange={(e)=>setDirectionFilter(e.target.value as any)}
+                            className="w-full border-none bg-white p-2.5 rounded-xl text-xs font-bold shadow-sm"
+                        >
+                            <option value="all">كل الاتجاهات (صادر / وارد)</option>
+                            <option value={DelegationDirection.OUTGOING}>{DelegationDirection.OUTGOING}</option>
+                            <option value={DelegationDirection.INCOMING}>{DelegationDirection.INCOMING}</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-slate-400 mb-1.5 block">نطاق الغرض القانوني:</label>
+                        <select 
+                            value={scopeFilter} 
+                            onChange={(e)=>setScopeFilter(e.target.value as any)}
+                            className="w-full border-none bg-white p-2.5 rounded-xl text-xs font-bold shadow-sm"
+                        >
+                            <option value="all">كل نطاقات التراخيص</option>
+                            <option value={DelegationScopeType.COURT_APPEARANCE}>{DelegationScopeType.COURT_APPEARANCE}</option>
+                            <option value={DelegationScopeType.PROCEDURAL}>{DelegationScopeType.PROCEDURAL}</option>
+                            <option value={DelegationScopeType.CASE_FOLLOW_UP}>{DelegationScopeType.CASE_FOLLOW_UP}</option>
+                            <option value={DelegationScopeType.HEARING_REPRESENTATION}>{DelegationScopeType.HEARING_REPRESENTATION}</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-slate-400 mb-1.5 block">حالة السند القانوني:</label>
+                        <select 
+                            value={statusFilter} 
+                            onChange={(e)=>setStatusFilter(e.target.value as any)}
+                            className="w-full border-none bg-white p-2.5 rounded-xl text-xs font-bold shadow-sm"
+                        >
+                            <option value="all">كل حالات الاعتمادات المتاحة</option>
+                            <option value={RepresentationRequestStatus.PENDING}>قيد المطالعة والقبول (Pending)</option>
+                            <option value={RepresentationRequestStatus.ACCEPTED}>معتمد ومفعّل (Active)</option>
+                            <option value={RepresentationRequestStatus.COMPLETED}>تمت المهمة مجمع المحاكم (Closed)</option>
+                            <option value={RepresentationRequestStatus.REJECTED}>تم الرفض والالغاء (Cancelled)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label className="text-slate-400 mb-1.5 block">مربع البحث السريع:</label>
+                        <div className="relative">
+                            <input 
+                                type="text" 
+                                placeholder="رقم القضية، الموكل، الزميل المناب..."
+                                value={searchQuery}
+                                onChange={(e)=>setSearchQuery(e.target.value)}
+                                className="w-full border-none bg-white pr-9 pl-4 py-2.5 rounded-xl text-xs font-bold shadow-sm"
+                            />
+                            <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Table list of delegations */}
+                <div className="overflow-x-auto min-h-[350px]">
+                    <table className="min-w-full text-right text-xs">
+                        <thead>
+                            <tr className="bg-gray-50 dark:bg-dm-background border-b border-gray-100 dark:border-gray-800 text-gray-500 font-black uppercase tracking-widest">
+                                <th className="p-4">رقم القضية والارتباط</th>
+                                <th className="p-4 text-center">التوجيه</th>
+                                <th className="p-4">نطاق الإنابة والمسؤولية</th>
+                                <th className="p-4">المحامي الأصيل ← المناب</th>
+                                <th className="p-4">صلاحية التفويض</th>
+                                <th className="p-4 text-center">أمن السند</th>
+                                <th className="p-4 text-center">التحكم</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-850 font-bold text-gray-700 dark:text-gray-300">
+                            {filteredDelegations.map(del => {
+                                const isExpired = new Date(del.endDate).getTime() < Date.now();
+                                return (
+                                    <tr key={del.id} className="hover:bg-gray-55/40 transition-colors group">
+                                        <td className="p-4 whitespace-nowrap">
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-primary/10 rounded-xl">
+                                                    <ScaleIcon className="w-5 h-5 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <span className="font-black text-gray-900 dark:text-white block">{del.caseNumber}</span>
+                                                    <span className="text-[10px] text-gray-400 dark:text-gray-500 block truncate max-w-[150px] font-bold">{del.clientName}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 text-center whitespace-nowrap">
+                                            <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${del.direction === DelegationDirection.OUTGOING ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
+                                                {del.direction.split(' ')[0]}
+                                            </span>
+                                        </td>
+                                        <td className="p-4">
+                                            <div>
+                                                <span className="font-extrabold text-gray-800 dark:text-gray-200 block">{del.scopeType}</span>
+                                                <span className="text-[10px] text-primary block truncate max-w-[160px]" title={del.sessionObjective}>{del.sessionObjective}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4 whitespace-nowrap text-xs">
+                                            <span className="text-gray-900 dark:text-gray-250 font-bold">{del.primaryLawyerName.split(' ')[1] || del.primaryLawyerName}</span>
+                                            <span className="text-slate-400 mx-2">←</span>
+                                            <span className="text-primary font-black">{del.substituteLawyerName ? (del.substituteLawyerName.split(' ')[1] || del.substituteLawyerName) : 'لم يتم تحديده'}</span>
+                                        </td>
+                                        <td className="p-4 whitespace-nowrap font-mono">
+                                            {isExpired ? (
+                                                <span className="text-red-650 font-extrabold line-through block">متقادم ({del.endDate})</span>
+                                            ) : (
+                                                <span className="text-emerald-700 block">سارٍ لغاية {del.endDate}</span>
+                                            )}
+                                        </td>
+                                        <td className="p-4 text-center">
+                                            <RepresentationRequestStatusBadge status={del.status} />
+                                        </td>
+                                        <td className="p-4 text-center whitespace-nowrap">
+                                            <div className="flex gap-1 justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={() => setViewingDelegation(del)} className="p-2.5 bg-gray-50 hover:bg-primary/10 text-primary rounded-xl" title="حوكمة وتعديل وسجل التواقيع"><EyeIcon className="w-4 h-4"/></button>
+                                                <button onClick={() => handleEditDelegation(del)} className="p-2.5 bg-gray-50 hover:bg-amber-50 text-amber-600 rounded-xl" title="تعديل التفاصيل"><PencilIcon className="w-4 h-4"/></button>
+                                                <button onClick={() => handlePrintLetter(del)} className="p-2.5 bg-gray-50 hover:bg-indigo-55 text-indigo-600 rounded-xl" title="استعراض كتاب التفويض والتصدير"><PrinterIcon className="w-4 h-4"/></button>
+                                                <button onClick={() => handleDeleteDelegation(del.id)} className="p-2.5 bg-gray-50 hover:bg-rose-50 text-rose-600 rounded-xl" title="إلغاء وإسقاط الصلاحية"><TrashIcon className="w-4 h-4"/></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            </Card>
+
+            {/* Modals controls */}
+            <DelegationFormModal 
+                isOpen={isFormOpen}
+                onClose={() => setIsFormOpen(false)}
+                onSubmit={handleFormSubmit}
+                initialData={editingDelegation}
+                cases={initialCases}
+                lawyers={initialEmployees}
+            />
+
+            <DelegationDetailModal 
+                delegation={viewingDelegation}
+                onClose={() => setViewingDelegation(null)}
+                onUpdateStatus={handleUpdateStatus}
+                onPerformAction={handlePerformAction}
+                onPrintLetter={handlePrintLetter}
+                onSignApproved={handleSignApproved}
+            />
+
+            <OfficialAuthLetterModal 
+                delegation={printingDelegation}
+                onClose={() => setPrintingDelegation(null)}
+            />
+        </div>
+    );
 };
+
+// --- Custom Internal Helpers ---
+function StatCard({ label, value, icon: Icon, color, pulse }: { label: string, value: number, icon: any, color: 'blue' | 'yellow' | 'green' | 'red', pulse?: boolean }) {
+    const colorMap = {
+        blue: 'from-blue-500/20 to-blue-600/20 text-blue-700 border-blue-200',
+        yellow: 'from-yellow-500/20 to-yellow-600/20 text-yellow-700 border-yellow-200',
+        green: 'from-green-500/20 to-green-600/20 text-green-700 border-green-200',
+        red: 'from-red-500/20 to-red-600/20 text-red-700 border-red-200'
+    };
+    
+    return (
+        <motion.div 
+            whileHover={{ scale: 1.02 }}
+            className={`bg-white dark:bg-dm-card p-5 rounded-2xl border dark:border-gray-800 shadow-sm flex items-center justify-between overflow-hidden relative`}
+        >
+            <div className={`absolute -right-4 -bottom-4 w-24 h-24 bg-gradient-to-br ${colorMap[color].split(' ')[0]} rounded-full blur-2xl opacity-50`}></div>
+            <div className="relative z-10">
+                <p className="text-xs font-bold text-gray-500 mb-1 uppercase tracking-wider">{label}</p>
+                <div className="flex items-baseline">
+                    <span className="text-3xl font-black text-gray-900 dark:text-white">{value}</span>
+                    <span className="text-xs text-gray-400 ms-1 font-bold">ملفات</span>
+                </div>
+            </div>
+            <div className={`relative z-10 p-3 rounded-xl bg-gradient-to-br ${colorMap[color].split(' ')[0]} ${pulse ? 'animate-pulse' : ''}`}>
+                <Icon className={`w-6 h-6 ${colorMap[color].split(' ')[2]}`} />
+            </div>
+        </motion.div>
+    );
+}
 
 export default LegalRepresentationPage;

@@ -78,6 +78,7 @@ import PartyTrackingPage from './pages/PartyTrackingPage'; // New Party Tracking
 import DebtSettlementPage from './pages/DebtSettlementPage'; // New Debt Settlement Page
 import AutomatedDocketPage from './pages/AutomatedDocketPage'; // New Automated Docket Page
 import MojSearchPage from './pages/MojSearchPage'; // New MOJ Search Page
+import LitigationToolsPage from './pages/LitigationToolsPage';
 
 
 // Employee Affairs Sub-modules
@@ -87,6 +88,9 @@ import DisciplinaryActionsPage from './pages/DisciplinaryActionsPage';
 import EmployeeRequestsPage from './pages/EmployeeRequestsPage';
 import InvestigationsPage from './pages/InvestigationsPage'; // NEW: Investigations Page
 import EmployeePerformancePage from './pages/EmployeePerformancePage';
+import RecruitmentHiringPage from './pages/RecruitmentHiringPage';
+import EmployeeContractsPage from './pages/EmployeeContractsPage';
+import PayrollManagementPage from './pages/PayrollManagementPage';
 
 // Property Management Sub-modules (NEW)
 import PropertyMaintenancePage from './pages/PropertyMaintenancePage';
@@ -242,7 +246,11 @@ const AppContent: React.FC = () => {
                 <Route path="/employee-affairs/investigations" element={<InvestigationsPage />} />
                 <Route path="/employee-affairs/performance" element={<EmployeePerformancePage />} />
                 <Route path="/employee-affairs/requests" element={<EmployeeRequestsPage />} />
+                <Route path="/employee-affairs/recruitment" element={<RecruitmentHiringPage />} />
+                <Route path="/employee-affairs/contracts" element={<EmployeeContractsPage />} />
+                <Route path="/employee-affairs/payroll" element={<PayrollManagementPage />} />
                 
+                <Route path="/litigation-tools" element={<LitigationToolsPage initialTab="dashboard" />} />
                 <Route path="/kba" element={<KuwaitBarAssociationPage />} /> 
                 <Route path="/legal-representation" element={<LegalRepresentationPage />} /> 
                 <Route path="/notifications" element={<NotificationsManagementPage />} /> 

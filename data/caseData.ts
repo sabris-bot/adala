@@ -224,5 +224,67 @@ export const initialCases: Case[] = [
     ],
     createdDate: '2024-04-01', 
     description: 'نزاع عمالي لموظف أجنبي تم إنهاء خدماته فجأة بعد عشر سنوات من العمل دون صرف مستحقاته القانونية.',
+  },
+  {
+    id: '10',
+    title: 'دعوى فرز وتجنيب حصص وإخلاء عقار استثماري مع المطالبة بقيمة ريع الإيجار المتأخر',
+    caseNumber: '2024/78224-RE',
+    internalCaseNumber: 'EX-RE-2024-010',
+    fileNumber: '2024/010-RE',
+    clientName: 'غالية فهد الغانم',
+    clientRole: ['مدعية'],
+    group: 'المنازعات العقارية والملكية',
+    caseMainType: CaseMainType.REAL_ESTATE,
+    caseSubType: 'فرز وتجنيب وإخلاء بوضع اليد',
+    status: CaseStatus.IN_PROGRESS,
+    priority: CasePriority.HIGH,
+    riskLevel: RiskLevel.MEDIUM,
+    assignedLawyer: 'أ. صبري شطا',
+    assignedLegalTeam: ['أ. صبري شطا', 'أ. مريم العتيبي'],
+    courtName: 'محكمة الأحمدي الكلية - الدائرة العقارية الثالثة',
+    courtLevel: CourtLevel.FIRST_INSTANCE,
+    litigationStage: LitigationStage.FIRST_INSTANCE,
+    circuit: 'الدائرة الثالثة عقاري كلي',
+    judgeName: 'المستشار ناصر الكندري',
+    opposingPartyName: 'خالد عبد الرحمن الغانم شريك بالشيوع',
+    opponentRole: 'مدعى عليه (مطلوب ضده)',
+    filingDate: '2024-03-01',
+    registrationDate: '2024-02-25',
+    legalDemands: 'فرز وتجنيب حصة الموكلة بالعقار الاستثماري الكائن بمنطقة الفنطاس، ندب خبير هندسي، وإلزام المدعى عليه بسداد 18,500 د.ك قيمة ريع متأخر.',
+    legalNotes: 'كافة وثائق عقود التوريث وحصر الورثة مستوفاة ومرفقة لبيان ملكية الشيوع.',
+    poaNumbers: ['2023/889211'],
+    statuteOfLimitationsDate: '2029-03-01',
+    notificationStatus: NotificationStatus.COMPLETED,
+    financials: {
+      totalFees: 5800,
+      paid: 3000,
+      remaining: 2800,
+      currency: 'د.ك',
+      expenses: [
+        { id: 'exp-10-1', name: 'رسوم معاينة خبير هندسي', amount: 150 },
+        { id: 'exp-10-2', name: 'رسوم قيد عقاري كلي', amount: 50 }
+      ]
+    },
+    hearings: [
+      { id: 'h10-1', date: '2024-04-05', type: 'نظرة أولى وإحالة للخبراء', status: 'Completed', notes: 'تم ندب لجنة الخبراء الهندسية لمعاينة العقار الشائع على الطبيعة.' },
+      { id: 'h10-2', date: '2024-05-28', type: 'معاينة بمكتب الخبراء', status: 'Scheduled', notes: 'تقديم مستندات ملكية الشركاء بحجم الحصص وتفصيل الانتفاع.' }
+    ],
+    caseFiles: [
+      { id: 'f10-1', fileName: 'وثيقة حصر ورثة وفريضة شرعية.pdf', fileType: 'Legal Document', uploadedAt: '2024-02-25', description: 'تثبت ملكية الشيوع وأنصبة الخلطاء بالقانون' },
+      { id: 'f10-2', fileName: 'سجل إيرادات العقار السنوي.xlsx', fileType: 'Financial Document', uploadedAt: '2024-03-05', description: 'تفصيل الإيجارات المحصلة من المستأجرين بدون وجه حق لقاء منفعة المدعى عليه المالك على الشيوع' }
+    ],
+    expertActions: [
+      {
+        id: 'exp10-1',
+        referralDate: '2024-04-05',
+        expertField: ExpertField.ENGINEERING,
+        assignedTask: 'معاينة العقار وتثبيت المساحات الكلية والقابلة للقسمة عيناً وبيان قيمة الريع المستحق.',
+        status: ExpertActionStatus.IN_PROGRESS,
+        expertName: 'م. يوسف العازمي - لجنة الخبراء الهندسية',
+        notes: 'الجلسة الميدانية مقررة قريباً بالتنسيق مع حارس العقار.'
+      }
+    ],
+    createdDate: '2024-02-20',
+    description: 'دعوى فرز وتجنيب حصة شائعة بعمارة استثمارية مكونة من 16 شقة سكنية بالفنطاس، مع مطالبة خالد عبد الرحمن الغانم بالريع عما حصله من إيرادات الإيجارات الفردية.'
   }
 ];

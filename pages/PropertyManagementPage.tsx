@@ -28,7 +28,8 @@ import {
     PropertyUnitStatus, LeaseAgreementStatus, 
     EvictionNoticeRecord, PropertyType, PropertyCategoryKuwait, PropertyUnit,
     RentPaymentFrequency, LeaseTermType, PropertyUnitTypeKuwait,
-    RentPayment, PaymentMethod
+    RentPayment, PaymentMethod,
+    Landlord, Broker, Complaint, PropertyExpense
 } from '../types';
 import { 
     LeaseAgreementStatusBadge, PropertyUnitStatusBadge, RentPaymentStatusBadge
@@ -46,8 +47,15 @@ import {
   mockProperties as initialProperties, 
   mockLeaseAgreements as initialLeases, 
   mockRentPayments as initialPayments, 
-  mockEvictionNotices as initialNotices 
+  mockEvictionNotices as initialNotices,
+  mockLandlords,
+  mockBrokers,
+  mockComplaints,
+  mockPropertyExpenses
 } from '../data/propertyData';
+
+// Import litigation print system
+import { LegalPrintSystem } from './litigationPrintSystem';
 
 // Load our bilingual translation mapping
 import { propertyTranslations } from '../data/propertyTranslations';
@@ -81,7 +89,7 @@ export const PropertyManagementPage: React.FC = () => {
     }, [i18n?.language]);
 
     // Active Tab Navigation
-    const [activeTab, setActiveTab] = useState<'overview' | 'properties' | 'tenants' | 'leases' | 'payments' | 'notices'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'properties' | 'tenants' | 'leases' | 'payments' | 'notices' | 'landlords_brokers' | 'finance_ledger' | 'complaints_desk'>('overview');
     
     // Layout Display Modes: 'cards' | 'table' | 'map' | 'timeline'
     const [displayMode, setDisplayMode] = useState<'cards' | 'table' | 'map' | 'timeline'>('cards');
@@ -92,6 +100,22 @@ export const PropertyManagementPage: React.FC = () => {
     const [leases, setLeases] = useState<LeaseAgreement[]>(initialLeases);
     const [payments, setPayments] = useState<RentPayment[]>(initialPayments);
     const [notices, setNotices] = useState<EvictionNoticeRecord[]>(initialNotices);
+
+    // Landlords, Brokers, Expenses, Complaints
+    const [landlords, setLandlords] = useState<Landlord[]>(mockLandlords);
+    const [brokers, setBrokers] = useState<Broker[]>(mockBrokers);
+    const [complaints, setComplaints] = useState<Complaint[]>(mockComplaints);
+    const [expenses, setExpenses] = useState<PropertyExpense[]>(mockPropertyExpenses);
+
+    // Print Document State
+    const [printDoc, setPrintDoc] = useState<{
+        isOpen: boolean;
+        title: string;
+        refNo: string;
+        metadata: Record<string, string>;
+        content: string;
+        showStamp?: boolean;
+    } | null>(null);
 
     // Filter and Search states
     const [searchTerm, setSearchTerm] = useState('');
@@ -116,6 +140,18 @@ export const PropertyManagementPage: React.FC = () => {
 
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [editingPayment, setEditingPayment] = useState<RentPayment | null>(null);
+
+    const [isLandlordModalOpen, setIsLandlordModalOpen] = useState(false);
+    const [editingLandlord, setEditingLandlord] = useState<Landlord | null>(null);
+
+    const [isBrokerModalOpen, setIsBrokerModalOpen] = useState(false);
+    const [editingBroker, setEditingBroker] = useState<Broker | null>(null);
+
+    const [isComplaintModalOpen, setIsComplaintModalOpen] = useState(false);
+    const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(null);
+
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [editingExpense, setEditingExpense] = useState<PropertyExpense | null>(null);
 
     const [isNoticeModalOpen, setIsNoticeModalOpen] = useState(false);
     const [editingNotice, setEditingNotice] = useState<EvictionNoticeRecord | null>(null);
@@ -371,6 +407,229 @@ export const PropertyManagementPage: React.FC = () => {
         addToast({ type: 'warning', title: 'إنذار عدلي كويتي', message: t.saveSuccess });
     };
 
+    const handleSaveLandlord = (lnd: Landlord) => {
+        if (editingLandlord?.id) {
+            setLandlords(prev => prev.map(l => l.id === editingLandlord.id ? lnd : l));
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تعديل مالك' : 'Landlord Updated', message: t.saveSuccess });
+        } else {
+            const added = { ...lnd, id: `lnd-${Date.now()}` };
+            setLandlords(prev => [added, ...prev]);
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'إضافة مالك' : 'Landlord Added', message: t.saveSuccess });
+        }
+        setIsLandlordModalOpen(false);
+    };
+
+    const handleDeleteLandlord = (id: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من حذف هذا المالك؟' : 'Are you sure you want to delete this landlord?')) {
+            setLandlords(prev => prev.filter(l => l.id !== id));
+            addToast({ type: 'info', title: pageLang === 'ar' ? 'إزالة مالك' : 'Landlord Deleted', message: t.deleteSuccess });
+        }
+    };
+
+    const handleSaveBroker = (brk: Broker) => {
+        if (editingBroker?.id) {
+            setBrokers(prev => prev.map(b => b.id === editingBroker.id ? brk : b));
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تعديل وسيط' : 'Broker Updated', message: t.saveSuccess });
+        } else {
+            const added = { ...brk, id: `brk-${Date.now()}` };
+            setBrokers(prev => [added, ...prev]);
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'إضافة وسيط' : 'Broker Added', message: t.saveSuccess });
+        }
+        setIsBrokerModalOpen(false);
+    };
+
+    const handleDeleteBroker = (id: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من حذف هذا الوسيط؟' : 'Are you sure you want to delete this broker?')) {
+            setBrokers(prev => prev.filter(b => b.id !== id));
+            addToast({ type: 'info', title: pageLang === 'ar' ? 'إزالة وسيط' : 'Broker Deleted', message: t.deleteSuccess });
+        }
+    };
+
+    const handleSaveComplaint = (cmp: Complaint) => {
+        if (editingComplaint?.id) {
+            setComplaints(prev => prev.map(c => c.id === editingComplaint.id ? cmp : c));
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تحديث شكوى' : 'Complaint Updated', message: t.saveSuccess });
+        } else {
+            const added = { ...cmp, id: `cmp-${Date.now()}` };
+            setComplaints(prev => [added, ...prev]);
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تسجيل شكوى' : 'Complaint Logged', message: t.saveSuccess });
+        }
+        setIsComplaintModalOpen(false);
+    };
+
+    const handleDeleteComplaint = (id: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من حذف هذه الشكوى؟' : 'Are you sure you want to delete this complaint?')) {
+            setComplaints(prev => prev.filter(c => c.id !== id));
+            addToast({ type: 'info', title: pageLang === 'ar' ? 'حذف شكوى' : 'Complaint Deleted', message: t.deleteSuccess });
+        }
+    };
+
+    const handleSaveExpense = (exp: PropertyExpense) => {
+        if (editingExpense?.id) {
+            setExpenses(prev => prev.map(e => e.id === editingExpense.id ? exp : e));
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تحديث مصروف' : 'Expense Updated', message: t.saveSuccess });
+        } else {
+            const added = { ...exp, id: `exp-${Date.now()}` };
+            setExpenses(prev => [added, ...prev]);
+            addToast({ type: 'success', title: pageLang === 'ar' ? 'تسجيل مصروف' : 'Expense Logged', message: t.saveSuccess });
+        }
+        setIsExpenseModalOpen(false);
+    };
+
+    const handleDeleteExpense = (id: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من حذف هذا السجل المالي؟' : 'Are you sure you want to delete this financial record?')) {
+            setExpenses(prev => prev.filter(e => e.id !== id));
+            addToast({ type: 'info', title: pageLang === 'ar' ? 'إلغاء قيد المصروف' : 'Expense Deleted', message: t.deleteSuccess });
+        }
+    };
+
+    // Contract Management Actions
+    const handleRenewContract = (lease: LeaseAgreement) => {
+        // Automatically renew contract for 1 year, and open creation modal with renewed date
+        const nextStart = new Date(lease.endDate);
+        nextStart.setDate(nextStart.getDate() + 1);
+        const nextEnd = new Date(nextStart);
+        nextEnd.setFullYear(nextEnd.getFullYear() + 1);
+        nextEnd.setDate(nextEnd.getDate() - 1);
+
+        const renewedLease: Partial<LeaseAgreement> = {
+            ...lease,
+            id: undefined,
+            contractNumber: `LSE-REN-${Date.now()}`,
+            startDate: nextStart.toISOString().split('T')[0],
+            endDate: nextEnd.toISOString().split('T')[0],
+            status: LeaseAgreementStatus.ACTIVE,
+            createdAt: new Date().toISOString()
+        };
+
+        setEditingLease(renewedLease as LeaseAgreement);
+        setIsLeaseModalOpen(true);
+        addToast({ type: 'info', title: pageLang === 'ar' ? 'تجديد عقد' : 'Lease Renewal', message: pageLang === 'ar' ? 'تم تحضير بيانات التجديد التلقائي لعام إضافي' : 'Automatic renewal details prepared for 1 year' });
+    };
+
+    const handleTerminateContract = (id: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من فسخ هذا العقد فوراً وإعادة العين المؤجرة شاغرة؟' : 'Are you sure you want to terminate this contract immediately and make the asset vacant?')) {
+            setLeases(prev => prev.map(l => l.id === id ? { ...l, status: LeaseAgreementStatus.TERMINATED } : l));
+            const lease = leases.find(l => l.id === id);
+            if (lease && lease.propertyId && lease.unitId) {
+                const prop = properties.find(p => p.id === lease.propertyId);
+                if (prop) {
+                    const updatedUnits = prop.units?.map(u => u.id === lease.unitId ? { ...u, status: PropertyUnitStatus.VACANT } : u);
+                    setProperties(prev => prev.map(p => p.id === prop.id ? { ...p, units: updatedUnits } : p));
+                }
+            }
+            addToast({ type: 'warning', title: pageLang === 'ar' ? 'فسخ تعاقدي' : 'Contract Terminated', message: pageLang === 'ar' ? 'تم فسخ العقد وإخلاء الوحدة بنجاح' : 'Contract terminated and unit emptied' });
+        }
+    };
+
+    // Custom Document Generation and Printing logic
+    const handleTriggerPrintLease = (lease: LeaseAgreement) => {
+        const tenant = tenants.find(t => t.id === lease.tenantId);
+        const prop = properties.find(p => p.id === lease.propertyId);
+        const refNo = lease.contractNumber;
+        
+        const metadata = {
+            'رقم العقد الإطاري': refNo,
+            'الرقم الآلي PACI': prop?.paciNumber || 'غير متوفر',
+            'المالك الحالي': prop?.ownerName || 'محفظة بلدي المعتمَدة',
+            'الطرف الثاني (المستأجر)': tenant?.fullNameAr || '-',
+            'الرقم المدني': tenant?.civilIdOrPassport || '-',
+            'قيمة الإيجار د.ك': `${lease.rentAmount.toFixed(3)} د.كشهرياً`,
+            'تاريخ السريان': formatDate(lease.startDate, 'ar'),
+            'تاريخ المغادرة': formatDate(lease.endDate, 'ar')
+        };
+
+        const content = `عقد إيجار كويتي نموذجي موحد خاضع للائحة القانون العقاري الكويتي رقم 35 لسنة 1978.
+
+إنه في يوم الموافق ${formatDate(new Date().toISOString(), 'ar')}، تم تحرير هذا العقد بين كل من:
+الطرف الأول (المؤجر): ${prop?.ownerName || 'مكتب شطا لإدارة المحافظ العقارية'}، ويُشار إليه بالمؤجر.
+الطرف الثاني (المستأجر): السيد / الشركة: ${tenant?.fullNameAr}، يحمل بطاقة مدنية / سجل تجاري رقم: ${tenant?.civilIdOrPassport}، ويُشار إليه بالمستأجر.
+
+تم الاتفاق والتعاقد بالتراضي على ما يلي:
+أولاً (العين المؤجرة): يقر الطرفان بأن العين عبارة عن (وحدة عقارية) في العقار المسمى: ${prop?.name} والكائن في العنوان: ${prop?.address}، بغرض الاستخدام المحدد قانوناً.
+ثانياً (القيمة الإيجارية): تم الاتفاق على أجرة شهرية ثابتة وقدرها ${lease.rentAmount.toFixed(3)} د.ك (فقط ${lease.rentAmount} دينار كويتي لا غير) تلتزم بها الجهة المتعاقدة بالدفع في الأول من كل فترة بانتظام عبر القنوات المعتمدة ولا تبرأ الذمة إلا بموجب سند قبض مختوم وموقع رسمياً.
+ثالثاً (مدة السكن الإيجاري): مدة هذا العقد تبدأ من تاريخ ${formatDate(lease.startDate, 'ar')} وتنتهي في تاريخ ${formatDate(lease.endDate, 'ar')} وهو عقد محدد المدة غير قابل للمد التلقائي إلا بموافقة كتابية موقعة من الوارد اسمهم أعلاه وبموجب ملحق تعاقدي رسمي.
+رابعاً (الشروط واللوائح التنظيمية): يلتزم الطرف الثاني بالمحافظة الكاملة على شروط الأمن والسلامة وبلدية الكويت الخاصة بالأشغال السكنية والتجارية، وهو ملزم بكافة الفواتير الخدمية الاستهلاكية ما لم يتفق على خلاف ذلك.`;
+
+        setPrintDoc({
+            isOpen: true,
+            title: 'عقد إيجار نموذجي موحد',
+            refNo,
+            metadata,
+            content,
+            showStamp: true
+        });
+    };
+
+    const handleTriggerPrintReceipt = (pay: RentPayment) => {
+        const lease = leases.find(l => l.id === pay.leaseAgreementId);
+        const tenant = tenants.find(t => t.id === lease?.tenantId);
+        const prop = properties.find(p => p.id === lease?.propertyId);
+        const refNo = `REC-${pay.id?.toUpperCase() || Date.now()}`;
+
+        const metadata = {
+            'إيصال تحصيل رقم': refNo,
+            'القيمة المحصلة': `${pay.amountPaid.toFixed(3)} د.ك`,
+            'المستأجر الوفائي': tenant?.fullNameAr || '-',
+            'الوحدة المؤجرة': `وحدة رقم ${lease?.unitId || '-'}`,
+            'العقار': prop?.name || '-',
+            'الفترة المالية المحصل عنها': pay.paymentForPeriod,
+            'طريقة القناة المستلمة': pay.paymentMethod || 'كي نت',
+            'الحالة المالية': pay.status === RentPaymentStatus.PAID ? 'مسدد وبراءة ذمة' : 'سداد جزئي'
+        };
+
+        const content = `سند قبض مالي معتمد وبراءة ذمة إيجارية مؤقتة.
+
+تشهد إدارة المحفظة الإدارية والمالية لعقارات الكويت بأنها استلمت وقبضت من السيد / السادة: ${tenant?.fullNameAr}، القيمة الإيجارية المقررة وقدرها: ${pay.amountPaid.toFixed(3)} د.ك (فقط ${pay.amountPaid} دينار كويتي لا غير)، وذلك وفاءً وسداداً عن الفترة الإيجارية المحسوبة: ${pay.paymentForPeriod} للعقار السكني/التجاري: ${prop?.name}.
+
+طريقة التحصيل: تم استلام هذا المبلغ عن طريق قناة المبيعات المالية المعتمدة: ${pay.paymentMethod || 'الدفع الإلكتروني كي نت (KNET)'} بموجب الرمز المرجعي والرمز التعقبي المرفق. 
+تعتبر هذه المستندات براءة ذمة تامة وعقداً مبرماً وحيداً عن المدة المالية ونوع الوفاء المبين أعلاه فقط، ولا يمتد أثرها لأي متأخرات سابقة مسجلة أمام اللجان القضائية ما لم يذكر خلاف ذلك كتابة.`;
+
+        setPrintDoc({
+            isOpen: true,
+            title: 'سند قبض بالقيمة الإيجارية',
+            refNo,
+            metadata,
+            content,
+            showStamp: true
+        });
+    };
+
+    const handleTriggerPrintNotice = (not: EvictionNoticeRecord) => {
+        const tenant = tenants.find(t => t.id === not.tenantId);
+        const prop = properties.find(p => p.id === not.propertyId);
+        const refNo = `WAR-${not.id.toUpperCase()}`;
+
+        const metadata = {
+            'إنذار رسمي مرقم': refNo,
+            'اسم المستهدف بالإعلان': tenant?.fullNameAr || '-',
+            'رقم المدني / التجاري': tenant?.civilIdOrPassport || '-',
+            'العقار المعني بالإخلاء': prop?.name || '-',
+            'العنوان بالكامل': prop?.address || '-',
+            'تاريخ توجيه الإنذار': formatDate(not.noticeDate, 'ar'),
+            'الحالة القانونية': 'مخل بالالتزام والوفاء المالي'
+        };
+
+        const content = `إنذار عدلي رسمي للوفاء المالي بالإيجار وبدء إجراءات فسخ العقد والإخلاء الجبري.
+بموجب أحكام المادة 20 من القانون الكويتي رقم 35 لسنة 1978 في شأن إيجار العقارات.
+
+موجّه إلى المستأجر السيد / الشركة: ${tenant?.fullNameAr}، الشاغل للعين المؤجرة في: ${prop?.name} - الكائنة في: ${prop?.address}.
+
+بناءً على طلب المالك وبصفتنا الوكلاء القانونيين والمفوضين الإداريين للمحفظة الاستثمارية:
+ننذركم بضرورة الوفاء وسداد الأجور الإيجارية والقيم المتأخرة المستحقة بذمتكم المالية وقدرها ${payAmount(500)} د.ك عن الفترات الزمنية المخل بها، وذلك خلال خمسة عشر (15) يوماً كاملة من تاريخ استلامكم وإعلانكم بهذا الإنذار الرسمي.
+
+وفي حالة تمام مضي تلك المدة القانونية دون سداد كامل القيمة الإيجارية، يُعتبر عقد الإيجار المبرم بيننا مفسوخاً من تلقاء ذاته بقوة القانون الكويتي المنظم، وسيتخذ مكتبنا كافة التدابير والمطالبات لإجراء الإخلاء الجبري للعين الشاغرة وإلزامكم بكافة التعويضات وفوائد التأخير والرسوم القانونية المترتبة أمام المحكمة الكلية (دوائر الإيجار).`;
+
+        setPrintDoc({
+            isOpen: true,
+            title: 'إعلان إنذار رسمي بالوفاء',
+            refNo,
+            metadata,
+            content,
+            showStamp: true
+        });
+    };
+
     const handleCaseLink = (e: React.FormEvent) => {
         e.preventDefault();
         if (!mockCourtCaseNum) return;
@@ -498,12 +757,15 @@ export const PropertyManagementPage: React.FC = () => {
                         { id: 'tenants', label: t.tenants, icon: <UsersIcon className="w-4 h-4"/> },
                         { id: 'leases', label: t.leases, icon: <DocumentTextIcon className="w-4 h-4"/> },
                         { id: 'payments', label: t.payments, icon: <BanknotesIcon className="w-4 h-4"/> },
-                        { id: 'notices', label: t.notices, icon: <ScaleIcon className="w-4 h-4"/> }
+                        { id: 'notices', label: t.notices, icon: <ScaleIcon className="w-4 h-4"/> },
+                        { id: 'landlords_brokers', label: pageLang === 'ar' ? 'الملاك والشركاء' : 'Landlords & Brokers', icon: <UsersIcon className="w-4 h-4"/> },
+                        { id: 'finance_ledger', label: pageLang === 'ar' ? 'السجل المالي' : 'Finances', icon: <TrendingUpIcon className="w-4 h-4"/> },
+                        { id: 'complaints_desk', label: pageLang === 'ar' ? 'متابعة الشكاوى' : 'Complaints & Followups', icon: <BellAlertIcon className="w-4 h-4"/> }
                     ].map(tab => (
                         <button 
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as any)}
-                            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-xl transition-all ${
+                            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-black rounded-xl transition-all ${
                                 activeTab === tab.id 
                                     ? 'bg-primary text-white shadow-md shadow-primary/20 scale-102' 
                                     : 'text-slate-400 hover:text-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
@@ -1045,9 +1307,12 @@ export const PropertyManagementPage: React.FC = () => {
                                                 </td>
                                                 <td className="px-5 py-4"><LeaseAgreementStatusBadge status={l.status}/></td>
                                                 <td className="px-5 py-4 text-end">
-                                                    <div className="flex gap-2 justify-end">
+                                                    <div className="flex gap-1.5 justify-end">
+                                                        <Button size="sm" variant="ghost" title={pageLang === 'ar' ? 'طباعة العقد الموحد' : 'Print Agreement'} onClick={() => handleTriggerPrintLease(l)}><PrinterIcon className="w-4 h-4 text-slate-500"/></Button>
+                                                        <Button size="sm" variant="ghost" title={pageLang === 'ar' ? 'تجديد العقد' : 'Renew Lease'} onClick={() => handleRenewContract(l)}><ArrowPathIcon className="w-4 h-4 text-emerald-600"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => setSelectedProfile({ type: 'lease', data: l })}><EyeIcon className="w-4 h-4 text-primary"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => { setEditingLease(l); setIsLeaseModalOpen(true); }}><PencilIcon className="w-4 h-4 text-yellow-500"/></Button>
+                                                        <Button size="sm" variant="ghost" title={pageLang === 'ar' ? 'إنهاء / فسخ العقد' : 'Terminate Contract'} onClick={() => handleTerminateContract(l.id)} className="text-orange-500"><XMarkIcon className="w-4 h-4"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => handleDeleteLease(l.id)} className="text-red-500"><TrashIcon className="w-4 h-4"/></Button>
                                                     </div>
                                                 </td>
@@ -1098,6 +1363,7 @@ export const PropertyManagementPage: React.FC = () => {
                                                 <td className="px-5 py-4"><RentPaymentStatusBadge status={p.status}/></td>
                                                 <td className="px-5 py-4 text-end">
                                                     <div className="flex gap-2 justify-end">
+                                                        <Button size="sm" variant="ghost" title={pageLang === 'ar' ? 'طباعة إيصال القبض' : 'Print Official Receipt'} onClick={() => handleTriggerPrintReceipt(p)}><PrinterIcon className="w-4 h-4 text-slate-500"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => setSelectedProfile({ type: 'payment', data: p })}><EyeIcon className="w-4 h-4 text-primary"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => { setEditingPayment(p); setIsPaymentModalOpen(true); }}><PencilIcon className="w-4 h-4 text-yellow-500"/></Button>
                                                     </div>
@@ -1189,6 +1455,7 @@ export const PropertyManagementPage: React.FC = () => {
                                                 </td>
                                                 <td className="px-5 py-4 text-end">
                                                     <div className="flex gap-2 justify-end">
+                                                        <Button size="sm" variant="ghost" title={pageLang === 'ar' ? 'طباعة الإنذار الرسمي' : 'Print Official Warning'} onClick={() => handleTriggerPrintNotice(notice)}><PrinterIcon className="w-4 h-4 text-slate-500"/></Button>
                                                         <Button size="sm" variant="ghost" onClick={() => { setEditingNotice(notice); setIsNoticeModalOpen(true); }}><PencilIcon className="w-4 h-4 text-yellow-600"/></Button>
                                                     </div>
                                                 </td>
@@ -1199,6 +1466,316 @@ export const PropertyManagementPage: React.FC = () => {
                             </table>
                         </div>
                     </Card>
+                </div>
+            )}
+
+            {/* -------------------- LANDLORDS & BROKERS TAB CONTENT -------------------- */}
+            {activeTab === 'landlords_brokers' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-left-3 duration-500">
+                    <div className="flex justify-between items-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl border">
+                        <div>
+                            <h3 className="font-extrabold text-slate-800 dark:text-white text-sm">{pageLang === 'ar' ? 'إدارة الملاك وشركاء الوساطة' : 'Landlords & Brokerage Network'}</h3>
+                            <p className="text-[11px] text-slate-500">{pageLang === 'ar' ? 'إسناد الحمولات العقارية وعمولات الوسطاء المرخصين' : 'Track major landlords, certified brokers and contractual commissions'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button size="sm" onClick={() => { setEditingLandlord(null); setIsLandlordModalOpen(true); }} leftIcon={<PlusCircleIcon className="w-4 h-4"/>}>
+                                {pageLang === 'ar' ? 'إضافة مالك عقار' : 'Add Landlord'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => { setEditingBroker(null); setIsBrokerModalOpen(true); }} leftIcon={<UsersIcon className="w-4 h-4"/>}>
+                                {pageLang === 'ar' ? 'إضافة وسيط مرخص' : 'Add Broker'}
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Landlords list */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center border-b pb-2">
+                                <h4 className="font-black text-slate-800 dark:text-white text-xs flex items-center gap-1.5"><HomeIcon className="w-4 h-4 text-primary"/>{pageLang === 'ar' ? 'ملاك المحافظ العقارية' : 'Real Estate Landlords'}</h4>
+                                <span className="bg-primary/10 text-primary px-2.5 py-0.5 rounded-full text-[10px] font-black">{landlords.length} {pageLang === 'ar' ? 'ملاك' : 'Landlords'}</span>
+                            </div>
+
+                            <div className="space-y-3">
+                                {landlords.map(lnd => (
+                                    <Card key={lnd.id} className="p-4 hover:shadow-md transition-shadow relative">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h5 className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-1">{lnd.fullNameAr} <span className="text-[10px] text-slate-400 font-normal">#{lnd.id}</span></h5>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-500 mt-2 font-semibold">
+                                                    <div>{pageLang === 'ar' ? 'الرقم المدني:' : 'Civil ID:'} <span className="font-mono text-slate-700">{lnd.civilId}</span></div>
+                                                    <div>{pageLang === 'ar' ? 'رقم الهاتف:' : 'Phone:'} <span className="font-mono text-indigo-600">{lnd.phone}</span></div>
+                                                    <div className="col-span-2">{pageLang === 'ar' ? 'التحويل المالي:' : 'Bank Transfer:'} <span className="text-slate-700 bg-slate-100 dark:bg-slate-800/80 px-1.5 py-0.5 rounded text-[10px] font-mono">{lnd.bankName} - {lnd.bankAccountNumber}</span></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button onClick={() => { setEditingLandlord(lnd); setIsLandlordModalOpen(true); }} className="p-1 px-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors font-bold">{pageLang === 'ar' ? 'تعديل' : 'Edit'}</button>
+                                                <button onClick={() => handleDeleteLandlord(lnd.id)} className="p-1 px-2 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors font-bold">{pageLang === 'ar' ? 'حذف' : 'Del'}</button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px]">
+                                            <span className="text-slate-400">{pageLang === 'ar' ? 'ملاحظات:' : 'Notes:'} {lnd.notes || '-'}</span>
+                                            <span className="bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-full">{lnd.propertyIds?.length || 0} {pageLang === 'ar' ? 'عقارات مسندة' : 'Buildings Owned'}</span>
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Brokers list */}
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center border-b pb-2">
+                                <h4 className="font-black text-slate-800 dark:text-white text-xs flex items-center gap-1.5"><UsersIcon className="w-4 h-4 text-emerald-500"/>{pageLang === 'ar' ? 'الوسطاء المرخصين (الدلالين)' : 'Licensed Real Estate Brokers'}</h4>
+                                <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-black">{brokers.length} {pageLang === 'ar' ? 'وسطاء' : 'Brokers'}</span>
+                            </div>
+
+                            <div className="space-y-3">
+                                {brokers.map(brk => (
+                                    <Card key={brk.id} className="p-4 hover:shadow-md transition-shadow">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <h5 className="font-black text-slate-800 dark:text-white text-sm flex items-center gap-1">{brk.fullNameAr}</h5>
+                                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-slate-500 mt-2 font-semibold">
+                                                    <div>{pageLang === 'ar' ? 'رقم ترخيص العدل:' : 'License No:'} <span className="font-mono text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded text-[10px]">{brk.licenseNumber}</span></div>
+                                                    <div>{pageLang === 'ar' ? 'رقم التواصل:' : 'Phone:'} <span className="font-mono text-slate-700">{brk.phone}</span></div>
+                                                    <div>{pageLang === 'ar' ? 'عمولة التسويق المقررة:' : 'Comm Rate:'} <span className="font-extrabold text-primary">{brk.commissionRate}%</span></div>
+                                                    <div>{pageLang === 'ar' ? 'البريد الإلكتروني:' : 'Email:'} <span className="font-mono text-slate-400">{brk.email || '-'}</span></div>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-1">
+                                                <button onClick={() => { setEditingBroker(brk); setIsBrokerModalOpen(true); }} className="p-1 px-2 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition-colors font-bold">{pageLang === 'ar' ? 'تعديل' : 'Edit'}</button>
+                                                <button onClick={() => handleDeleteBroker(brk.id)} className="p-1 px-2 text-[10px] bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg transition-colors font-bold">{pageLang === 'ar' ? 'حذف' : 'Del'}</button>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400">
+                                            {pageLang === 'ar' ? 'ملاحظات العمليات:' : 'Operational Notes:'} {brk.notes || '-'}
+                                        </div>
+                                    </Card>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* -------------------- REVENUES & EXPENSES TAB CONTENT (FINANCE LEDGER) -------------------- */}
+            {activeTab === 'finance_ledger' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-3 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="p-4 border border-emerald-100 bg-emerald-50/20">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{pageLang === 'ar' ? 'إجمالي المقبوضات المحصلة' : 'Rent Collected'}</p>
+                                    <h4 className="text-2xl font-black text-emerald-700 mt-1">{payAmount(stats.actualCollected)}</h4>
+                                </div>
+                                <div className="p-3 bg-emerald-100 text-emerald-700 rounded-2xl"><TrendingUpIcon className="w-6 h-6"/></div>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-2 font-bold">{pageLang === 'ar' ? 'تشمل الدفعات العادية الحرة والإلكترونية' : 'Includes manual and online collection channels'}</p>
+                        </Card>
+
+                        <Card className="p-4 border border-rose-100 bg-rose-50/20">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{pageLang === 'ar' ? 'المصروفات التشغيلية والمشتريات' : 'Operational Expenses'}</p>
+                                    <h4 className="text-2xl font-black text-rose-700 mt-1">{payAmount(expenses.reduce((sum, e) => sum + e.amount, 0))}</h4>
+                                </div>
+                                <div className="p-3 bg-rose-100 text-rose-700 rounded-2xl"><WrenchScrewdriverIcon className="w-6 h-6"/></div>
+                            </div>
+                            <p className="text-[9px] text-slate-400 mt-2 font-bold">{pageLang === 'ar' ? 'تشمل عقود الصيانة الدورية وعمولات الوسطاء' : 'Covers vendor repairs, services, and municipal fees'}</p>
+                        </Card>
+
+                        <Card className="p-4 border border-indigo-100 bg-indigo-50/20 flex flex-col justify-between">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{pageLang === 'ar' ? 'صافي الميزانية التشغيلية' : 'Net Cash Flow'}</p>
+                                    <h4 className="text-2xl font-black text-indigo-700 mt-1">{payAmount(stats.actualCollected - expenses.reduce((sum, e) => sum + e.amount, 0))}</h4>
+                                </div>
+                                <div className="p-3 bg-indigo-100 text-indigo-700 rounded-2xl"><PresentationChartLineIcon className="w-6 h-6"/></div>
+                            </div>
+                            <div className="w-full bg-slate-100 rounded-full h-1 mt-2">
+                                <div className="bg-indigo-600 h-1 rounded-full" style={{ width: '82%' }}></div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    <Card 
+                        title={pageLang === 'ar' ? 'سجل السندات المالية والمصروفات الإدارية بالبنايات' : 'General Expenses Ledger Register'}
+                        actions={
+                            <Button size="sm" onClick={() => { setEditingExpense(null); setIsExpenseModalOpen(true); }} leftIcon={<PlusCircleIcon className="w-4 h-4"/>}>
+                                {pageLang === 'ar' ? 'قيد مصروف جديد' : 'Record Expense'}
+                            </Button>
+                        }
+                    >
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-start text-xs">
+                                <thead className="bg-slate-50 border-b font-black text-slate-500 uppercase tracking-widest text-[10px]">
+                                    <tr>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'تاريخ المعاملة' : 'Payment Date'}</th>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'العقار المستفيد' : 'Target Asset'}</th>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'نوع قيد الصرف' : 'Expense Category'}</th>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'اسم المستلم والشركة المنفذة' : 'Beneficiary Recipient'}</th>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'قيمة السند د.ك' : 'Amount KWD'}</th>
+                                        <th className="px-5 py-4 text-start">{pageLang === 'ar' ? 'طريقة الصرف' : 'Method'}</th>
+                                        <th className="px-5 py-4 text-end">{pageLang === 'ar' ? 'إجراءات' : 'Actions'}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 font-semibold text-slate-600">
+                                    {expenses.map(exp => {
+                                        const prop = properties.find(p => p.id === exp.propertyId);
+                                        return (
+                                            <tr key={exp.id} className="hover:bg-slate-50/50">
+                                                <td className="px-5 py-4 font-mono font-bold text-slate-400">{formatDate(exp.paymentDate, pageLang)}</td>
+                                                <td className="px-5 py-4 font-black text-slate-800">{prop?.name || exp.propertyName}</td>
+                                                <td className="px-5 py-4">
+                                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                                                        exp.expenseType === 'maintenance' ? 'bg-blue-50 text-blue-600' :
+                                                        exp.expenseType === 'commission' ? 'bg-indigo-50 text-indigo-600' :
+                                                        exp.expenseType === 'elevator' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'
+                                                    }`}>
+                                                        {exp.expenseType === 'maintenance' ? (pageLang === 'ar' ? 'صيانة وإصلاحات' : 'Maintenance & Repairs') :
+                                                         exp.expenseType === 'commission' ? (pageLang === 'ar' ? 'عمولة دلالة' : 'Broker Commission') :
+                                                         exp.expenseType === 'elevator' ? (pageLang === 'ar' ? 'مصاعد وخدمات' : 'Elevators Services') :
+                                                         exp.expenseType === 'municipal_fee' ? (pageLang === 'ar' ? 'رسوم بلدية' : 'Municipal Fees') :
+                                                         exp.expenseType === 'cleaning' ? (pageLang === 'ar' ? 'تنظيف ومياه' : 'Cleaning & Water') : (pageLang === 'ar' ? 'مصاريف أخرى' : 'Other Fees')}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-4 text-slate-700">{exp.recipientName}</td>
+                                                <td className="px-5 py-4 font-mono font-black text-rose-600">{payAmount(exp.amount)}</td>
+                                                <td className="px-5 py-4 text-slate-500">{exp.paymentMethod || 'تحويل بنكي KNET'}</td>
+                                                <td className="px-5 py-4 text-end">
+                                                    <div className="flex gap-2 justify-end">
+                                                        <Button size="sm" variant="ghost" onClick={() => { setEditingExpense(exp); setIsExpenseModalOpen(true); }}><PencilIcon className="w-4 h-4 text-yellow-600"/></Button>
+                                                        <Button size="sm" variant="ghost" onClick={() => handleDeleteExpense(exp.id)} className="text-red-500"><TrashIcon className="w-4 h-4"/></Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {expenses.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="px-5 py-8 text-center text-slate-400 italic font-medium">{t.emptyList}</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* -------------------- COMPLAINTS & FOLLOW-UPS DESK TAB CONTENT -------------------- */}
+            {activeTab === 'complaints_desk' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-left-3 duration-500">
+                    <div className="flex justify-between items-center border-b pb-3">
+                        <div>
+                            <h4 className="font-extrabold text-slate-800 dark:text-white text-md flex items-center gap-1.5"><BellAlertIcon className="w-5 h-5 text-indigo-500"/>{pageLang === 'ar' ? 'متابعة الشكاوى وبلاغات المستأجرين' : 'Complaints & Urgent Follow-ups'}</h4>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{pageLang === 'ar' ? 'معالجة الشكاوى الإدارية والخدمية وتفعيل تصعيد التنبيهات القانونية الفورية للعدل' : 'Process administrative concerns or fire direct evictions/warnings'}</p>
+                        </div>
+                        <Button size="sm" onClick={() => { setEditingComplaint(null); setIsComplaintModalOpen(true); }} leftIcon={<PlusCircleIcon className="w-4 h-4"/>}>
+                            {pageLang === 'ar' ? 'تسجيل بلاغ/شكوى جديدة' : 'Log New Complaint'}
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Column Active Complaints (Pending & In Progress) */}
+                        <div className="lg:col-span-2 space-y-4">
+                            <h5 className="font-black text-slate-800 dark:text-white text-xs flex items-center gap-1.5 border-b pb-2 text-indigo-600">
+                                <span>●</span> {pageLang === 'ar' ? 'بلاغات وشكاوى قيد المتابعة الحثيثة' : 'Active Tenant Complaints'}
+                                <span className="bg-indigo-50 text-indigo-600 px-2.5 py-0.5 rounded-full text-[9px] font-black">{complaints.filter(c => c.status !== 'resolved').length}</span>
+                            </h5>
+
+                            <div className="space-y-3">
+                                {complaints.filter(c => c.status !== 'resolved').map(cmp => {
+                                    const prop = properties.find(p => p.id === cmp.propertyId);
+                                    return (
+                                        <Card key={cmp.id} className={`p-4 hover:shadow-md transition-shadow relative border-l-4 ${cmp.priority === 'high' ? 'border-l-rose-500 bg-rose-50/5' : 'border-l-amber-500'}`}>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                                            cmp.priority === 'high' ? 'bg-rose-50 text-rose-600 animate-pulse' :
+                                                            cmp.priority === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-600'
+                                                        }`}>
+                                                            {cmp.priority === 'high' ? (pageLang === 'ar' ? 'بلاغ عاجل' : 'High Priority') :
+                                                             cmp.priority === 'medium' ? (pageLang === 'ar' ? 'بلاغ عادي' : 'Medium Priority') : (pageLang === 'ar' ? 'بلاغ منخفض' : 'Low Priority')}
+                                                        </span>
+                                                        <span className="text-slate-400 text-[9px] font-mono">{formatDate(cmp.createdAt, pageLang)}</span>
+                                                    </div>
+                                                    
+                                                    <h6 className="font-black text-slate-800 dark:text-white text-sm mt-2">{cmp.description}</h6>
+                                                    
+                                                    <div className="text-[11px] text-slate-500 mt-2 font-semibold">
+                                                        {pageLang === 'ar' ? 'المستأجر البلاغي:' : 'Tenant:'} <span className="text-slate-700">{cmp.tenantName}</span> • {pageLang === 'ar' ? 'العقار:' : 'Property:'} <span className="text-primary">{prop?.name || cmp.propertyName} (وحدة {cmp.unitNumber || '-'})</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-1.5">
+                                                    <Button size="sm" variant="primary" onClick={() => {
+                                                        const resolvedNotes = prompt(pageLang === 'ar' ? 'يرجى كتابة مذكرة حل الشكوى وتفاصيل التسوية:' : 'Enter resolution details:');
+                                                        if (resolvedNotes) {
+                                                            handleSaveComplaint({
+                                                                ...cmp,
+                                                                status: 'resolved',
+                                                                resolutionDate: new Date().toISOString().split('T')[0],
+                                                                resolutionNotes: resolvedNotes
+                                                            });
+                                                        }
+                                                    }} className="text-[10px] py-1 h-fit font-black">{pageLang === 'ar' ? 'تسوية وإغلاق' : 'Resolve'}</Button>
+                                                    
+                                                    <Button size="sm" variant="danger" onClick={() => {
+                                                        const confirmEscalate = window.confirm(pageLang === 'ar' ? 'هل تود تحويل هذه الشكوى وتصعيدها إلى إنذار إخلاء رسمي بوزارة العدل؟' : 'Do you want to escalate this complaint into a Ministry of Justice eviction warning?');
+                                                        if (confirmEscalate) {
+                                                            const newNotice: Partial<EvictionNoticeRecord> = {
+                                                                id: `not-${Date.now()}`,
+                                                                tenantId: cmp.tenantId,
+                                                                propertyId: cmp.propertyId,
+                                                                noticeDate: new Date().toISOString().split('T')[0],
+                                                                reason: cmp.description,
+                                                                status: 'Sent',
+                                                                notes: pageLang === 'ar' ? `إنذار ناتج عن تصعيد الشكوى الإدارية المعقدة رقم #${cmp.id}` : `Notice resulting from escalations of operational complaint #${cmp.id}`
+                                                            };
+                                                            setNotices(prev => [newNotice as EvictionNoticeRecord, ...prev]);
+                                                            handleSaveComplaint({ ...cmp, status: 'litigated' });
+                                                            addToast({ type: 'warning', title: pageLang === 'ar' ? 'تصعيد قضائي ناجح' : 'Dispute Escalated', message: pageLang === 'ar' ? 'تم تحويل الشكوى بنجاح إلى إنذار رسمي تمهيداً للإخلاء' : 'Complaint successfully escalated to eviction legal warning notice dockets' });
+                                                            setActiveTab('notices');
+                                                        }
+                                                    }} className="text-[10px] py-1 h-fit font-black">{pageLang === 'ar' ? 'إصدار إنذار قضائي' : 'Legal Eviction'}</Button>
+                                                </div>
+                                            </div>
+                                        </Card>
+                                    );
+                                })}
+
+                                {complaints.filter(c => c.status !== 'resolved').length === 0 && (
+                                    <div className="p-8 bg-slate-50 border rounded-2xl text-center text-slate-400 font-medium italic">{pageLang === 'ar' ? 'لا توجد شكاوى نشطة حالياً. كل بناياتك في وضع تشغيلي ممتاز!' : 'No open complaints recorded.'}</div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Column Resolved Complaints Audit History */}
+                        <div className="space-y-4">
+                            <h5 className="font-black text-slate-800 dark:text-white text-xs flex items-center gap-1.5 border-b pb-2 text-emerald-600">
+                                <span>✔</span> {pageLang === 'ar' ? 'الأرشيف الإداري والبلاغات المغلقة' : 'Resolved Archive History'}
+                                <span className="bg-emerald-50 text-emerald-600 px-2.5 py-0.5 rounded-full text-[9px] font-black">{complaints.filter(c => c.status === 'resolved').length}</span>
+                            </h5>
+
+                            <div className="space-y-3">
+                                {complaints.filter(c => c.status === 'resolved').map(cmp => (
+                                    <div key={cmp.id} className="p-3 bg-slate-50 dark:bg-slate-800/20 border rounded-xl text-xs flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex justify-between items-center text-[9px]">
+                                                <span className="font-black text-emerald-600">{pageLang === 'ar' ? 'تمت التسوية بنجاح' : 'Settled & Solved'}</span>
+                                                <span className="font-mono text-slate-400">{formatDate(cmp.resolutionDate || cmp.createdAt, pageLang)}</span>
+                                            </div>
+                                            <p className="font-black text-slate-700 mt-2">{cmp.description}</p>
+                                        </div>
+                                        <div className="mt-2.5 pt-2 border-t border-slate-200/50 text-[10px] text-slate-500 font-semibold bg-white p-2 rounded-lg leading-relaxed shadow-xs">
+                                            <span className="text-slate-400 font-bold">{pageLang === 'ar' ? 'مذكرة التسوية المقررة:' : 'Resolution action:'}</span> {cmp.resolutionNotes}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -1450,6 +2027,132 @@ export const PropertyManagementPage: React.FC = () => {
                     </div>
                 </form>
             </Modal>
+
+            {/* 6.5. HIGH FIDELITY FORMAL PRINT PREVIEW OVERLAY */}
+            {printDoc && printDoc.isOpen && (
+                <Modal isOpen={printDoc.isOpen} onClose={() => setPrintDoc(prev => prev ? { ...prev, isOpen: false } : null)} title={printDoc.title} size="lg">
+                    <div className="space-y-6 text-start text-xs text-slate-700 p-2" id="printable-area">
+                        {/* Header: Logo, Title, Watermark */}
+                        <div className="flex justify-between items-center border-b-2 border-slate-900 pb-4">
+                            <div className="space-y-1">
+                                <h2 className="text-lg font-black text-slate-900">{pageLang === 'ar' ? 'مكتب العاصمة لإدارة العقارات والمحاماة' : 'Al-Asimah Property Management & Litigations'}</h2>
+                                <p className="text-[10px] text-slate-500">{pageLang === 'ar' ? 'الشركاء الاستراتيجيون لوزارة العدل والبلدية بدولة الكويت' : 'Kuwait Judiciary & Municipality Legal Partner'}</p>
+                            </div>
+                            <div className="text-end text-[10px] font-semibold text-slate-500 leading-tight">
+                                <p>{pageLang === 'ar' ? 'الرمز التعريفي الموحد:' : 'Ref ID:'} <span className="font-mono font-bold text-slate-900">{printDoc.refNo}</span></p>
+                                <p>{pageLang === 'ar' ? 'التوجيه:' : 'Status:'} <span className="font-bold text-slate-800">{pageLang === 'ar' ? 'معتمد ورسمي' : 'Official Authorized'}</span></p>
+                                <p>{pageLang === 'ar' ? 'التاريخ:' : 'Date:'} <span className="font-mono">{new Date().toLocaleDateString(pageLang === 'ar' ? 'ar-KW' : 'en-US')}</span></p>
+                            </div>
+                        </div>
+
+                        {/* Document Body card */}
+                        <div className="p-6 bg-white border border-slate-200 rounded-xl shadow-xs relative overflow-hidden">
+                            {/* Visual Watermark */}
+                            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.03]">
+                                <BuildingOffice2Icon className="w-80 h-80 text-emerald-950" />
+                            </div>
+
+                            <div className="relative space-y-4">
+                                <h3 className="text-sm font-black text-center text-slate-900 underline underline-offset-4">{printDoc.title}</h3>
+                                
+                                {/* Metadata attributes grid */}
+                                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100 font-semibold mb-4 text-[11px]">
+                                    {Object.entries(printDoc.metadata || {}).map(([key, val]) => (
+                                        <div key={key} className="flex justify-between gap-1">
+                                            <span className="text-slate-400">{key}:</span>
+                                            <span className="text-slate-900 font-bold">{val}</span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Paragraph Content */}
+                                <div className="text-slate-800 leading-relaxed whitespace-pre-line text-justify font-sans">
+                                    {printDoc.content}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Verification QR / Stamp section */}
+                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                            <div className="flex items-center gap-3">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(JSON.stringify({ ref: printDoc.refNo, verification: 'https://paci.gov.kw/' }))}`} 
+                                    alt="Verification QR Code" 
+                                    className="w-16 h-16 border p-1 bg-white rounded-lg shadow-xs"
+                                />
+                                <div className="space-y-0.5 text-[9px] text-slate-400">
+                                    <p className="font-bold text-slate-600">{pageLang === 'ar' ? 'بوابة التحقق المدني PACI' : 'PACI Civil Portal'}</p>
+                                    <p>{pageLang === 'ar' ? 'هذا المستند معتمد ومطابق للقانون الكويتي' : 'This certified record complies with Kuwaiti real estate acts'}</p>
+                                    <p className="font-mono">ID: {printDoc.refNo?.substring(0, 8)}</p>
+                                </div>
+                            </div>
+
+                            {printDoc.showStamp && (
+                                <div className="relative text-center border-2 border-dashed border-red-500/80 p-2.5 rounded-xl rotate-[-3deg] w-40 text-red-600 font-bold bg-red-50/10 shadow-xs">
+                                    <p className="text-[10px] tracking-widest">{pageLang === 'ar' ? 'مكتب العاصمة للمحاماة' : 'AL-ASIMAH LAWYERS'}</p>
+                                    <p className="text-[8px] uppercase tracking-wider">{pageLang === 'ar' ? 'معتمد ومصدق الكترونياً' : 'OFFICIALLY APPROVED'}</p>
+                                    <div className="text-[9px] font-mono mt-1 border-t border-red-200 pt-0.5">{pageLang === 'ar' ? 'تاريخ الختم الكلي' : 'STAMP DATE'} • 2026/2027</div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Non-printable operations triggers */}
+                        <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 print:hidden">
+                            <Button size="sm" variant="outline" onClick={() => {
+                                const blob = new Blob([printDoc.content], { type: 'text/plain;charset=utf-8' });
+                                const link = document.createElement('a');
+                                link.href = URL.createObjectURL(blob);
+                                link.download = `${printDoc.refNo || 'doc'}.txt`;
+                                link.click();
+                                addToast({ type: 'success', title: pageLang === 'ar' ? 'تم التصدير' : 'Exported', message: pageLang === 'ar' ? 'تم تصدير ملف النص بنجاح' : 'Document exported as text asset' });
+                            }}>
+                                {pageLang === 'ar' ? 'تحميل نص المستند' : 'Download TXT text'}
+                            </Button>
+                            <Button size="sm" onClick={() => window.print()} leftIcon={<PrinterIcon className="w-4 h-4" />}>
+                                {pageLang === 'ar' ? 'اطبع المستند المعتمد' : 'Print Certified Form'}
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => setPrintDoc(prev => prev ? { ...prev, isOpen: false } : null)}>
+                                {pageLang === 'ar' ? 'إغلاق المعاينة' : 'Close Preview'}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+
+            {/* 7. LANDLORD FORM MODAL */}
+            <LandlordFormModal 
+                isOpen={isLandlordModalOpen}
+                onClose={() => setIsLandlordModalOpen(false)}
+                onSubmit={handleSaveLandlord}
+                initialData={editingLandlord}
+            />
+
+            {/* 8. BROKER FORM MODAL */}
+            <BrokerFormModal 
+                isOpen={isBrokerModalOpen}
+                onClose={() => setIsBrokerModalOpen(false)}
+                onSubmit={handleSaveBroker}
+                initialData={editingBroker}
+            />
+
+            {/* 9. PROPERTY OPERATIONS EXPENSE MODAL */}
+            <ExpenseFormModal 
+                isOpen={isExpenseModalOpen}
+                onClose={() => setIsExpenseModalOpen(false)}
+                onSubmit={handleSaveExpense}
+                initialData={editingExpense}
+                properties={properties}
+            />
+
+            {/* 10. TENANT OPERATIONAL COMPLAINT MODAL */}
+            <ComplaintFormModal 
+                isOpen={isComplaintModalOpen}
+                onClose={() => setIsComplaintModalOpen(false)}
+                onSubmit={handleSaveComplaint}
+                initialData={editingComplaint}
+                properties={properties}
+                tenants={tenants}
+            />
         </div>
     );
 };
@@ -1754,6 +2457,264 @@ const NoticeFormModal: React.FC<NoticeFormProps> = ({ isOpen, onClose, onSubmit,
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
                     <Button type="submit" size="sm" variant="danger">إعلان رسمي بموجب القانون</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// --- LandlordFormModal ---
+interface LandlordFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: Landlord) => void;
+    initialData?: Partial<Landlord> | null;
+}
+const LandlordFormModal: React.FC<LandlordFormProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+    const [formData, setFormData] = useState<Partial<Landlord>>({});
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(initialData || {
+                id: `lnd-${Date.now()}`,
+                fullNameAr: '',
+                phone: '',
+                civilId: '',
+                bankName: '',
+                bankAccountNumber: '',
+                propertyIds: [],
+                notes: ''
+            });
+        }
+    }, [isOpen, initialData]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={initialData?.fullNameAr ? "تعديل بيانات مالك عقار" : "إضافة مالك عقار جديد"} size="md">
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData as Landlord); }} className="space-y-4 text-xs text-start">
+                <Input label="الاسم الكامل لمالك المحفظة" name="fullNameAr" value={formData.fullNameAr || ''} onChange={handleChange} required />
+                <div className="grid grid-cols-2 gap-3">
+                    <Input label="الرقم المدني الكويتي" name="civilId" value={formData.civilId || ''} onChange={handleChange} required />
+                    <Input label="رقم الهاتف النقال" name="phone" value={formData.phone || ''} onChange={handleChange} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <Input label="اسم البنك المحلي للتحويل" name="bankName" value={formData.bankName || ''} onChange={handleChange} required placeholder="مثال: بيت التمويل الكويتي" />
+                    <Input label="رقم الحساب أو الآيبان" name="bankAccountNumber" value={formData.bankAccountNumber || ''} onChange={handleChange} required placeholder="KWD0000..." />
+                </div>
+                <TextArea label="شروط وملاحظات الإسناد" name="notes" value={formData.notes || ''} onChange={handleChange} rows={2} />
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
+                    <Button type="submit" size="sm">حفظ بيانات المالك</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// --- BrokerFormModal ---
+interface BrokerFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: Broker) => void;
+    initialData?: Partial<Broker> | null;
+}
+const BrokerFormModal: React.FC<BrokerFormProps> = ({ isOpen, onClose, onSubmit, initialData }) => {
+    const [formData, setFormData] = useState<Partial<Broker>>({ commissionRate: 5 });
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(initialData || {
+                id: `brk-${Date.now()}`,
+                fullNameAr: '',
+                phone: '',
+                licenseNumber: '',
+                commissionRate: 5,
+                email: '',
+                notes: ''
+            });
+        }
+    }, [isOpen, initialData]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={initialData?.fullNameAr ? "تعديل ترخيص وسيط / دلال" : "تسجيل وسيط دلال مرخص جديد"} size="md">
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData as Broker); }} className="space-y-4 text-xs text-start">
+                <Input label="اسم الوسيط أو مكتب الوساطة" name="fullNameAr" value={formData.fullNameAr || ''} onChange={handleChange} required />
+                <div className="grid grid-cols-2 gap-3">
+                    <Input label="رقم ترخيص العدل المعتمد" name="licenseNumber" value={formData.licenseNumber || ''} onChange={handleChange} required placeholder="رقم الترخيص الرسمي" />
+                    <Input label="رقم الهاتف النقال" name="phone" value={formData.phone || ''} onChange={handleChange} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <Input label="نسبة العمولة التسويقية المقررة (%)" type="number" name="commissionRate" value={formData.commissionRate || ''} onChange={handleChange} required />
+                    <Input label="البريد الإلكتروني" type="email" name="email" value={formData.email || ''} onChange={handleChange} />
+                </div>
+                <TextArea label="ملاحظات وسجل التعاون" name="notes" value={formData.notes || ''} onChange={handleChange} rows={2} />
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
+                    <Button type="submit" size="sm">تسجيل الوسيط</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// --- ExpenseFormModal ---
+interface ExpenseFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: PropertyExpense) => void;
+    initialData?: Partial<PropertyExpense> | null;
+    properties: Property[];
+}
+const ExpenseFormModal: React.FC<ExpenseFormProps> = ({ isOpen, onClose, onSubmit, initialData, properties }) => {
+    const [formData, setFormData] = useState<Partial<PropertyExpense>>({ expenseType: 'maintenance', paymentMethod: PaymentMethod.KNET });
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(initialData || {
+                id: `exp-${Date.now()}`,
+                propertyId: properties[0]?.id || '',
+                propertyName: properties[0]?.name || '',
+                expenseType: 'maintenance',
+                amount: 150,
+                paymentDate: new Date().toISOString().split('T')[0],
+                recipientName: '',
+                paymentMethod: PaymentMethod.KNET,
+                notes: ''
+            });
+        }
+    }, [isOpen, initialData, properties]);
+
+    const handleSelectProp = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const propId = e.target.value;
+        const p = properties.find(item => item.id === propId);
+        setFormData(prev => ({
+            ...prev,
+            propertyId: propId,
+            propertyName: p ? p.name : ''
+        }));
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={initialData?.id ? "تعديل سند الصرف" : "تسجيل سند صرف ومشتريات عقار"} size="md">
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData as PropertyExpense); }} className="space-y-4 text-xs text-start">
+                <Select label="العقار الأساسي المستفيد" value={formData.propertyId || ''} options={properties.map(p => ({ value: p.id, label: p.name }))} onChange={handleSelectProp} required />
+                <div className="grid grid-cols-2 gap-3">
+                    <Select label="نوع قيد الصرف" value={formData.expenseType} onChange={e => setFormData(prev => ({ ...prev, expenseType: e.target.value as any }))} options={[
+                        { value: 'maintenance', label: 'صيانة وإصلاحات فنية' },
+                        { value: 'commission', label: 'عمولة وسيط دلالة' },
+                        { value: 'elevator', label: 'صيانة مصاعد وخدمات' },
+                        { value: 'municipal_fee', label: 'رسوم بلدية وأجهزة حكومية' },
+                        { value: 'cleaning', label: 'تنظيف ومياه دورية' },
+                        { value: 'other', label: 'مصاريف أخرى متنوعة' }
+                    ]} />
+                    <Input label="قيمة المعاملة (د.ك الكويتي)" type="number" value={formData.amount || ''} onChange={e => setFormData(prev => ({ ...prev, amount: Number(e.target.value) }))} required />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                    <Input label="اسم الطرف المستلم والجهة المنفذة" value={formData.recipientName || ''} onChange={e => setFormData(prev => ({ ...prev, recipientName: e.target.value }))} required placeholder="مثال: شركة الخليج للمصاعد" />
+                    <Input label="تاريخ سداد القيد" type="date" value={formData.paymentDate || ''} onChange={e => setFormData(prev => ({ ...prev, paymentDate: e.target.value }))} required />
+                </div>
+                <Select 
+                    label="طريقة المعاملة المالية المعاصرة"
+                    value={formData.paymentMethod || ''} 
+                    onChange={e => setFormData(prev => ({ ...prev, paymentMethod: e.target.value as PaymentMethod }))}
+                    options={[
+                        { value: PaymentMethod.KNET, label: 'قنوات التحصيل السريع كي-نت KNET' },
+                        { value: PaymentMethod.BANK_TRANSFER, label: 'حوالة مصرفية رسمية' },
+                        { value: PaymentMethod.CHEQUE, label: 'شيك مصدق مقبول الدفع' },
+                        { value: PaymentMethod.CASH, label: 'دفع نقدي بصندوق الشركة' }
+                    ]} 
+                    required 
+                />
+                <TextArea label="الوصف والتفاصيل الفنية لسند القيد" value={formData.notes || ''} onChange={e => setFormData(prev => ({ ...prev, notes: e.target.value }))} rows={2} />
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
+                    <Button type="submit" size="sm">تسجيل سند الصرف</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+// --- ComplaintFormModal ---
+interface ComplaintFormProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: Complaint) => void;
+    initialData?: Partial<Complaint> | null;
+    properties: Property[];
+    tenants: Tenant[];
+}
+const ComplaintFormModal: React.FC<ComplaintFormProps> = ({ isOpen, onClose, onSubmit, initialData, properties, tenants }) => {
+    const [formData, setFormData] = useState<Partial<Complaint>>({ priority: 'medium', status: 'pending' });
+
+    useEffect(() => {
+        if (isOpen) {
+            setFormData(initialData || {
+                id: `cmp-${Date.now()}`,
+                tenantId: tenants[0]?.id || '',
+                tenantName: tenants[0]?.fullNameAr || '',
+                propertyId: properties[0]?.id || '',
+                propertyName: properties[0]?.name || '',
+                unitNumber: '',
+                description: '',
+                priority: 'medium',
+                status: 'pending',
+                createdAt: new Date().toISOString().split('T')[0]
+            });
+        }
+    }, [isOpen, initialData, properties, tenants]);
+
+    const handleSelectTenant = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const tId = e.target.value;
+        const tenant = tenants.find(t => t.id === tId);
+        setFormData(prev => ({
+            ...prev,
+            tenantId: tId,
+            tenantName: tenant ? tenant.fullNameAr : ''
+        }));
+    };
+
+    const handleSelectProp = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const propId = e.target.value;
+        const p = properties.find(item => item.id === propId);
+        setFormData(prev => ({
+            ...prev,
+            propertyId: propId,
+            propertyName: p ? p.name : ''
+        }));
+    };
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={initialData?.id ? "تعديل بلاغ الشكوى" : "تسجيل بلاغ شكوى فنية/إدارية"} size="md">
+            <form onSubmit={(e) => { e.preventDefault(); onSubmit(formData as Complaint); }} className="space-y-4 text-xs text-start">
+                <div className="grid grid-cols-2 gap-3">
+                    <Select label="اسم المستأجر البلاغة" value={formData.tenantId || ''} options={tenants.map(t => ({ value: t.id, label: t.fullNameAr }))} onChange={handleSelectTenant} required />
+                    <Select label="العقار المعني بالتصليح" value={formData.propertyId || ''} options={properties.map(p => ({ value: p.id, label: p.name }))} onChange={handleSelectProp} required />
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                    <Input label="رقم الشقة/المحل" value={formData.unitNumber || ''} onChange={e => setFormData(prev => ({ ...prev, unitNumber: e.target.value }))} required />
+                    <Select label="درجة الأولوية" value={formData.priority} onChange={e => setFormData(prev => ({ ...prev, priority: e.target.value as any }))} options={[
+                        { value: 'high', label: 'أولوية قصوى (عاجل)' },
+                        { value: 'medium', label: 'أولوية متوسطة' },
+                        { value: 'low', label: 'بلاغ منخفض الأهمية' }
+                    ]} />
+                    <Select label="حالة المعالجة الحالية" value={formData.status} onChange={e => setFormData(prev => ({ ...prev, status: e.target.value as any }))} options={[
+                        { value: 'pending', label: 'جديد قيد الدراسة' },
+                        { value: 'in_progress', label: 'جاري العمل مع الفني' },
+                        { value: 'resolved', label: 'تمت التسوية بنجاح' }
+                    ]} />
+                </div>
+                <TextArea label="شرح تفصيلي للمشكلة والطلب" value={formData.description || ''} onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))} required rows={3} />
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
+                    <Button type="submit" size="sm">تسجيل البلاغ</Button>
                 </div>
             </form>
         </Modal>

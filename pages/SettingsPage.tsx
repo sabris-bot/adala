@@ -88,6 +88,7 @@ const SettingsHub = ({ tabs, activeTab, setActiveTab }: { tabs: any[], activeTab
 };
 
 import { useToast } from '../components/ui/Toast';
+import { LocalizationSettings } from '../components/Settings/LocalizationSettings';
 
 const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode }) => {
     const { t, i18n } = useTranslation();
@@ -154,6 +155,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode 
     const tabs = [
         { id: 'office', label: 'ملف المكتب', desc: 'البيانات الرسمية والعناوين والشعار', icon: <BuildingOffice2Icon /> },
         { id: 'dictionary', label: 'القواميس والجداول', desc: 'إدارة تصنيفات القضايا والمصاريف والفروع', icon: <Square3Stack3DIcon /> },
+        { id: 'localization', label: 'الترجمة والتعريب المتكامل', desc: 'التحكم المطلق بملفات وقواميس اللغات ورفع حزم i18n الموحدة المعربة', icon: <GlobeAltIcon /> },
         { id: 'users', label: 'المستخدمين', desc: 'إدارة فريق العمل وحسابات الموظفين', icon: <UsersIcon /> },
         { id: 'roles', label: 'الصلاحيات', desc: 'تحديد مستويات الوصول والأدوار', icon: <ShieldCheckIcon /> },
         { id: 'appearance', label: 'المظهر والسمات', desc: 'تخصيص الألوان والوضع الليلي', icon: <SwatchIcon /> },
@@ -169,6 +171,7 @@ const SettingsPage: React.FC<SettingsPageProps> = ({ toggleDarkMode, isDarkMode 
             case 'hub': return <SettingsHub tabs={tabs} activeTab={activeTab} setActiveTab={setActiveTab} />;
             case 'office': return <OfficeSettings info={officeInfo} setInfo={setOfficeInfo} />;
             case 'dictionary': return <DictionarySettings />;
+            case 'localization': return <LocalizationSettings />;
             case 'users': return <UserManagement users={users} onAdd={() => { setEditingUser(null); setIsUserModalOpen(true); }} onEdit={(u: any) => { setEditingUser(u); setIsUserModalOpen(true); }} onDelete={(id: string) => setUsers(prev => prev.filter(u => u.id !== id))} />;
             case 'roles': return <RolePermissionsSettings permissions={rolePermissions} setPermissions={setRolePermissions} />;
             case 'appearance': return <AppearanceSettings prefs={prefs} setPrefs={setPrefs} toggleDarkMode={toggleDarkMode} isDarkMode={isDarkMode} />;

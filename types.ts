@@ -633,7 +633,7 @@ export interface Allowance {
 export interface EmergencyContact {
   name: string;
   phone: string;
-  relation: string;
+  relation?: string;
 }
 
 export interface EmployeeAsset {
@@ -773,12 +773,30 @@ export enum TerminationReasonKuwait {
   RESIGNATION_ART_48_FRAUD_CONDITIONS = "ترك العمل (المادة 48): وقع غش من صاحب العمل عند التعاقد بشأن شروط العمل",
 }
 
-export type EOS_SettlementStatus = 'UnderReview' | 'FinanciallyApproved' | 'LegallyApproved' | 'Completed' | 'Disbursed' | 'Cancelled';
+export type EOS_SettlementStatus = 
+  | 'Draft' 
+  | 'PendingReview' 
+  | 'UnderHRReview' 
+  | 'UnderFinancialReview' 
+  | 'AwaitingEmployeeApproval' 
+  | 'AwaitingManagementApproval' 
+  | 'Approved' 
+  | 'Rejected' 
+  | 'SettlementInProgress' 
+  | 'Completed' 
+  | 'Archived'
+  | 'UnderReview' 
+  | 'FinanciallyApproved' 
+  | 'LegallyApproved' 
+  | 'Disbursed' 
+  | 'Cancelled';
 
 export interface EOS_Settlement {
   id: string;
+  settlementNumber?: string;
   employeeId: string;
   employeeName: string;
+  department?: string;
   settlementDate: string;
   lastWorkingDay: string;
   terminationReason: TerminationReasonKuwait;
@@ -812,6 +830,22 @@ export interface EOS_Settlement {
   attachments?: string[];
   preparedBy: string;
   approvedBy?: string;
+
+  // Extended details
+  joiningDate?: string;
+  contractType?: string;
+  nationality?: string;
+  jobTitle?: string;
+  absenceDays?: number;
+  socialInsuranceDeduction?: number;
+  leaveBalanceDays?: number;
+  deductionsTotal?: number;
+  disciplinaryDeductions?: number;
+  finalMonthWorkedDays?: number;
+  unpaidLeaveDays?: number;
+  timeline?: { date: string; actionAr: string; actionEn: string; user: string }[];
+  approvals?: { hr: string; legal: string; finance: string; gm: string };
+  signatures?: { employee: string; hr: string; fin: string; legal: string };
 }
 
 export interface EndOfServiceInputs {
@@ -916,13 +950,18 @@ export enum LoanType {
   OTHER = "أخرى",
 }
 export enum LoanStatus {
+  DRAFT = "مسودة",
   PENDING_APPROVAL = "بانتظار الموافقة",
+  UNDER_FINANCIAL_REVIEW = "تحت التدقيق المالي",
+  AWAITING_HR_APPROVAL = "بانتظار موافقة الموارد البشرية",
   APPROVED = "موافق عليه",
-  ACTIVE = "نشط (جاري السداد)",
+  ACTIVE = "جاري الاستقطاع (نشط)",
+  PARTIALLY_PAID = "مسدد جزئياً",
   PAID_IN_FULL = "مسدد بالكامل",
   REJECTED = "مرفوض",
   CANCELLED = "ملغى",
-  DEFAULTED = "متعثر",
+  DEFAULTED = "متعثر عن السداد",
+  ARCHIVED = "مؤرشف",
 }
 export enum InstallmentStatus {
   PENDING = "مستحق",
@@ -1566,6 +1605,61 @@ export interface MaintenanceRequest {
     notes?: string;
     createdAt: string;
     updatedAt?: string;
+}
+
+export interface Landlord {
+    id: string;
+    fullNameAr: string;
+    fullNameEn?: string;
+    civilId: string;
+    phone: string;
+    email?: string;
+    bankAccountNumber?: string;
+    bankName?: string;
+    notes?: string;
+    propertyIds?: string[];
+    createdAt: string;
+}
+
+export interface Broker {
+    id: string;
+    fullNameAr: string;
+    licenseNumber: string;
+    phone: string;
+    email?: string;
+    commissionRate?: number;
+    notes?: string;
+    createdAt: string;
+}
+
+export interface Complaint {
+    id: string;
+    tenantId: string;
+    tenantName?: string;
+    propertyId: string;
+    propertyName?: string;
+    unitId?: string;
+    unitNumber?: string;
+    type: 'noise' | 'maintenance_delay' | 'public_disturbance' | 'other';
+    priority: 'low' | 'medium' | 'high';
+    description: string;
+    status: 'pending' | 'in_progress' | 'resolved' | 'litigated';
+    createdAt: string;
+    resolutionDate?: string;
+    resolutionNotes?: string;
+}
+
+export interface PropertyExpense {
+    id: string;
+    propertyId: string;
+    propertyName?: string;
+    expenseType: 'maintenance' | 'commission' | 'municipal_fee' | 'elevator' | 'cleaning' | 'paci_presents' | 'other';
+    amount: number;
+    paymentDate: string;
+    recipientName: string;
+    paymentMethod: PaymentMethod;
+    notes?: string;
+    createdAt: string;
 }
 
 // --- COMPANY AFFAIRS ---
@@ -2367,9 +2461,20 @@ export interface PartyAssignment {
 
 // --- INVESTIGATIONS ---
 export enum InvestigationStatus {
+    NEW = 'جديد',
+    UNDER_REVIEW = 'قيد المراجعة',
+    EVIDENCE_COLLECTION = 'جمع الاستدلالات',
+    WITNESS_HEARING = 'سماع الشهود',
+    AWAITING_RESPONSE = 'بانتظار الرد',
+    UNDER_LEGAL_REVIEW = 'قيد الدراسة القانونية',
+    RECOMMENDATION_ISSUED = 'تم إصدار التوصية',
+    DECISION_PENDING = 'بانتظار القرار',
     ONGOING = 'جارٍ',
     CLOSED = 'مغلق',
     ON_HOLD = 'معلق',
+    ARCHIVED = 'مؤرشف',
+    ESCALATED = 'تم التصعيد',
+    REOPENED = 'أعيد فتحه',
 }
 export enum InvestigationPartyType {
     EMPLOYEE_UNDER_COMPLAINT = 'موظف (مشكو بحقه)',
@@ -2392,6 +2497,8 @@ export interface InvestigationSession {
     questions: InvestigationQuestion[];
     partySignature?: string;
     investigatorSignature?: string;
+    sessionTime?: string;
+    notes?: string;
 }
 export interface Investigation {
     id: string;
@@ -2408,4 +2515,22 @@ export interface Investigation {
     relatedCaseIds?: string[];
     createdAt: string;
     updatedAt?: string;
+
+    // Prosecution-style Case Profile enhancements
+    employeeId?: string;
+    employeeName?: string;
+    employeeDepartment?: string;
+    employeeJobTitle?: string;
+    complainantName?: string;
+    complainantTitle?: string;
+    legalReferences?: string[];
+    violations?: string[];
+    evidence?: { id: string; name: string; type: string; url?: string; dateAdded: string; notes?: string }[];
+    witnesses?: { id: string; name: string; status?: 'summoned' | 'attended' | 'absent'; phone?: string }[];
+    notes?: string;
+    disciplinaryAction?: string;
+    attachments?: { id: string; name: string; url: string; size?: string; dateAdded: string }[];
+    approvals?: { id: string; role: string; name: string; status: 'PENDING' | 'APPROVED' | 'REJECTED'; date?: string }[];
+    legalComments?: string;
+    activityLogs?: { id: string; action: string; user: string; timestamp: string }[];
 }

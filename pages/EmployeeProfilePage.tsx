@@ -1,5 +1,5 @@
-
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
 import { useTranslation } from 'react-i18next';
 import Card from '../components/ui/Card';
@@ -8,7 +8,6 @@ import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import TextArea from '../components/ui/TextArea';
 import Modal from '../components/ui/Modal';
-import PrintHeader from '../components/ui/PrintHeader';
 import { 
     UserCircleIcon, PlusCircleIcon, EyeIcon, PencilIcon, TrashIcon, 
     FolderIcon, InformationCircleIcon, PrinterIcon, UsersIcon, 
@@ -18,1186 +17,1748 @@ import {
     BriefcaseIcon, IdentificationIcon, ShieldCheckIcon, CalendarDaysIcon,
     AcademicCapIcon, CreditCardIcon, ClockIcon, MapPinIcon, MagnifyingGlassIcon,
     ClipboardDocumentCheckIcon, BeakerIcon, ChartBarIcon, BellIcon,
-    TableCellsIcon, DocumentDuplicateIcon, HistoryIcon, ArrowPathIcon, GlobeAltIcon
+    TableCellsIcon, DocumentDuplicateIcon, HistoryIcon, ArrowPathIcon, GlobeAltIcon,
+    ArrowRightIcon, ArrowLeftIcon, CheckIcon, XMarkIcon, ShieldExclamationIcon
 } from '../constants';
-import { Employee, ContractTypeKuwait, Gender, EmployeeStatus } from '../types';
-import { contractTypeKuwaitOptions } from '../constants';
-import { Badge } from '../components/ui/Badge';
+import { ContractTypeKuwait } from '../types';
+import { initialExtendedEmployees, ExtendedEmployee } from '../data/employeeExtendedData';
 
-// --- Multi-lingual Constants ---
-const getHRConstants = (t: any) => ({
-    DEPARTMENTS_LIST: [
-        { value: 'Senior Management', label: 'الإدارة العليا' },
-        { value: 'Litigation', label: 'قسم التقاضي والمحاكم' },
-        { value: 'Consultation', label: 'قسم الاستشارات والعقود' },
-        { value: 'Corporate', label: 'قسم الشركات والتجاري' },
-        { value: 'Labor', label: 'قسم القضايا العمالية' },
-        { value: 'HR', label: 'إدارة الموارد البشرية' },
-        { value: 'Finance', label: 'الإدارة المالية' },
-        { value: 'Admin', label: 'الشؤون الإدارية والسكرتارية' },
-        { value: 'IT', label: 'تقنية المعلومات' },
-    ],
-    JOB_TITLES_LIST: [
-        { value: 'Managing Partner', label: 'شريك مدير' },
-        { value: 'Senior Consultant', label: 'مستشار قانوني أول' },
-        { value: 'Cassation Lawyer', label: 'محام (تمييز ودستورية)' },
-        { value: 'Appeals Lawyer', label: 'محام (استئناف)' },
-        { value: 'Trainee Lawyer', label: 'محام تحت التدريب' },
-        { value: 'HR Manager', label: 'مدير الموارد البشرية' },
-        { value: 'Accountant', label: 'محاسب' },
-        { value: 'Legal Secretary', label: 'سكرتير قانوني' },
-        { value: 'Court Representative', label: 'مندوب محاكم' },
-    ],
-    NATIONALITIES_LIST: [
-        { value: 'Kuwaiti', label: 'كويتي' },
-        { value: 'Egyptian', label: 'مصري' },
-        { value: 'Saudi', label: 'سعودي' },
-        { value: 'Jordanian', label: 'أردني' },
-        { value: 'Lebanese', label: 'لبناني' },
-        { value: 'Indian', label: 'هندي' },
-        { value: 'Other', label: 'جنسية أخرى' },
-    ],
-    SOCIAL_STATUS_LIST: [
-        { value: 'Single', label: 'أعزب' },
-        { value: 'Married', label: 'متزوج' },
-        { value: 'Divorced', label: 'مطلق' },
-        { value: 'Widowed', label: 'أرمل' },
-    ],
-    DUAL_GENDER_LIST: [
-        { value: 'Male', label: 'ذكر' },
-        { value: 'Female', label: 'أنثى' },
-    ],
-    EMPLOYEE_STATUS_OPTIONS: [
-        { value: 'Active', label: 'نشط (على رأس العمل)' },
-        { value: 'OnLeave', label: 'في إجازة' },
-        { value: 'Probation', label: 'فترة تجربة' },
-        { value: 'Terminated', label: 'منتهي الخدمة' },
-        { value: 'Suspended', label: 'موقوف إدارياً' },
-    ],
-    BRANCHES_LIST: [
-        { value: 'Main', label: 'الفرع الرئيسي - مدينة الكويت' },
-        { value: 'Fahaheel', label: 'فرع الفحيحيل' },
-        { value: 'Jahra', label: 'فرع الجهراء' },
-    ]
-});
+export const initialEmployees = initialExtendedEmployees;
 
-// --- Mock Data ---
-export const initialEmployees: Employee[] = [
-    {
-        id: 'emp-101',
-        employeeId: 'EMP-1001',
-        fullNameAr: 'أحمد محمود العبدالله',
-        fullNameEn: 'Ahmed Mahmoud Al-Abdullah',
-        civilId: '285010112345',
-        nationality: 'كويتي',
-        jobTitle: 'Managing Partner',
-        department: 'Senior Management',
-        joiningDate: '2010-01-01',
-        contractType: ContractTypeKuwait.UNLIMITED,
-        basicSalary: 4500,
-        allowances: [{ name: 'بدل مدير شريك', value: 1500, subjectToIndemnity: true }],
-        email: 'ahmed.m@alwagayan.com',
-        phone: '99001122',
-        status: 'Active',
-        photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150',
-        gender: 'Male',
-        socialStatus: 'Married',
-        dateOfBirth: '1980-05-15',
-        address: 'الخالدية، قطعة 2، شارع 21، منزل 5',
-        bankName: 'بنك الكويت الوطني (NBK)',
-        bankIban: 'KW65NBOK0000000123456789',
-        branch: 'Main',
-        jobGrade: 'A1',
-        contractStartDate: '2010-01-01',
-        workHoursPerDay: 8,
-        workSystem: 'دوام كامل',
-        restDays: ['Friday', 'Saturday'],
-    },
-    {
-        id: 'emp-102',
-        employeeId: 'EMP-1002',
-        fullNameAr: 'مريم ناصر الصقر',
-        fullNameEn: 'Maryam Nasser Al-Saqer',
-        civilId: '292040556789',
-        nationality: 'كويتي',
-        jobTitle: 'Senior Consultant',
-        department: 'Consultation',
-        joiningDate: '2015-06-15',
-        contractType: ContractTypeKuwait.LIMITED,
-        contractDuration: '2 سنة',
-        contractStartDate: '2015-06-15',
-        contractEndDate: '2025-06-15',
-        basicSalary: 2800,
-        allowances: [
-            { name: 'بدل سكن', value: 400, subjectToIndemnity: true },
-            { name: 'بدل انتقال', value: 100, subjectToIndemnity: false }
-        ],
-        email: 'm.alsaqer@alwagayan.com',
-        phone: '66554433',
-        status: 'Active',
-        photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=150',
-        gender: 'Female',
-        civilIdExpiry: '2026-12-30',
-        passportExpiry: '2028-01-01',
-        residencyExpiry: '2026-12-30',
-        workPermitExpiry: '2026-12-30',
-        jobGrade: 'B1',
-    },
-    {
-        id: 'emp-103',
-        employeeId: 'EMP-1003',
-        fullNameAr: 'فهد محمد الشمري',
-        fullNameEn: 'Fahad Mohammed Al-Shammari',
-        civilId: '295080811223',
-        nationality: 'كويتي',
-        jobTitle: 'Appeals Lawyer',
-        department: 'Litigation',
-        joiningDate: '2019-09-01',
-        contractType: ContractTypeKuwait.UNLIMITED,
-        basicSalary: 1900,
-        allowances: [{ name: 'بدل ترافع', value: 350, subjectToIndemnity: true }],
-        email: 'f.alshammari@alwagayan.com',
-        phone: '55443322',
-        status: 'Active',
-        gender: 'Male',
-        socialStatus: 'Single',
-        photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150',
-    },
-    {
-        id: 'emp-104',
-        employeeId: 'EMP-1004',
-        fullNameAr: 'سارة خالد العتيبي',
-        fullNameEn: 'Sara Khaled Al-Otaibi',
-        civilId: '298101033445',
-        nationality: 'كويتي',
-        jobTitle: 'HR Manager',
-        department: 'HR',
-        joiningDate: '2020-02-10',
-        contractType: ContractTypeKuwait.UNLIMITED,
-        basicSalary: 2100,
-        email: 's.alotaibi@alwagayan.com',
-        status: 'Active',
-        gender: 'Female',
-        photoUrl: 'https://images.unsplash.com/photo-1598550874175-4d0fe4a2c90b?auto=format&fit=crop&q=80&w=150',
-    },
-    {
-        id: 'emp-105',
-        employeeId: 'EMP-1005',
-        fullNameAr: 'خالد جاسم محمد',
-        fullNameEn: 'Khaled Jassem Mohammed',
-        civilId: '290111244556',
-        nationality: 'مصري',
-        jobTitle: 'Accountant',
-        department: 'Finance',
-        joiningDate: '2021-11-20',
-        contractType: ContractTypeKuwait.LIMITED,
-        basicSalary: 950,
-        status: 'Active',
-        gender: 'Male',
-        photoUrl: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=150',
-    },
-    {
-        id: 'emp-106',
-        employeeId: 'EMP-1006',
-        fullNameAr: 'نورة حمد الراشد',
-        fullNameEn: 'Noura Hamad Al-Rashed',
-        civilId: '296030388990',
-        nationality: 'كويتي',
-        jobTitle: 'Legal Secretary',
-        department: 'Admin',
-        joiningDate: '2022-03-01',
-        contractType: ContractTypeKuwait.LIMITED,
-        contractEndDate: '2025-03-01',
-        basicSalary: 850,
-        status: 'Active',
-        gender: 'Female',
-        photoUrl: 'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?auto=format&fit=crop&q=80&w=150',
-    },
-    {
-        id: 'emp-107',
-        employeeId: 'EMP-1007',
-        fullNameAr: 'عبدالرحمن العتيبي',
-        fullNameEn: 'Abdulrahman Al-Otaibi',
-        civilId: '299010177889',
-        nationality: 'كويتي',
-        jobTitle: 'Court Representative',
-        department: 'Admin',
-        joiningDate: '2023-01-15',
-        contractType: ContractTypeKuwait.UNLIMITED,
-        basicSalary: 600,
-        status: 'Probation',
-        gender: 'Male',
-        photoUrl: 'https://images.unsplash.com/photo-1542909168-82c3e7fdca5c?auto=format&fit=crop&q=80&w=150',
-    }
+// --- Multi-lingual Settings ---
+const DEPARTMENTS_LIST = [
+    { value: 'Senior Management', label: 'الإدارة العليا' },
+    { value: 'Litigation', label: 'قسم التقاضي والمحاكم' },
+    { value: 'Consultation', label: 'قسم الاستشارات والعقود' },
+    { value: 'Corporate', label: 'قسم الشركات والتجاري' },
+    { value: 'HR', label: 'إدارة الموارد البشرية' },
+    { value: 'Finance', label: 'الإدارة المالية' },
+    { value: 'Admin', label: 'الشؤون الإدارية والسكرتارية' }
 ];
 
-// --- Sub-components (Detail Tabs) ---
-const DetailsTabProfile: React.FC<{ emp: Employee }> = ({ emp }) => {
-    const { t } = useTranslation();
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Card className="md:col-span-2 shadow-sm border-slate-100">
-                <div className="p-2">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <IdentificationIcon className="w-5 h-5 text-indigo-500" />
-                        البيانات الشخصية والأساسية
-                    </h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-12">
-                        <DetailItem label="الرقم المدني" value={emp.civilId} />
-                        <DetailItem label="الجنسية" value={emp.nationality} />
-                        <DetailItem label="تاريخ الميلاد" value={emp.dateOfBirth} />
-                        <DetailItem label="الجنس" value={emp.gender === 'Male' ? 'ذكر' : 'أنثى'} />
-                        <DetailItem label="الحالة الاجتماعية" value={emp.socialStatus || 'غير محدد'} />
-                        <DetailItem label="رقم الهاتف" value={emp.phone} />
-                        <DetailItem label="البريد الإلكتروني" value={emp.email} />
-                        <DetailItem label="فصيلة الدم" value={emp.bloodType} />
-                        <div className="sm:col-span-2">
-                            <DetailItem label="العنوان السكني" value={emp.address} />
-                        </div>
-                    </div>
-                </div>
-            </Card>
-            <Card className="shadow-sm border-slate-100 bg-indigo-50/20">
-                 <div className="p-2">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <ShieldCheckIcon className="w-5 h-5 text-indigo-500" />
-                        صلاحية المستندات
-                    </h3>
-                    <div className="space-y-4">
-                        <StatusItem label="انتهاء البطاقة المدنية" value={emp.civilIdExpiry} critical />
-                        <StatusItem label="انتهاء جواز السفر" value={emp.passportExpiry} />
-                        <StatusItem label="انتهاء الإقامة" value={emp.residencyExpiry} critical />
-                        <StatusItem label="انتهاء إذن العمل" value={emp.workPermitExpiry} />
-                        <StatusItem label="رقم التأمين الصحي" value={emp.healthInsuranceNumber || 'غير مسجل'} />
-                    </div>
-                 </div>
-            </Card>
-        </div>
-    );
-};
+const JOB_TITLES_LIST = [
+    { value: 'Managing Partner', label: 'شريك مدير' },
+    { value: 'Senior Consultant', label: 'مستشار قانوني أول' },
+    { value: 'Cassation Lawyer', label: 'محام (تمييز ودستورية)' },
+    { value: 'Appeals Lawyer', label: 'محام (استئناف)' },
+    { value: 'Trainee Lawyer', label: 'محام تحت التدريب' },
+    { value: 'HR Manager', label: 'مدير الموارد البشرية' },
+    { value: 'Accountant', label: 'محاسب' },
+    { value: 'Legal Secretary', label: 'سكرتير قانوني' }
+];
 
-const DetailsTabContract: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <Card className="shadow-sm border-slate-100">
-            <div className="p-2">
-                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <BriefcaseIcon className="w-5 h-5 text-indigo-500" />
-                    بيانات الوظيفة والقسم
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4">
-                    <DetailItem label="القسم" value={emp.department} />
-                    <DetailItem label="المسمى الوظيفي" value={emp.jobTitle} />
-                    <DetailItem label="الدرجة الوظيفية" value={emp.jobGrade || 'غير محدد'} />
-                    <DetailItem label="الفرع" value={emp.branch || 'الرئيسي'} />
-                    <DetailItem label="تاريخ التعيين" value={emp.joiningDate} />
-                    <DetailItem label="المدير المباشر" value={emp.managerName || 'الإدارة العليا'} />
-                </div>
-            </div>
-        </Card>
-        <Card className="shadow-sm border-slate-100">
-            <div className="p-2">
-                <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                    <DocumentTextIcon className="w-5 h-5 text-indigo-500" />
-                    تفاصيل العقد والدوام
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4">
-                    <DetailItem label="نوع العقد" value={emp.contractType} />
-                    <DetailItem label="مدة العقد" value={emp.contractDuration || 'غير محدد'} />
-                    <DetailItem label="بداية العقد" value={emp.contractStartDate} />
-                    <DetailItem label="نهاية العقد" value={emp.contractEndDate || 'مستمر'} />
-                    <DetailItem label="ساعات العمل" value={emp.workHoursPerDay ? `${emp.workHoursPerDay} ساعة` : '-'} />
-                    <DetailItem label="نظام الدوام" value={emp.workSystem || 'دوام كامل'} />
-                    <div className="sm:col-span-2">
-                        <DetailItem label="أيام الراحة" value={emp.restDays?.join(' - ') || 'الجمعة / السبت'} />
-                    </div>
-                </div>
-            </div>
-        </Card>
-    </div>
-);
-
-const DetailsTabPayroll: React.FC<{ emp: Employee }> = ({ emp }) => {
-    const totalAllowances = emp.allowances?.reduce((sum, a) => sum + a.value, 0) || 0;
-    const grossSalary = emp.basicSalary + totalAllowances;
-    
-    return (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <Card className="shadow-sm border-slate-100">
-                <div className="p-2">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <BanknotesIcon className="w-5 h-5 text-indigo-500" />
-                        هيكل الرواتب والبدلات
-                    </h3>
-                    <div className="space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
-                            <span className="text-slate-500 text-sm">الراتب الأساسي</span>
-                            <span className="font-bold text-slate-900">{emp.basicSalary.toLocaleString()} د.ك</span>
-                        </div>
-                        {emp.allowances?.map((a, i) => (
-                            <div key={i} className="flex justify-between items-center px-3 py-2 border-b border-dashed border-slate-200">
-                                <span className="text-slate-500 text-sm">{a.name}</span>
-                                <span className="font-semibold text-slate-700">{a.value.toLocaleString()} د.ك</span>
-                            </div>
-                        ))}
-                        <div className="flex justify-between items-center p-4 bg-indigo-600 rounded-xl text-white shadow-lg shadow-indigo-500/20">
-                            <span className="font-medium">إجمالي الراتب (Gross)</span>
-                            <span className="font-black text-2xl">{grossSalary.toLocaleString()} د.ك</span>
-                        </div>
-                    </div>
-                </div>
-            </Card>
-            <Card className="shadow-sm border-slate-100 bg-emerald-50/20">
-                <div className="p-2">
-                    <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                        <CreditCardIcon className="w-5 h-5 text-indigo-500" />
-                        البيانات البنكية والتأمينات
-                    </h3>
-                    <div className="space-y-6">
-                        <DetailItem label="اسم البنك" value={emp.bankName || 'غير مسجل'} />
-                        <DetailItem label="رقم الحساب" value={emp.bankAccount || '-'} font="mono" />
-                        <DetailItem label="IBAN" value={emp.bankIban || '-'} font="mono" size="xs" />
-                        <hr className="border-slate-200 border-dashed" />
-                        <DetailItem label="رقم التأمينات الاجتماعية" value={emp.socialSecurityNumber || 'غير مسجل'} />
-                    </div>
-                </div>
-            </Card>
-        </div>
-    );
-};
-
-const DetailsTabReports: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatCard label="الإنتاجية" value="92%" icon={<CheckCircleIcon className="w-6 h-6"/>} trend="+5%" />
-            <StatCard label="الالتزام بالوقت" value="88%" icon={<ClockIcon className="w-6 h-6"/>} />
-            <StatCard label="المهام المنجزة" value="142" icon={<FolderIcon className="w-6 h-6"/>} />
-            <StatCard label="تقييم الإدارة" value="4.8/5" icon={<UserCircleIcon className="w-6 h-6"/>} />
-        </div>
-        <Card className="rounded-[2.5rem] border-slate-100 shadow-sm overflow-hidden">
-            <div className="bg-slate-50 p-6 border-b border-slate-100">
-                <h5 className="text-lg font-black text-slate-800">سجل التقييمات السنوية</h5>
-            </div>
-            <div className="divide-y divide-slate-100">
-                {[
-                    { year: '2023', score: 'إمتياز (95%)', note: 'أداء متميز في الترافع والبحث القانوني.', author: 'أحمد الصباح' },
-                    { year: '2022', score: 'جيد جداً (88%)', note: 'تطور ملحوظ في المهارات العملية.', author: 'سارة العبدالله' },
-                ].map((r, i) => (
-                    <div key={i} className="p-6 flex items-start justify-between bg-white hover:bg-slate-50 transition-colors">
-                        <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className="text-xs font-black bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">{r.year}</span>
-                                <h6 className="font-black text-slate-800">{r.score}</h6>
-                            </div>
-                            <p className="text-sm text-slate-500 font-medium line-clamp-2 max-w-xl">{r.note}</p>
-                        </div>
-                        <div className="text-left text-xs text-slate-400">
-                            <p className="font-bold">المقيم: {r.author}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </Card>
-    </div>
-);
-
-const DetailsTabLeaves: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <StatCard label="رصيد الإجازات المتبقي" value="22 يوم" icon={<CalendarDaysIcon className="w-6 h-6"/>} trend="محدث" />
-            <StatCard label="إجازات مستنفذة" value="8 أيام" icon={<ClockIcon className="w-6 h-6"/>} />
-            <StatCard label="طلبات معلقة" value="1" icon={<ExclamationTriangleIcon className="w-6 h-6"/>} critical />
-        </div>
-        <div className="bg-slate-50 p-6 rounded-3xl border border-slate-100">
-            <h5 className="font-black text-slate-800 mb-4 flex items-center gap-2">
-                <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                تاريخ الإجازات الأخير
-            </h5>
-            <div className="space-y-3">
-                {[
-                    { type: 'إجازة سنوية', date: '2024/03/01 - 2024/03/10', status: 'Approved', days: 10 },
-                    { type: 'إجازة مرضية', date: '2024/01/15', status: 'Approved', days: 1 },
-                ].map((l, i) => (
-                    <div key={i} className="bg-white p-4 rounded-2xl shadow-sm flex items-center justify-between">
-                        <div>
-                            <p className="font-bold text-slate-800 text-sm">{l.type}</p>
-                            <p className="text-[10px] text-slate-400 font-mono tracking-tighter">{l.date}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="font-black text-indigo-600 text-xs">{l.days} يوم</p>
-                            <span className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest">معتمد</span>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    </div>
-);
-
-const DetailsTabAttendance: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between mb-8">
-            <h5 className="text-lg font-black text-slate-800">سجل الدوام والحضور</h5>
-            <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="rounded-xl font-bold">الشهر الحالي</Button>
-                <Button variant="outline" size="sm" className="rounded-xl font-bold">تصدير PDF</Button>
-            </div>
-        </div>
-        <div className="grid grid-cols-4 gap-4 mb-8">
-            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-3xl text-center">
-                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">الحضور</p>
-                <p className="text-xl font-black text-emerald-700">95%</p>
-            </div>
-            <div className="bg-amber-50 border border-amber-100 p-4 rounded-3xl text-center">
-                <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">التأخير</p>
-                <p className="text-xl font-black text-amber-700">120 د</p>
-            </div>
-            <div className="bg-rose-50 border border-rose-100 p-4 rounded-3xl text-center">
-                <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">الغياب</p>
-                <p className="text-xl font-black text-rose-700">1 يوم</p>
-            </div>
-            <div className="bg-indigo-50 border border-indigo-100 p-4 rounded-3xl text-center">
-                <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">إضافي</p>
-                <p className="text-xl font-black text-indigo-700">15 س</p>
-            </div>
-        </div>
-        <Card className="rounded-3xl border-slate-100 shadow-sm overflow-hidden">
-             <table className="w-full">
-                <thead>
-                    <tr className="bg-slate-50 border-b border-slate-100">
-                        <th className="p-4 text-right text-[10px] font-black text-slate-400">التاريخ</th>
-                        <th className="p-4 text-right text-[10px] font-black text-slate-400">الدخول</th>
-                        <th className="p-4 text-right text-[10px] font-black text-slate-400">الخروج</th>
-                        <th className="p-4 text-right text-[10px] font-black text-slate-400">الحالة</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 text-xs">
-                    {[
-                        { date: '2024/05/10', in: '08:05', out: '16:15', status: 'Present' },
-                        { date: '2024/05/09', in: '08:30', out: '16:00', status: 'Late' },
-                        { date: '2024/05/08', in: '08:00', out: '16:05', status: 'Present' },
-                    ].map((a, i) => (
-                        <tr key={i} className="hover:bg-slate-50/50">
-                            <td className="p-4 font-mono">{a.date}</td>
-                            <td className="p-4 font-mono font-bold text-slate-600">{a.in}</td>
-                            <td className="p-4 font-mono font-bold text-slate-600">{a.out}</td>
-                            <td className="p-4">
-                                <span className={`px-2 py-0.5 rounded-lg font-black text-[9px] ${a.status === 'Present' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
-                                    {a.status === 'Present' ? 'حاضر' : 'تأخير'}
-                                </span>
-                            </td>
-                        </tr>
-                    ))}
-                </tbody>
-             </table>
-        </Card>
-    </div>
-);
-
-const DetailsTabDocs: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between mb-8">
-            <h5 className="text-lg font-black text-slate-800 tracking-tight">الأرشيف الرقمي</h5>
-            <Button className="rounded-2xl bg-slate-900 h-10 px-6 text-xs font-black shadow-lg shadow-slate-900/10" leftIcon={<CloudArrowUpIcon className="w-4"/>}>رفع مستند جديد</Button>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-                { title: 'البطاقة المدنية', icon: <IdentificationIcon/>, expires: '2025/12/30', status: 'Valid' },
-                { title: 'جواز السفر', icon: <GlobeAltIcon/>, expires: '2026/05/15', status: 'Valid' },
-                { title: 'عقد العمل الموثق', icon: <BriefcaseIcon/>, expires: 'N/A', status: 'Permanent' },
-                { title: 'إذن العمل', icon: <ShieldCheckIcon/>, expires: '2024/11/20', status: 'Expiring Soon' },
-                { title: 'الشهادة الجامعية', icon: <AcademicCapIcon/>, expires: 'N/A', status: 'Permanent' },
-                { title: 'شهادة الراتب', icon: <BanknotesIcon/>, expires: 'N/A', status: 'Permanent' },
-            ].map((doc, i) => (
-                <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all group border-b-4 border-b-indigo-500">
-                    <div className="flex items-start justify-between mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                            {React.cloneElement(doc.icon as React.ReactElement, { className: 'w-6 h-6' } as any)}
-                        </div>
-                        <div className="flex gap-1">
-                            <button className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors"><EyeIcon className="w-4"/></button>
-                            <button className="w-8 h-8 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors"><ArrowDownTrayIcon className="w-4"/></button>
-                        </div>
-                    </div>
-                    <h6 className="font-black text-slate-800 text-sm mb-1">{doc.title}</h6>
-                    <div className="flex items-center justify-between mt-4">
-                         <p className="text-[9px] text-slate-400 font-mono tracking-tighter uppercase">Expiry: {doc.expires}</p>
-                         <span className={`text-[8px] font-black px-2 py-0.5 rounded-lg ${doc.status === 'Valid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600 uppercase'}`}>{doc.status}</span>
-                    </div>
-                </div>
-            ))}
-        </div>
-    </div>
-);
-
-const DetailsTabAlerts: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h5 className="text-lg font-black text-slate-800 mb-6 px-2">تنبيهات النظام الذكية</h5>
-        <div className="space-y-4">
-            {[
-                { title: 'اقتراب موعد انتهاء الإقامة', date: 'بعد 15 يوم', priority: 'High', msg: 'يرجى البدء في إجراءات الفحص الطبي وتجديد الإقامة.' },
-                { title: 'موعد التقييم السنوي', date: 'بعد 5 أيام', priority: 'Medium', msg: 'تم تحديد موعد لمقابلة الأداء مع مدير القسم المختص.' },
-                { title: 'علاوة دورية مستحقة', date: 'الشهر القادم', priority: 'Low', msg: 'الموظف يستحق الترقية الوظيفية حسب سنوات الخبرة.' },
-            ].map((al, i) => (
-                <div key={i} className={`p-6 rounded-[2rem] border ${al.priority === 'High' ? 'bg-rose-50 border-rose-100' : 'bg-white border-slate-100'} shadow-sm flex gap-5 animate-in slide-in-from-right duration-700 delay-${i*100}`}>
-                    <div className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center shadow-sm ${al.priority === 'High' ? 'bg-rose-500 text-white' : 'bg-indigo-600 text-white'}`}>
-                         <BellIcon className="w-7 h-7" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                             <h6 className={`font-black text-lg ${al.priority === 'High' ? 'text-rose-900' : 'text-slate-800'}`}>{al.title}</h6>
-                             <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg ${al.priority === 'High' ? 'bg-rose-100 text-rose-700' : 'bg-indigo-50 text-indigo-700'}`}>{al.date}</span>
-                        </div>
-                        <p className={`text-sm ${al.priority === 'High' ? 'text-rose-700/80' : 'text-slate-500'} leading-relaxed font-medium`}>{al.msg}</p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    </div>
-);
-
-const DetailsTabHistory: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <h5 className="text-lg font-black text-slate-800 mb-8 px-2 tracking-tight">التسلسل الزمني الوظيفي</h5>
-        <div className="relative border-r-2 border-slate-100 pr-8 space-y-12 py-4">
-            {[
-                { title: 'ترقية إلى مسمى رفيع', date: '2024/01/01', desc: 'تمت ترقية الموظف تقديراً للأداء الاستثنائي في إدارة القضايا المعقدة.' },
-                { title: 'تعديل الراتب الأساسي', date: '2023/06/15', desc: 'زيادة سنوية بنسبة 10% بناءً على نتائج التقييم السنوي.' },
-                { title: 'اجتياز فترة التجربة', date: '2022/03/01', desc: 'تثبيت الموظف في ملاك الوظائف الدائم بالدائرة القانونية.' },
-                { title: 'تاريخ التعيين', date: '2021/11/01', desc: 'الانضمام للمكتب بصفة باحث قانوني مبتدئ.' },
-            ].map((h, i) => (
-                <div key={i} className="relative animate-in slide-in-from-right duration-500 delay-150">
-                    <div className="absolute -right-[41px] top-0 w-5 h-5 bg-indigo-600 rounded-full border-4 border-white ring-4 ring-indigo-50"></div>
-                    <div>
-                        <p className="text-[10px] font-black text-indigo-500 mb-1 tabular-nums bg-indigo-50 inline-block px-2 py-0.5 rounded-lg">{h.date}</p>
-                        <h6 className="font-black text-slate-800 text-md mb-2">{h.title}</h6>
-                        <p className="text-sm text-slate-500 leading-relaxed font-medium">{h.desc}</p>
-                    </div>
-                </div>
-            ))}
-        </div>
-    </div>
-);
-
-const DetailsTabNotes: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="flex items-center justify-between mb-8">
-            <h5 className="text-lg font-black text-slate-800 mb-6 px-2">ملاحظات ومرئيات الإدارة</h5>
-            <Button className="rounded-2xl bg-indigo-600 h-10 px-6 text-xs font-black" leftIcon={<PlusCircleIcon className="w-4"/>}>إضافة ملاحظة</Button>
-        </div>
-        <div className="space-y-4">
-            {[
-                { author: 'أحمد الصباح', role: 'المدير العام', date: 'منذ يومين', text: 'الموظف يبدي التزاماً كبيراً بمواعيد الجلسات ودقة في صياغة المذكرات القانونية.' },
-                { author: 'سارة العبدالله', role: 'مدير HR', date: 'منذ أسبوع', text: 'يرجى مراجعة ملف الدورات التدريبية المتبقية للموظف لهذا العام.' },
-            ].map((n, i) => (
-                <div key={i} className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 shadow-sm relative overflow-hidden group">
-                    <div className="flex items-center justify-between mb-4">
-                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center font-black">{(n.author[0])}</div>
-                            <div>
-                                <p className="font-black text-slate-800 text-sm">{n.author}</p>
-                                <p className="text-[9px] text-indigo-500 font-bold uppercase">{n.role}</p>
-                            </div>
-                         </div>
-                         <p className="text-[10px] text-slate-400 font-bold">{n.date}</p>
-                    </div>
-                    <p className="text-sm text-slate-600 leading-relaxed font-medium italic">"{n.text}"</p>
-                </div>
-            ))}
-        </div>
-    </div>
-);
-
-const DetailsTabChangeLog: React.FC<{ emp: Employee }> = ({ emp }) => (
-    <div className="p-8 animate-in fade-in duration-500">
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-             <div className="bg-slate-50/50 p-4 border-b border-slate-100">
-                 <h5 className="text-sm font-black text-slate-800">سجل النشاطات والتعديلات الآلي</h5>
-             </div>
-             <div className="divide-y divide-slate-50">
-                 {[
-                    { action: 'تغيير الحالة', detail: 'من "تجربة" إلى "نشط"', user: 'System Agent', time: 'اليوم، 10:30 صباحاً' },
-                    { action: 'تعديل الراتب', detail: 'زيادة 150 د.ك على الراتب الأساسي', user: 'Admin User', time: 'أمس، 02:20 مساءً' },
-                    { action: 'تحديث مستند', detail: 'تجديد البطاقة المدنية', user: 'Admin User', time: '05 مايو 2024' },
-                    { action: 'إضافة إجازة', detail: 'إجازة سنوية لمدة 10 أيام', user: 'Employee Portal', time: '01 مايو 2024' },
-                 ].map((log, i) => (
-                    <div key={i} className="p-4 hover:bg-slate-50/30 transition-colors flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-sm"></div>
-                            <div>
-                                <p className="font-black text-slate-800">{log.action}</p>
-                                <p className="text-slate-400 font-medium">{log.detail}</p>
-                            </div>
-                        </div>
-                        <div className="text-left">
-                            <p className="text-indigo-600 font-black">{log.user}</p>
-                            <p className="text-[10px] text-slate-300 font-mono tracking-tighter uppercase">{log.time}</p>
-                        </div>
-                    </div>
-                 ))}
-             </div>
-        </div>
-        <div className="mt-8 p-6 bg-slate-900 rounded-3xl text-center">
-             <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-2 font-mono">End of Encrypted Log</p>
-             <p className="text-xs text-slate-400 font-medium tracking-tight">يحتفظ النظام بسجل كامل لكافة التغييرات لأغراض الرقابة والامتثال القانوني.</p>
-        </div>
-    </div>
-);
-
-// --- Helpers ---
-const DetailItem = ({ label, value, font = 'sans', size = 'sm' }: { label: string, value?: string | number, font?: 'sans' | 'mono', size?: 'xs' | 'sm' | 'md' }) => (
-    <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-        <p className={`text-${size} font-bold text-slate-800 ${font === 'mono' ? 'font-mono' : ''}`}>{value || '-'}</p>
-    </div>
-);
-
-const StatusItem = ({ label, value, critical = false }: { label: string, value?: string, critical?: boolean }) => {
-    const isExpiring = value && new Date(value) < new Date(new Date().setMonth(new Date().getMonth() + 2));
-    return (
-        <div className="flex justify-between items-center text-sm group">
-            <span className="text-slate-500">{label}</span>
-            <span className={`px-2 py-0.5 rounded-lg text-xs font-bold leading-tight ${
-                isExpiring && critical ? 'bg-rose-100 text-rose-600 ring-1 ring-rose-200' : 
-                isExpiring ? 'bg-amber-100 text-amber-600 ring-1 ring-amber-200' : 
-                'bg-slate-100 text-slate-500'
-            }`}>
-                {value || 'غير مسجل'}
-            </span>
-        </div>
-    );
-};
-
-const EmployeeStatusBadge: React.FC<{ status: string }> = ({ status }) => {
-    const configs: Record<string, { label: string, class: string }> = {
-        'Active': { label: 'نشط', class: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200' },
-        'OnLeave': { label: 'في إجازة', class: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200' },
-        'Probation': { label: 'فترة تجربة', class: 'bg-amber-100 text-amber-700 ring-1 ring-amber-200' },
-        'Terminated': { label: 'منتهي', class: 'bg-rose-100 text-rose-700 ring-1 ring-rose-200' },
-        'Suspended': { label: 'موقوف', class: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200' },
-    };
-    const config = configs[status] || { label: status, class: 'bg-gray-100 text-gray-700' };
-    return <span className={`px-3 py-1 rounded-full text-[10px] font-black tracking-tighter uppercase ${config.class}`}>{config.label}</span>;
-};
-
-// --- Modern HR Helpers ---
-const SidebarLink = ({ icon, label, count, active = false }: { icon: any, label: string, count?: number, active?: boolean }) => (
-    <button className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all ${active ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50 hover:text-indigo-600'}`}>
-        <div className="flex items-center gap-3">
-            <span className={active ? 'text-indigo-600' : 'text-slate-400'}>{icon}</span>
-            <span className="text-sm font-bold">{label}</span>
-        </div>
-        {count && <span className="bg-slate-100 text-slate-500 text-[10px] font-black px-2 py-0.5 rounded-lg">{count}</span>}
-    </button>
-);
-
-const StatCard = ({ label, value, icon, trend, critical = false }: { label: string, value: string | number, icon: any, trend?: string, critical?: boolean }) => (
-    <div className={`bg-white p-6 rounded-[2.5rem] border ${critical ? 'border-rose-100 ring-4 ring-rose-50/50' : 'border-slate-100'} shadow-sm relative overflow-hidden group`}>
-        <div className="flex items-center gap-4 relative z-10">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${critical ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                {icon}
-            </div>
-            <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</p>
-                <h4 className="text-2xl font-black text-slate-800 tracking-tight">{value}</h4>
-            </div>
-        </div>
-        {trend && (
-            <div className="mt-4 flex items-center gap-1.5">
-                <span className="text-[10px] font-black px-2 py-0.5 rounded-lg bg-emerald-50 text-emerald-600">{trend}</span>
-            </div>
-        )}
-        <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-slate-50 rounded-full scale-0 group-hover:scale-100 transition-transform duration-500"></div>
-    </div>
-);
-
-const HeroStat = ({ icon, label, value }: { icon: any, label: string, value: string }) => (
-    <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl flex items-center gap-3 border border-white/5 group hover:bg-white/20 transition-all">
-        <div className="text-indigo-300 group-hover:scale-110 transition-transform">{icon}</div>
-        <div>
-            <p className="text-[9px] font-black text-indigo-200/50 uppercase tracking-widest leading-none mb-1">{label}</p>
-            <p className="text-xs font-bold font-mono tracking-tighter leading-none">{value}</p>
-        </div>
-    </div>
-);
-
-const TabBtn = ({ id, icon, label, active, onClick }: { id: string, icon: any, label: string, active: boolean, onClick: () => void }) => (
-    <button 
-        onClick={onClick}
-        className={`px-5 py-3 rounded-2xl text-xs font-bold flex items-center gap-2 shrink-0 transition-all ${
-            active 
-            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20 translate-y-[-2px]' 
-            : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-100'
-        }`}
-    >
-        <span className={active ? 'text-white' : 'text-slate-400'}>{React.cloneElement(icon as React.ReactElement, { className: 'w-4 h-4' } as any)}</span>
-        {label}
-    </button>
-);
-
-
-// --- Main Page Component ---
 const EmployeeProfilePage: React.FC = () => {
-    const { t } = useTranslation();
     const { addToast } = useToast();
-    const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-    const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-    const [activeDetailTab, setActiveDetailTab] = useState<'profile' | 'contract' | 'payroll' | 'leaves' | 'attendance' | 'docs' | 'evaluations' | 'alerts' | 'history' | 'notes' | 'changelog'>('profile');
+    const { t, i18n } = useTranslation();
+    const isRtl = i18n.language === 'ar' || document.documentElement.dir === 'rtl';
 
-    // Form State
-    const [formData, setFormData] = useState<Partial<Employee>>({
+    // State
+    const [employees, setEmployees] = useState<ExtendedEmployee[]>(() => {
+        const stored = localStorage.getItem('alwagayan_employees');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (e) {
+                console.error("Local storage employee parse error:", e);
+            }
+        }
+        return initialExtendedEmployees;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('alwagayan_employees', JSON.stringify(employees));
+    }, [employees]);
+
+    // UI Configuration States
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedDept, setSelectedDept] = useState('All');
+    const [selectedStatus, setSelectedStatus] = useState('All');
+    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'dashboard'>('grid');
+    const [selectedEmployee, setSelectedEmployee] = useState<ExtendedEmployee | null>(null);
+    const [activeDetailTab, setActiveDetailTab] = useState<string>('overview');
+    
+    // Dialog/Modal States
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [editingEmployee, setEditingEmployee] = useState<ExtendedEmployee | null>(null);
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const [printDocType, setPrintDocType] = useState<'contract' | 'payslip' | 'warning' | 'id'>('contract');
+    const [previewDocContent, setPreviewDocContent] = useState<any>(null);
+
+    // Interactive Document Upload State
+    const [isPreviewDocOpen, setIsPreviewDocOpen] = useState(false);
+    const [previewFileMeta, setPreviewFileMeta] = useState<{ title: string; type: string; url?: string; content?: string } | null>(null);
+
+    // Employee Form Data
+    const [formData, setFormData] = useState<Partial<ExtendedEmployee>>({
         fullNameAr: '',
         fullNameEn: '',
         civilId: '',
-        employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
+        employeeId: '',
         nationality: 'كويتي',
-        jobTitle: '',
-        department: '',
+        jobTitle: 'Senior Consultant',
+        department: 'Consultation',
         joiningDate: new Date().toISOString().split('T')[0],
         contractType: ContractTypeKuwait.UNLIMITED,
         status: 'Active',
-        basicSalary: 0,
+        basicSalary: 1200,
         gender: 'Male',
         email: '',
         phone: '',
+        civilIdExpiry: '',
+        passportNumber: '',
+        passportExpiry: '',
+        residencyExpiry: '',
+        bankName: '',
+        bankIban: '',
+        bankAccount: '',
+        socialSecurityNumber: '',
+        healthInsuranceNumber: '',
+        bloodType: 'A+',
+        managerName: '',
+        socialStatus: 'Single',
+        jobGrade: 'B1',
+        branch: 'Main',
+        contractStartDate: '',
+        contractEndDate: '',
+        workHoursPerDay: 8,
+        workSystem: 'دوام كامل',
+        restDays: ['الجمعة', 'السبت'],
+        address: ''
     });
+
+    // Helper functions for alerts and notifications
+    const globalAlerts = useMemo(() => {
+        const alerts: Array<{ id: string; empId: string; empName: string; title: string; date: string; type: 'critical' | 'warning' | 'info'; text: string }> = [];
+        employees.forEach(emp => {
+            const now = new Date();
+            const getExpiryDiffDays = (dateStr?: string) => {
+                if (!dateStr) return null;
+                const expiry = new Date(dateStr);
+                return Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+            };
+
+            const civilIdDiff = getExpiryDiffDays(emp.civilIdExpiry);
+            if (civilIdDiff !== null && civilIdDiff <= 60) {
+                alerts.push({
+                    id: `id-${emp.id}`,
+                    empId: emp.id,
+                    empName: emp.fullNameAr,
+                    title: 'قرب انتهاء صلاحية البطاقة المدنية',
+                    date: emp.civilIdExpiry || '',
+                    type: civilIdDiff <= 15 ? 'critical' : 'warning',
+                    text: `البطاقة المدنية تنتهي خلال ${civilIdDiff} يوماً (${emp.civilIdExpiry}).`
+                });
+            }
+
+            const residencyDiff = getExpiryDiffDays(emp.residencyExpiry);
+            if (residencyDiff !== null && residencyDiff <= 45) {
+                alerts.push({
+                    id: `res-${emp.id}`,
+                    empId: emp.id,
+                    empName: emp.fullNameAr,
+                    title: 'موعد تجديد الإقامة والترخيص',
+                    date: emp.residencyExpiry || '',
+                    type: residencyDiff <= 10 ? 'critical' : 'warning',
+                    text: `ترخيص العمل والإقامة ينتهي خلال ${residencyDiff} يوماً.`
+                });
+            }
+
+            const passportDiff = getExpiryDiffDays(emp.passportExpiry);
+            if (passportDiff !== null && passportDiff <= 90) {
+                alerts.push({
+                    id: `pass-${emp.id}`,
+                    empId: emp.id,
+                    empName: emp.fullNameAr,
+                    title: 'صلاحية جواز السفر المعتمد',
+                    date: emp.passportExpiry || '',
+                    type: passportDiff <= 30 ? 'warning' : 'info',
+                    text: `ينتهي جواز السفر في تاريخ ${emp.passportExpiry}.`
+                });
+            }
+
+            // Loan Overdue Sim
+            if (emp.loans && emp.loans.length > 0) {
+                emp.loans.forEach(ln => {
+                    if (ln.status === 'Active' && ln.balanceAmount > 1000) {
+                        alerts.push({
+                            id: `loan-${ln.id}`,
+                            empId: emp.id,
+                            empName: emp.fullNameAr,
+                            title: 'تنبيه سلفة مالية نشطة',
+                            date: ln.maturityDate,
+                            type: 'info',
+                            text: `الموظف لديه سلفة نشطة برصيد متبقٍ قدره ${ln.balanceAmount} د.ك.`
+                        });
+                    }
+                });
+            }
+        });
+        return alerts;
+    }, [employees]);
 
     // Filtering logic
     const filteredEmployees = useMemo(() => {
         const term = searchTerm.toLowerCase().trim();
-        return employees.filter(e => 
-            e.fullNameAr.toLowerCase().includes(term) ||
-            (e.fullNameEn && e.fullNameEn.toLowerCase().includes(term)) ||
-            e.employeeId.toLowerCase().includes(term) ||
-            e.civilId.includes(term) ||
-            (e.jobTitle && e.jobTitle.toLowerCase().includes(term))
-        );
-    }, [employees, searchTerm]);
-
-    const handleAddExample = () => {
-        setEmployees(prev => [...prev, ...initialEmployees.map(e => ({...e, id: Math.random().toString(36).substr(2, 9)}))]);
-        addToast({
-            type: 'success',
-            title: 'تمت الإضافة',
-            message: 'تمت إضافة موظفين نموذجيين إضافيين للسجل المحلي.'
+        return employees.filter(e => {
+            const matchesSearch = e.fullNameAr.toLowerCase().includes(term) ||
+                (e.fullNameEn && e.fullNameEn.toLowerCase().includes(term)) ||
+                e.employeeId.toLowerCase().includes(term) ||
+                e.civilId.includes(term) ||
+                e.jobTitle.toLowerCase().includes(term);
+            const matchesDept = selectedDept === 'All' || e.department === selectedDept;
+            const matchesStatus = selectedStatus === 'All' || e.status === selectedStatus;
+            return matchesSearch && matchesDept && matchesStatus;
         });
-    };
+    }, [employees, searchTerm, selectedDept, selectedStatus]);
 
-    const handleOpenForm = (emp?: Employee) => {
+    // Actions
+    const handleOpenForm = (emp?: ExtendedEmployee) => {
         if (emp) {
             setEditingEmployee(emp);
-            setFormData(emp);
+            setFormData({ ...emp });
         } else {
             setEditingEmployee(null);
             setFormData({
+                id: `emp-${Math.floor(Math.random() * 1000 + 100)}`,
+                employeeId: `EMP-${Math.floor(Math.random() * 8999 + 1000)}`,
                 fullNameAr: '',
                 fullNameEn: '',
                 civilId: '',
-                employeeId: `EMP-${Math.floor(1000 + Math.random() * 9000)}`,
                 nationality: 'كويتي',
-                jobTitle: '',
-                department: '',
+                jobTitle: 'Senior Consultant',
+                department: 'Consultation',
                 joiningDate: new Date().toISOString().split('T')[0],
                 contractType: ContractTypeKuwait.UNLIMITED,
                 status: 'Active',
-                basicSalary: 0,
+                basicSalary: 1200,
                 gender: 'Male',
                 email: '',
                 phone: '',
+                civilIdExpiry: '2028-12-30',
+                passportNumber: '',
+                passportExpiry: '2029-01-01',
+                residencyExpiry: '2028-12-30',
+                bankName: 'بنك الكويت الوطني (NBK)',
+                bankIban: '',
+                bankAccount: '',
+                socialSecurityNumber: '',
+                healthInsuranceNumber: '',
+                bloodType: 'A+',
+                managerId: '',
+                managerName: 'أحمد محمود العبدالله',
+                socialStatus: 'Single',
+                jobGrade: 'B2',
+                branch: 'Main',
+                contractStartDate: new Date().toISOString().split('T')[0],
+                contractEndDate: '',
+                workHoursPerDay: 8,
+                workSystem: 'دوام كامل',
+                restDays: ['الجمعة', 'السبت'],
+                address: '',
+                allowances: [],
+                attendanceLogs: [
+                  { date: new Date().toISOString().split('T')[0], checkIn: '08:00', checkOut: '16:00', status: 'Present', delayMinutes: 0 }
+                ],
+                leaveRequests: [],
+                disciplinaryActions: [],
+                investigations: [],
+                loans: [],
+                evaluations: [],
+                administrativeRequests: [],
+                historyTimeline: [
+                  {
+                    id: `tl-${Math.random()}`,
+                    date: new Date().toISOString().split('T')[0],
+                    category: 'Hiring',
+                    titleAr: 'التعيين بالمنشأة',
+                    titleEn: 'Hired at Company',
+                    descriptionAr: 'الانضمام إلى المكتب وبدء استحقاق المزايا',
+                    descriptionEn: 'Joined company and initialized benefits parameters',
+                    performedBy: 'نظام الموارد البشرية'
+                  }
+                ],
+                legalNotes: []
             });
         }
         setIsFormOpen(true);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        // Validation check for duplicates
+        const duplicateCheck = employees.some(emp => 
+            emp.civilId === formData.civilId && emp.id !== formData.id
+        );
+        
+        if (duplicateCheck) {
+            addToast({
+                type: 'error',
+                title: 'تنبيه مطابقة بيانات',
+                message: 'عذراً، يوجد موظف مسبق مسجل بنفس الرقم المدني الحالي.'
+            });
+            return;
+        }
+
         if (editingEmployee) {
-            setEmployees(prev => prev.map(emp => emp.id === editingEmployee.id ? { ...emp, ...formData } as Employee : emp));
+            setEmployees(prev => prev.map(emp => emp.id === editingEmployee.id ? { ...emp, ...formData } as ExtendedEmployee : emp));
             addToast({
                 type: 'success',
-                title: 'تم التحديث',
-                message: `تم تحديث بيانات الموظف ${formData.fullNameAr} بنجاح.`
+                title: 'حفظ وتحديث',
+                message: `تم تحديث ملف الموظف ${formData.fullNameAr} بنجاح ومزامنته.`
             });
+            if (selectedEmployee?.id === editingEmployee.id) {
+                setSelectedEmployee({ ...selectedEmployee, ...formData } as ExtendedEmployee);
+            }
         } else {
-            const newEmp: Employee = {
-                ...formData,
-                id: Math.random().toString(36).substr(2, 9),
-            } as Employee;
+            const newEmp = { ...formData, id: `emp-${Math.random().toString(36).substr(2, 9)}` } as ExtendedEmployee;
             setEmployees(prev => [newEmp, ...prev]);
             addToast({
                 type: 'success',
-                title: 'تمت الإضافة',
-                message: 'تم إضافة الموظف الجديد إلى النظام.'
+                title: 'تسجيل ناجح',
+                message: `تم تسجيل الموظف ${formData.fullNameAr} بقاطعة العمل الموحدة.`
             });
         }
         setIsFormOpen(false);
     };
 
-    const handleDelete = (id: string, e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        if (window.confirm("هل أنت متأكد من رغبتك في حذف هذا الموظف نهائياً من السجل؟")) {
+    const handleDelete = (id: string, name: string) => {
+        if (window.confirm(`هل أنت متأكد من رغبتك في حذف ملف الموظف (${name}) نهائياً؟ هذا الإجراء سيقوم بإزالة كامل سجلات الحضور، الرواتب والتحقيقات المرتبطة به.`)) {
             setEmployees(prev => prev.filter(emp => emp.id !== id));
-            if (selectedEmployee?.id === id) setSelectedEmployee(null);
+            if (selectedEmployee?.id === id) {
+                setSelectedEmployee(null);
+            }
             addToast({
                 type: 'warning',
-                title: 'تم حذف الموظف',
-                message: 'تم حذف سجل الموظف من قاعدة البيانات.'
+                title: 'حذف السجلات',
+                message: `تمت إزالة السجل الكامل للموظف ${name} من الخادم المحلي.`
             });
         }
     };
 
-    const handleView = (emp: Employee, e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        setSelectedEmployee(emp);
+    const handleDuplicate = (emp: ExtendedEmployee) => {
+        const dup = {
+            ...emp,
+            id: `emp-${Math.floor(Math.random() * 900 + 100)}`,
+            employeeId: `EMP-${Math.floor(Math.random() * 8999 + 1000)}`,
+            fullNameAr: `${emp.fullNameAr} (مكرر)`,
+            fullNameEn: emp.fullNameEn ? `${emp.fullNameEn} (Copy)` : '',
+            civilId: `99${emp.civilId.substr(2)}` // Slightly alter civil ID
+        };
+        setEmployees(prev => [dup, ...prev]);
+        addToast({
+            type: 'success',
+            title: 'نسخ وتكرار ملف',
+            message: `تم نسخ ملف الموظف ${emp.fullNameAr} لإجراء التعديلات السرية.`
+        });
+    };
+
+    // Printing Setup
+    const handleOpenPrintDoc = (type: 'contract' | 'payslip' | 'warning' | 'id', emp: ExtendedEmployee) => {
+        setPrintDocType(type);
+        const refNo = `REF-${new Date().getFullYear()}-${Math.floor(Math.random() * 8999 + 1000)}`;
+        let content: any = {
+            refNo,
+            empName: emp.fullNameAr,
+            empCivilId: emp.civilId,
+            empJob: emp.jobTitle,
+            empDept: emp.department,
+            joiningDate: emp.joiningDate,
+            basicSalary: emp.basicSalary,
+            empId: emp.employeeId,
+            date: new Date().toISOString().split('T')[0]
+        };
+
+        if (type === 'payslip') {
+            const allowancesVal = emp.allowances?.reduce((sum, a) => sum + a.value, 0) || 0;
+            const gross = emp.basicSalary + allowancesVal;
+            const insDeduction = Math.round(emp.basicSalary * 0.08); // KWD 8% Social insurance contribution
+            const net = gross - insDeduction;
+            content = { ...content, allowancesVal, gross, insDeduction, net };
+        } else if (type === 'warning') {
+            content = {
+                ...content,
+                lawClause: 'المادة 41 من القانون رقم 6 لعام 2010 بشأن العمل في القطاع الأهلي بدولة الكويت',
+                reason: emp.disciplinaryActions?.[0]?.violationDetails || 'التغيب المتكرر أو عدم الامتثال للتوجيهات الصادرة عن مستشاري ورؤساء الأقسام بالمكتب القانوني.',
+                penalty: emp.disciplinaryActions?.[0]?.penalty || 'إنذار كتابي أول مع تسجيل القرار بملف الخدمة.'
+            };
+        }
+        
+        setPreviewDocContent(content);
+        setIsPrintModalOpen(true);
+    };
+
+    const triggerSystemPrint = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        const html = document.getElementById('printableArea')?.innerHTML || '';
+        printWindow.document.write(`
+            <html>
+                <head>
+                    <title>طباعة وثيقة رسمية - مكتب الوقيان والمنصور</title>
+                    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+                    <style>
+                        body { direction: rtl; font-family: 'Inter', sans-serif; padding: 20px;}
+                        @media print {
+                            .no-print { display: none; }
+                            body { padding: 0; }
+                        }
+                    </style>
+                </head>
+                <body onload="window.print(); window.close();">
+                    <div class="max-w-4xl mx-auto p-8 border border-slate-200">
+                        ${html}
+                    </div>
+                </body>
+            </html>
+        `);
+        printWindow.document.close();
+    };
+
+    // Interactive Document Archiver View
+    const handlePreviewDocument = (filename: string, docAr: string) => {
+        let contentText = "";
+        let docType = "text";
+        if (filename.includes("البطاقة")) {
+            docType = "civil_id";
+        } else if (filename.includes("جواز")) {
+            docType = "passport";
+        } else if (filename.includes("الشهادة")) {
+            docType = "degree";
+        } else {
+            contentText = `مستند أصلي رسمي صادر بموجب لوائح وقوانين ديوان الخدمة المدنية ووزارة القوى العاملة الكويتية لعام 2026.\n\nالمستند المذكور: ${docAr}\nرقم المرجع: CID-${Math.floor(Math.random() * 89999 + 10000)}\nتاريخ الاعتماد: 2026-01-10`;
+        }
+
+        setPreviewFileMeta({
+            title: docAr,
+            type: docType,
+            content: contentText
+        });
+        setIsPreviewDocOpen(true);
+    };
+
+    // Sub-record Mutators inside Profile Tab
+    const handleAddNote = (empId: string, author: string, noteText: string) => {
+        if (!noteText.trim()) return;
+        setEmployees(prev => prev.map(emp => {
+            if (emp.id === empId) {
+                const updatedNotes = [
+                    ...(emp.legalNotes || []),
+                    {
+                        id: `note-${Date.now()}`,
+                        date: new Date().toISOString().split('T')[0],
+                        author,
+                        noteText
+                    }
+                ];
+                return { ...emp, legalNotes: updatedNotes };
+            }
+            return emp;
+        }));
+        addToast({
+            type: 'success',
+            title: 'إضافة مرئية',
+            message: 'تم إضافة الملاحظة وعرضها بملف المراجعة.'
+        });
+    };
+
+    const handleCreateLoan = (empId: string, amount: number, installment: number) => {
+        if (amount <= 0 || installment <= 0) return;
+        setEmployees(prev => prev.map(emp => {
+            if (emp.id === empId) {
+                const updatedLoans = [
+                    ...(emp.loans || []),
+                    {
+                        id: `ln-${Date.now()}`,
+                        principalAmount: amount,
+                        monthlyInstallment: installment,
+                        balanceAmount: amount,
+                        issueDate: new Date().toISOString().split('T')[0],
+                        maturityDate: new Date(new Date().setMonth(new Date().getMonth() + Math.ceil(amount / installment))).toISOString().split('T')[0],
+                        status: 'Active' as const,
+                        payments: []
+                    }
+                ];
+                // Push to timeline too
+                const updatedTL = [
+                    {
+                        id: `tl-${Date.now()}`,
+                        date: new Date().toISOString().split('T')[0],
+                        category: 'Loan' as const,
+                        titleAr: 'صرف سلفة مالية عاجلة',
+                        titleEn: 'Approved Emergency Loan',
+                        descriptionAr: `تقديم طلب سلفة برأس مال ${amount} د.ك بقسط يعادل ${installment} شهرياَ.`,
+                        descriptionEn: `Approved loan advance of ${amount} KWD`,
+                        performedBy: 'الإدارة المالية'
+                    },
+                    ...(emp.historyTimeline || [])
+                ];
+                return { ...emp, loans: updatedLoans, historyTimeline: updatedTL };
+            }
+            return emp;
+        }));
+        addToast({
+            type: 'success',
+            title: 'محرك القروض المباشر',
+            message: `تم اعتماد سلفة جديدة بقيمة ${amount} د.ك وخصم الاستقطاعات.`
+        });
+    };
+
+    const handleUpdateLeaveStatus = (empId: string, requestId: string, newStatus: 'Approved' | 'Rejected') => {
+        setEmployees(prev => prev.map(emp => {
+            if (emp.id === empId) {
+                const updatedRequests = emp.leaveRequests?.map(req => {
+                    if (req.id === requestId) {
+                        return { 
+                            ...req, 
+                            status: newStatus,
+                            approvals: newStatus === 'Approved' ? [{ role: 'إدارة HR', name: 'سارة خالد العتيبي', date: new Date().toISOString().split('T')[0] }] : []
+                        };
+                    }
+                    return req;
+                }) || [];
+
+                // Timeline logger
+                const targetedRequest = emp.leaveRequests?.find(r => r.id === requestId);
+                const updatedTL = [
+                    {
+                        id: `tl-${Date.now()}`,
+                        date: new Date().toISOString().split('T')[0],
+                        category: 'Leave' as const,
+                        titleAr: `تحديث طلب الإجازة (${newStatus === 'Approved' ? 'اعتماد' : 'رفض'})`,
+                        titleEn: `Leave Request: ${newStatus}`,
+                        descriptionAr: `تم تحديث حالة طلب الإجازة المقدمة بمدى ${targetedRequest?.days} يوم للقرار الإداري.`,
+                        descriptionEn: `Leave request status updated by HR specialist.`,
+                        performedBy: 'سارة خالد (HR)'
+                    },
+                    ...(emp.historyTimeline || [])
+                ];
+
+                return { ...emp, leaveRequests: updatedRequests, historyTimeline: updatedTL };
+            }
+            return emp;
+        }));
+        
+        addToast({
+            type: newStatus === 'Approved' ? 'success' : 'warning',
+            title: 'إدارة الإجازات',
+            message: `تم تعديل حالة الإجازة إلى: ${newStatus === 'Approved' ? 'معتمد ومصدق بوزارة العمل' : 'مرفوض إدارياً'}.`
+        });
     };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC]">
-            {/* Sidebar-based Layout for HR System */}
-            <div className="flex">
-                {/* Internal Module Sidebar */}
-                <aside className="w-64 bg-white border-l h-screen sticky top-0 hidden lg:block overflow-y-auto">
-                    <div className="p-6">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+            {/* Main Flex Panel */}
+            <div className="flex flex-col lg:flex-row min-h-screen">
+                
+                {/* Modules Sidebar Wrapper */}
+                <aside className="w-full lg:w-76 bg-white dark:bg-slate-900 border-b lg:border-b-0 lg:border-l border-slate-100 dark:border-slate-800 p-6 shrink-0 z-10 flex flex-col justify-between">
+                    <div>
                         <div className="flex items-center gap-3 mb-8">
-                            <div className="bg-indigo-600 p-2 rounded-xl">
+                            <div className="bg-indigo-600 dark:bg-indigo-500 p-2.5 rounded-2xl shadow-lg shadow-indigo-600/15">
                                 <UsersIcon className="w-6 h-6 text-white" />
                             </div>
-                            <span className="font-bold text-slate-800 tracking-tight">إدارة الكوادر</span>
+                            <div>
+                                <h2 className="text-md font-black text-slate-800 dark:text-white leading-tight">شؤون الموظفين</h2>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">سجلات الموظفين الموحدة</p>
+                            </div>
                         </div>
 
                         <nav className="space-y-1">
-                            <SidebarLink icon={<ViewColumnsIcon className="w-5"/>} label="نظرة عامة" active />
-                            <SidebarLink icon={<IdentificationIcon className="w-5"/>} label="دليل الموظفين" />
-                            <SidebarLink icon={<BriefcaseIcon className="w-5"/>} label="عقود العمل" count={2} />
-                            <SidebarLink icon={<ShieldCheckIcon className="w-5"/>} label="الإقامات والتراخيص" count={3} />
-                            <SidebarLink icon={<CalendarDaysIcon className="w-5"/>} label="الإجازات والدوام" />
-                            <SidebarLink icon={<BanknotesIcon className="w-5"/>} label="كشوف الرواتب" />
-                            <SidebarLink icon={<AcademicCapIcon className="w-5"/>} label="التقييم السنوي" />
-                            <SidebarLink icon={<FolderIcon className="w-5"/>} label="الأرشيف الرقمي" />
+                            <button onClick={() => { setSelectedEmployee(null); setViewMode('dashboard'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all ${viewMode === 'dashboard' && !selectedEmployee ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold'}`}>
+                                <div className="flex items-center gap-3">
+                                    <ChartBarIcon className="w-5 h-5 opacity-70" />
+                                    <span className="text-xs">لوحة العمل والامتثال</span>
+                                </div>
+                            </button>
+                            <button onClick={() => { setSelectedEmployee(null); setViewMode('grid'); }} className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all ${(viewMode === 'grid' || viewMode === 'table') && !selectedEmployee ? 'bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-black' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold'}`}>
+                                <div className="flex items-center gap-3">
+                                    <UsersIcon className="w-5 h-5 opacity-70" />
+                                    <span className="text-xs">دليل ملفات الموظفين</span>
+                                </div>
+                                <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 px-2 py-0.5 rounded-full font-black font-mono">{employees.length}</span>
+                            </button>
                         </nav>
 
-                        <div className="mt-10 pt-10 border-t">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 px-3">الإعدادات والتقارير</p>
-                            <nav className="space-y-1">
-                                <SidebarLink icon={<ChartBarIcon className="w-5"/>} label="التحليلات" />
-                                <SidebarLink icon={<DocumentTextIcon className="w-5"/>} label="اللوائح الداخلية" />
-                            </nav>
+                        {/* Smart Alerts Section Inside Sidebar */}
+                        <div className="mt-8">
+                            <div className="flex items-center justify-between px-3 mb-3">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                                    تنبيهات استباقية مهمة
+                                </span>
+                                <span className="text-[9px] font-black font-mono text-rose-500">{globalAlerts.length}</span>
+                            </div>
+                            
+                            <div className="space-y-2 max-h-56 overflow-y-auto scrollbar-none">
+                                {globalAlerts.length === 0 ? (
+                                    <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-xl text-center text-[10px] font-medium text-slate-400">
+                                        جميع أذونات الإقامة والبطاقات المدنية سارية المفعول
+                                    </div>
+                                ) : (
+                                    globalAlerts.map(al => (
+                                        <div key={al.id} className={`p-3 rounded-2xl border transition-all text-xs text-right cursor-pointer ${al.type === 'critical' ? 'bg-rose-50 dark:bg-rose-950/20 border-rose-100 dark:border-rose-900/35 text-rose-700 dark:text-rose-400' : al.type === 'warning' ? 'bg-amber-50 dark:bg-amber-950/20 border-amber-100 dark:border-amber-900/35 text-amber-700 dark:text-amber-400' : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                                             onClick={() => {
+                                                 const found = employees.find(e => e.id === al.empId);
+                                                 if (found) {
+                                                     setSelectedEmployee(found);
+                                                     setActiveDetailTab('alerts');
+                                                 }
+                                             }}
+                                        >
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <ExclamationTriangleIcon className="w-3.5 h-3.5 inline text-current shrink-0" />
+                                                <span className="font-black text-[10px] truncate">{al.empName}</span>
+                                            </div>
+                                            <p className="text-[10px] leading-relaxed scale-95 origin-right opacity-90">{al.text}</p>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-6 mt-6">
+                        <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-3xl text-right">
+                            <span className="text-[9px] font-black text-indigo-500 block mb-1">منظومة القلعة المتكاملة</span>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">قوانين العمل مستوفاة بالكامل وفق المادة 41 / 44 من قانون العمل الكويتي.</p>
                         </div>
                     </div>
                 </aside>
 
-                {/* Main Content */}
-                <main className="flex-1 overflow-x-hidden">
-                    {/* Header */}
-                    <header className="bg-white border-b sticky top-0 z-30 px-8 py-4 flex items-center justify-between">
+                {/* Vertical Workspace Portal */}
+                <main className="flex-1 min-w-0 flex flex-col pt-0">
+                    
+                    {/* Header Controls */}
+                    <header className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-20 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h1 className="text-xl font-bold text-slate-800">ملفات الموظفين</h1>
-                            <p className="text-xs text-slate-400 font-medium">إدارة شاملة لبيانات الموظفين والامتثال القانوني</p>
+                            <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1.5">
+                                <Link to="/employee-affairs" className="hover:text-indigo-600 transition-colors">شؤون الموظفين</Link>
+                                <span>/</span>
+                                <span className="text-slate-600 dark:text-slate-300 font-bold">ملفات السجل الرسمي</span>
+                            </div>
+                            <h1 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                                {selectedEmployee ? `الملف المهني: ${selectedEmployee.fullNameAr}` : 'إدارة الكوادر والموظفين'}
+                                {selectedEmployee && (
+                                    <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2 py-0.5 rounded-full dark:bg-indigo-950 dark:text-indigo-300">
+                                        {selectedEmployee.employeeId}
+                                    </span>
+                                )}
+                            </h1>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <button className="p-2.5 rounded-xl border border-slate-100 hover:bg-slate-50 relative group transition-all">
-                                <BellIcon className="w-5 h-5 text-slate-400" />
-                                <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"></span>
-                            </button>
-                            <div className="h-8 w-[1px] bg-slate-100 mx-1"></div>
-                            <Button variant="outline" className="rounded-xl border-slate-200 h-11 text-xs font-bold" leftIcon={<CloudArrowUpIcon className="w-4"/>}>استيراد</Button>
-                            <Button variant="outline" className="rounded-xl border-slate-200 h-11 text-xs font-bold" leftIcon={<ArrowDownTrayIcon className="w-4"/>}>تصدير</Button>
-                            <Button className="rounded-xl bg-indigo-600 h-11 px-6 text-xs font-black shadow-lg shadow-indigo-600/10" leftIcon={<PlusCircleIcon className="w-5"/>} onClick={() => handleOpenForm()}>إضافة موظف</Button>
+
+                        {/* Top Action Layout */}
+                        <div className="flex items-center gap-2 self-start md:self-auto">
+                            {selectedEmployee ? (
+                                <Button variant="outline" className="rounded-2xl border-slate-200 text-xs font-black dark:border-slate-700" leftIcon={<ArrowRightIcon className="w-4 h-4" />} onClick={() => setSelectedEmployee(null)}>
+                                    العودة لملفات الدليل
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="outline" className="rounded-2xl border-slate-200 text-xs font-black dark:border-slate-700" leftIcon={<CloudArrowUpIcon className="w-4 h-4" />} onClick={() => handleOpenForm()}>
+                                        تسجيل موظف جديد
+                                    </Button>
+                                    <Button className="rounded-2xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-indigo-600 dark:hover:bg-indigo-500 text-xs font-black" leftIcon={<PlusCircleIcon className="w-4.5 h-4.5" />} onClick={() => {
+                                        setEmployees(prev => [...prev, ...initialExtendedEmployees.map(e => ({
+                                            ...e,
+                                            id: `emp-new-${Math.random()}`,
+                                            employeeId: `EMP-${Math.floor(Math.random() * 8999 + 1000)}`,
+                                            fullNameAr: `${e.fullNameAr} (مستورد من السيرفر)`,
+                                            civilId: `28${Math.floor(Math.random() * 10000000000)}`
+                                        }))]);
+                                        addToast({
+                                            type: 'success',
+                                            title: 'استيراد السجلات',
+                                            message: 'تم استيراد قائمة السيرفر التوضيحية.'
+                                        });
+                                    }}>
+                                        استيراد عينة البيانات
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     </header>
 
-                    <div className="p-8">
-                        {/* Dashboard Stats Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                            <StatCard 
-                                label="إجمالي الموظفين" 
-                                value={employees.length} 
-                                icon={<UsersIcon className="w-6 h-6 text-indigo-600"/>} 
-                                trend="+2 هذا الشهر"
-                            />
-                            <StatCard 
-                                label="الموظفون النشطون" 
-                                value={employees.filter(e => e.status === 'Active').length} 
-                                icon={<CheckCircleIcon className="w-6 h-6 text-emerald-600"/>}
-                            />
-                            <StatCard 
-                                label="إقامات تنتهي قريباً" 
-                                value={3} 
-                                icon={<ShieldCheckIcon className="w-6 h-6 text-rose-600"/>}
-                                critical
-                            />
-                            <StatCard 
-                                label="عقود تنتهي قريباً" 
-                                value={2} 
-                                icon={<BriefcaseIcon className="w-6 h-6 text-amber-600"/>}
-                            />
-                        </div>
-
-                        {/* Search and Filters */}
-                        <div className="bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm mb-8 flex flex-col md:flex-row items-center gap-4">
-                            <div className="relative flex-1 group">
-                                <MagnifyingGlassIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
-                                <input 
-                                    className="w-full h-12 pr-12 pl-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-indigo-500/20 text-sm font-bold"
-                                    placeholder="ابحث بذكاء (الاسم، الرقم المدني، المسمى)..."
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                            <div className="flex gap-2 shrink-0">
-                                <select className="h-12 px-4 rounded-2xl bg-slate-50 border-none text-xs font-bold">
-                                    <option>كافة الأقسام</option>
-                                    <option>التقاضي</option>
-                                    <option>الاستشارات</option>
-                                </select>
-                                <select className="h-12 px-4 rounded-2xl bg-slate-50 border-none text-xs font-bold">
-                                    <option>كافة الحالات</option>
-                                    <option>نشط</option>
-                                    <option>إجازة</option>
-                                </select>
-                                <div className="flex bg-slate-100/50 p-1 rounded-2xl">
-                                    <button onClick={() => setViewMode('grid')} className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-indigo-500'}`}><ViewColumnsIcon className="w-5 h-5"/></button>
-                                    <button onClick={() => setViewMode('table')} className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${viewMode === 'table' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-indigo-500'}`}><ListBulletIcon className="w-5 h-5"/></button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Main Content Render */}
-                        {viewMode === 'grid' ? (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
-                                {filteredEmployees.map(emp => (
-                                    <div 
-                                        key={emp.id} 
-                                        onClick={() => handleView(emp)}
-                                        className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-pointer group"
-                                    >
-                                        <div className="flex flex-col items-center text-center">
-                                            <div className="relative mb-4">
+                    {/* Central Workspace Panel */}
+                    <div className="p-6 md:p-8 flex-1">
+                        {selectedEmployee ? (
+                            
+                            // ==========================================
+                            // PREMIUM FULL PROFILE INTEGRATIVE HUB
+                            // ==========================================
+                            <div className="space-y-6">
+                                
+                                {/* Hero Widget Card */}
+                                <div className="bg-gradient-to-br from-indigo-950 via-indigo-900 to-slate-900 text-white rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden">
+                                    <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.15),transparent_60%)]"></div>
+                                    
+                                    <div className="relative flex flex-col md:flex-row items-center md:items-end justify-between gap-6">
+                                        <div className="flex flex-col md:flex-row items-center gap-5 text-center md:text-right">
+                                            <div className="relative group">
                                                 <img 
-                                                    src={emp.photoUrl || `https://ui-avatars.com/api/?name=${emp.fullNameAr}&background=random`} 
-                                                    className="w-24 h-24 rounded-[2rem] object-cover border-4 border-slate-50 shadow-inner group-hover:scale-105 transition-transform"
-                                                    alt=""
+                                                    src={selectedEmployee.photoUrl || `https://ui-avatars.com/api/?name=${selectedEmployee.fullNameAr}&background=random`} 
+                                                    className="w-32 h-32 rounded-[2rem] object-cover border-4 border-white/20 shadow-2xl group-hover:scale-105 transition-transform"
+                                                    alt={selectedEmployee.fullNameAr}
                                                 />
-                                                <div className={`absolute -bottom-1 -left-1 w-6 h-6 rounded-full border-4 border-white ${emp.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500 shadow-sm'}`}></div>
+                                                <div className="absolute -bottom-1 -left-1 w-6 h-6 rounded-full border-4 border-indigo-950 bg-emerald-500"></div>
                                             </div>
-                                            <h3 className="font-black text-slate-800 text-lg mb-1">{emp.fullNameAr}</h3>
-                                            <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-6">{emp.jobTitle}</p>
-                                            
-                                            <div className="w-full grid grid-cols-2 gap-2 mb-6">
-                                                <div className="bg-slate-50 p-2 rounded-2xl">
-                                                    <p className="text-[9px] text-slate-400 font-bold mb-0.5">ID</p>
-                                                    <p className="text-xs font-black text-slate-600">{emp.employeeId}</p>
+                                            <div>
+                                                <div className="flex flex-wrap items-center justify-center md:justify-start gap-2 mb-2">
+                                                    <h3 className="text-2xl font-black">{selectedEmployee.fullNameAr}</h3>
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black tracking-widest uppercase ${selectedEmployee.status === 'Active' ? 'bg-emerald-500/20 text-emerald-300 ring-1 ring-emerald-500/30' : 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/30'}`}>
+                                                        {selectedEmployee.status === 'Active' ? 'مباشر العمل' : 'إجازة / تجربة'}
+                                                    </span>
                                                 </div>
-                                                <div className="bg-slate-50 p-2 rounded-2xl">
-                                                    <p className="text-[9px] text-slate-400 font-bold mb-0.5">الحالة</p>
-                                                    <p className="text-[10px] font-black text-emerald-600">نشط</p>
+                                                <p className="text-indigo-200 text-sm font-bold mb-4">{selectedEmployee.jobTitle} • {selectedEmployee.department}</p>
+                                                
+                                                <div className="flex flex-wrap justify-center md:justify-start gap-2.5 text-xs">
+                                                    <div className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-1.5">
+                                                        <IdentificationIcon className="w-4 h-4 text-indigo-300" />
+                                                        <span>مدني: {selectedEmployee.civilId}</span>
+                                                    </div>
+                                                    <div className="bg-white/10 px-3 py-1.5 rounded-xl border border-white/5 flex items-center gap-1.5">
+                                                        <CalendarDaysIcon className="w-4 h-4 text-indigo-300" />
+                                                        <span>التوظيف: {selectedEmployee.joiningDate}</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-
-                                            <div className="flex gap-2 mt-auto w-full">
-                                                <button onClick={(e) => { e.stopPropagation(); handleOpenForm(emp); }} className="flex-1 h-10 rounded-xl bg-slate-50 text-slate-400 hover:bg-slate-900 hover:text-white transition-all text-xs font-bold">تعديل</button>
-                                                <button onClick={(e) => handleDelete(emp.id, e)} className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center"><TrashIcon className="w-5"/></button>
                                             </div>
                                         </div>
+
+                                        <div className="flex flex-wrap gap-2 shrink-0 md:self-center">
+                                            <Button variant="outline" className="h-10 text-xs border-white/20 text-white hover:bg-white/10 rounded-xl" leftIcon={<PrinterIcon className="w-4.5" />} onClick={() => handleOpenPrintDoc('id', selectedEmployee)}>
+                                                بطاقة إرشادية
+                                            </Button>
+                                            <Button variant="secondary" className="h-10 text-xs bg-white text-indigo-950 hover:bg-slate-100 rounded-xl font-bold" leftIcon={<PencilIcon className="w-4.5" />} onClick={() => handleOpenForm(selectedEmployee)}>
+                                                تعديل السيرة
+                                            </Button>
+                                        </div>
                                     </div>
-                                ))}
+                                </div>
+
+                                {/* Custom Responsive Tabs Panels */}
+                                <div className="flex gap-1.5 overflow-x-auto py-2.5 px-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl scrollbar-none shadow-sm">
+                                    {[
+                                        { id: 'overview', icon: <UserCircleIcon />, title: 'نظرة عامة' },
+                                        { id: 'employment', icon: <BriefcaseIcon />, title: 'قيد التوظيف العمالي' },
+                                        { id: 'payroll', icon: <BanknotesIcon />, title: 'بوابة الرواتب' },
+                                        { id: 'attendance', icon: <CalendarDaysIcon />, title: 'الحضور والإجازات' },
+                                        { id: 'disciplinary', icon: <ShieldExclamationIcon />, title: 'التحقيقات الإدارية' },
+                                        { id: 'loans', icon: <CreditCardIcon />, title: 'السلف والقروض' },
+                                        { id: 'docs', icon: <FolderIcon />, title: 'أرشيف الوثائق' },
+                                        { id: 'evaluations', icon: <AcademicCapIcon />, title: 'التقييمات ربع السنوية' }
+                                    ].map(tab => (
+                                        <button 
+                                            key={tab.id}
+                                            onClick={() => setActiveDetailTab(tab.id)}
+                                            className={`px-4 py-2.5 rounded-xl text-xs font-black shrink-0 transition-all flex items-center gap-2 ${activeDetailTab === tab.id ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/15' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                                        >
+                                            <span className={activeDetailTab === tab.id ? 'text-white' : 'text-slate-400'}>{tab.icon}</span>
+                                            {tab.title}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Render Selected Tab Modules */}
+                                <div className="mt-4 transition-all animate-in fade-in duration-300">
+                                    
+                                    {/* 1. Overview Tab */}
+                                    {activeDetailTab === 'overview' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            
+                                            {/* Left Card Area */}
+                                            <Card className="md:col-span-2 shadow-sm border-slate-100 bg-white">
+                                                <div className="flex items-center gap-2 mb-6 border-b pb-4">
+                                                    <InformationCircleIcon className="w-5 h-5 text-indigo-600" />
+                                                    <h4 className="text-sm font-black text-slate-800 dark:text-white">ملخص المسار والمؤهلات</h4>
+                                                </div>
+                                                
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 gap-x-8 text-right">
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-400 font-extrabold uppercase">الحالة الاجتماعية</span>
+                                                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{selectedEmployee.socialStatus === 'Married' ? 'متزوج' : 'أعزب'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-400 font-extrabold">المسؤول الإداري</span>
+                                                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mt-0.5">{selectedEmployee.managerName || 'أحمد محمود العبدالله'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-400 font-extrabold">الدرجة الوظيفية</span>
+                                                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 font-mono">{selectedEmployee.jobGrade || 'A'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-400 font-extrabold">رقم جواز السفر</span>
+                                                        <p className="text-xs font-extrabold text-slate-800 dark:text-slate-200 mt-0.5 font-mono">{selectedEmployee.passportNumber || 'N/A'}</p>
+                                                    </div>
+                                                    <div className="sm:col-span-2 border-t pt-4">
+                                                        <span className="text-[10px] text-slate-400 font-extrabold">العنوان التفصيلي (المدينة / السكن)</span>
+                                                        <p className="text-xs font-extrabold text-slate-700 dark:text-slate-300 mt-1">{selectedEmployee.address || 'الكويت، مبارك الكبير، قطعة 2'}</p>
+                                                    </div>
+                                                </div>
+                                            </Card>
+
+                                            {/* Right Timeline Logs Grid */}
+                                            <Card className="shadow-sm border-slate-100 bg-white flex flex-col justify-between">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-4 border-b pb-3">
+                                                        <HistoryIcon className="w-5 h-5 text-indigo-600" />
+                                                        <h4 className="text-slate-800 dark:text-white text-xs font-extrabold">النشاط والتسلسل الزمني</h4>
+                                                    </div>
+                                                    <div className="relative border-r pr-4 space-y-4">
+                                                        {(selectedEmployee.historyTimeline || []).slice(0, 3).map(tl => (
+                                                            <div key={tl.id} className="relative text-xs">
+                                                                <div className="absolute -right-[21px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-600 border border-white"></div>
+                                                                <p className="text-[9px] text-slate-400 font-mono">{tl.date}</p>
+                                                                <p className="font-extrabold text-slate-800 dark:text-slate-200">{tl.titleAr}</p>
+                                                                <p className="text-[10px] text-slate-500 scale-95 origin-right">{tl.descriptionAr}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="mt-4 pt-3 border-t">
+                                                    <h5 className="text-[10px] font-black text-indigo-500 mb-2">إضافة تعليق سري وملحوظة</h5>
+                                                    <div className="flex gap-2">
+                                                        <input 
+                                                            id="overviewNoteInputField"
+                                                            type="text" 
+                                                            placeholder="اكتب تعليقاً..."
+                                                            className="flex-1 bg-slate-50 dark:bg-slate-800 border-none rounded-xl text-xs px-3 h-10"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') {
+                                                                    const val = (e.target as HTMLInputElement).value;
+                                                                    handleAddNote(selectedEmployee.id, 'مشرف الموارد البشرية', val);
+                                                                    (e.target as HTMLInputElement).value = '';
+                                                                }
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* 2. Employment Tab */}
+                                    {activeDetailTab === 'employment' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                                            <Card className="shadow-sm border-slate-100 p-6 bg-white space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white flex items-center justify-between">
+                                                    <span>وزارة الشؤون الاجتماعية وصلاحية التسجيلات</span>
+                                                    <BriefcaseIcon className="w-4 h-4 text-indigo-500" />
+                                                </h5>
+                                                
+                                                <div className="space-y-3.5 divide-y divide-slate-50 dark:divide-slate-800">
+                                                    <div className="flex justify-between items-center py-2.5">
+                                                        <span className="text-xs text-slate-500">بداية العقد المصدق</span>
+                                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{selectedEmployee.contractStartDate || selectedEmployee.joiningDate}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center py-2.5">
+                                                        <span className="text-xs text-slate-500">نهاية العقد المصدق</span>
+                                                        <span className="text-xs font-bold text-slate-800 dark:text-slate-200">{selectedEmployee.contractEndDate || 'عقد غير محدد المدة'}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center py-2.5">
+                                                        <span className="text-xs text-slate-500">رقم رخصة العمل بالقطاع الأهلي</span>
+                                                        <span className="text-xs font-bold font-mono text-slate-800 dark:text-slate-200">KWT-88009922</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center py-2.5">
+                                                        <span className="text-xs text-slate-500">رقم التأمينات الاجتماعية</span>
+                                                        <span className="text-xs font-bold font-mono text-slate-850 dark:text-slate-250">{selectedEmployee.socialSecurityNumber || 'غير مسجل'}</span>
+                                                    </div>
+                                                </div>
+
+                                                <button onClick={() => handleOpenPrintDoc('contract', selectedEmployee)} className="w-full h-11 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl text-xs font-black transition-all">
+                                                    صياغة كشف نموذج عقد عمل رسمي معتمد
+                                                </button>
+                                            </Card>
+
+                                            <Card className="shadow-sm border-slate-100 p-6 bg-white space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white flex items-center justify-between">
+                                                    <span>مواصفات الدوام وساعات الدوام</span>
+                                                    <ClockIcon className="w-4.5 h-4.5 text-indigo-500" />
+                                                </h5>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl">
+                                                        <span className="text-[10px] text-slate-400 block mb-1">نظام الدوام الفعلي</span>
+                                                        <p className="text-xs font-black text-slate-800 dark:text-white">{selectedEmployee.workSystem || 'دوام كامل مرن الكتروني'}</p>
+                                                    </div>
+                                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl">
+                                                        <span className="text-[10px] text-slate-400 block mb-1">ساعات العمل القياسية</span>
+                                                        <p className="text-xs font-black text-slate-800 dark:text-white">{selectedEmployee.workHoursPerDay || 8} ساعات يومياً</p>
+                                                    </div>
+                                                    <div className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-2xl col-span-2">
+                                                        <span className="text-[10px] text-slate-400 block mb-1">أيام الراحة الأسبوعية المعتمدة</span>
+                                                        <p className="text-xs font-black text-slate-800 dark:text-white">{(selectedEmployee.restDays || ['الجمعة', 'السبت']).join(' - ')}</p>
+                                                    </div>
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* 3. Payroll Tab */}
+                                    {activeDetailTab === 'payroll' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                                            <Card className="shadow-sm border-slate-100 p-6 bg-white">
+                                                <div className="flex items-center justify-between border-b pb-4 mb-4">
+                                                    <h5 className="text-sm font-black text-slate-800 dark:text-white">تفاصيل الراتب والبدلات المتراكمة</h5>
+                                                    <BanknotesIcon className="w-5 h-5 text-indigo-500" />
+                                                </div>
+
+                                                <div className="space-y-3 mb-6">
+                                                    <div className="flex justify-between items-center p-3.5 bg-slate-50 dark:bg-slate-800/40 rounded-2xl">
+                                                        <span className="text-xs text-slate-500">الراتب الأساسي</span>
+                                                        <span className="text-sm font-black text-slate-850 dark:text-slate-200">{selectedEmployee.basicSalary.toLocaleString()} د.ك</span>
+                                                    </div>
+                                                    {selectedEmployee.allowances?.map((allow, index) => (
+                                                        <div key={index} className="flex justify-between items-center px-4 py-2 border-b border-dashed">
+                                                            <span className="text-xs text-slate-500">{allow.name}</span>
+                                                            <span className="text-xs font-extrabold text-emerald-600">+{allow.value} د.ك</span>
+                                                        </div>
+                                                    ))}
+                                                    <div className="flex justify-between items-center py-2.5 px-4 font-black text-sm text-indigo-700 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/45 rounded-xl">
+                                                        <span>إجمالي المستحقات (Gross Breakdown)</span>
+                                                        <span>{(selectedEmployee.basicSalary + (selectedEmployee.allowances?.reduce((s, a) => s + a.value, 0) || 0)).toLocaleString()} د.ك</span>
+                                                    </div>
+                                                </div>
+
+                                                <button onClick={() => handleOpenPrintDoc('payslip', selectedEmployee)} className="w-full h-11 bg-slate-900 hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-slate-900/10">
+                                                    بناء وطباعة قسيمة راتب مصدقة
+                                                </button>
+                                            </Card>
+
+                                            <Card className="shadow-sm border-slate-100 p-6 bg-white space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">الربط المصرفي واستحقاق الهيئة</h5>
+                                                <div className="space-y-3.5">
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-850/50 rounded-xl">
+                                                        <span className="text-[10px] text-slate-400 block mb-1">اسم البنك المعتمد</span>
+                                                        <p className="text-xs font-black text-slate-800 dark:text-white">{selectedEmployee.bankName || 'بنك الكويت الوطني (NBK)'}</p>
+                                                    </div>
+                                                    <div className="p-3 bg-slate-50 dark:bg-slate-850/50 rounded-xl">
+                                                        <span className="text-[10px] text-slate-400 block mb-1">حساب ورقم الآيبان (IBAN)</span>
+                                                        <p className="text-xs font-bold font-mono text-slate-800 dark:text-white">{selectedEmployee.bankIban || 'KW65NBOK'}</p>
+                                                    </div>
+                                                    <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-400 rounded-xl text-xs flex items-center gap-2">
+                                                        <CheckCircleIcon className="w-4.5 h-4.5 shrink-0" />
+                                                        <p className="font-extrabold">الموظف يتم تحويل مستحقاته الكترونياً وفق متطلبات نظام الهيئة العامة للقوى العاملة.</p>
+                                                    </div>
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* 4. Attendance & Leaves Tab */}
+                                    {activeDetailTab === 'attendance' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-right">
+                                            
+                                            <Card className="shadow-sm border-slate-100 bg-white p-5 text-center flex flex-col justify-between">
+                                                <div>
+                                                    <h5 className="text-xs font-black text-slate-400 uppercase mb-3">رصيد الإجازات السنوية المتبقي</h5>
+                                                    <p className="text-4xl font-black text-indigo-600 dark:text-indigo-400">22</p>
+                                                    <p className="text-xs font-extrabold text-slate-500 dark:text-slate-400 mt-2">يوم متاح للاستعمال العادي</p>
+                                                </div>
+                                                <div className="mt-4 pt-3 border-t grid grid-cols-2 gap-2 text-right text-xs">
+                                                    <div>
+                                                        <span className="text-[9px] text-slate-400">الإجازة المستنفذة</span>
+                                                        <p className="font-extrabold text-slate-800 dark:text-white">8 أيام</p>
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[9px] text-slate-400">الإجازة المعلقة</span>
+                                                        <p className="font-extrabold text-slate-850 dark:text-white">1 يوم</p>
+                                                    </div>
+                                                </div>
+                                            </Card>
+
+                                            <Card className="md:col-span-2 shadow-sm border-slate-100 bg-white p-5 space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">طلبات الإجازات النشطة والمعلقة بالملف</h5>
+                                                
+                                                <div className="space-y-3">
+                                                    {selectedEmployee.leaveRequests?.length === 0 ? (
+                                                        <p className="text-xs font-extrabold text-slate-400 py-6 text-center">لا يوجد طلبات إجازة نشطة حالياً.</p>
+                                                    ) : (
+                                                        selectedEmployee.leaveRequests?.map(req => (
+                                                            <div key={req.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                                                <div>
+                                                                    <p className="text-xs font-black text-slate-800 dark:text-white">{req.type} ({req.days} يوم)</p>
+                                                                    <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{req.startDate} حتى {req.endDate}</p>
+                                                                    <p className="text-[10px] text-slate-500 mt-1 italic">السبب: {req.reason}</p>
+                                                                </div>
+                                                                <div className="flex items-center gap-2 self-end sm:self-auto">
+                                                                    {req.status === 'Pending' ? (
+                                                                        <>
+                                                                            <button onClick={() => handleUpdateLeaveStatus(selectedEmployee.id, req.id, 'Approved')} className="bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-xl px-3 py-1.5 text-xs font-black transition-all">
+                                                                                اعتماد الطلب
+                                                                            </button>
+                                                                            <button onClick={() => handleUpdateLeaveStatus(selectedEmployee.id, req.id, 'Rejected')} className="bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl px-3 py-1.5 text-xs font-black transition-all">
+                                                                                رفض
+                                                                            </button>
+                                                                        </>
+                                                                    ) : (
+                                                                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black ${req.status === 'Approved' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                                                                            {req.status === 'Approved' ? 'معتمد ومثبت' : 'مرفوض'}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </Card>
+
+                                        </div>
+                                    )}
+
+                                    {/* 5. Invesigations Tab */}
+                                    {activeDetailTab === 'disciplinary' && (
+                                        <div className="space-y-6 text-right">
+                                            <Card className="shadow-sm border-slate-100 bg-white p-5 space-y-4">
+                                                <div className="flex items-center justify-between border-b pb-4">
+                                                    <h5 className="text-sm font-black text-slate-800 dark:text-white">جدول التحقيقات والقرارات الإدارية</h5>
+                                                    <ExclamationTriangleIcon className="w-5 h-5 text-amber-500" />
+                                                </div>
+
+                                                <div className="space-y-3.5">
+                                                    {(!selectedEmployee.investigations || selectedEmployee.investigations.length === 0) ? (
+                                                        <p className="text-xs text-slate-400 text-center py-8">السجل القانوني والتحقيق الإداري للموظف خال من المخالفات النشطة.</p>
+                                                    ) : (
+                                                        selectedEmployee.investigations.map(inv => (
+                                                            <div key={inv.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border-r-4 border-r-indigo-600 space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-xs font-black text-slate-800 dark:text-white">رقم ملف التحقيق: {inv.caseNumber}</p>
+                                                                    <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-lg font-mono font-bold">{inv.date}</span>
+                                                                </div>
+                                                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">موضوع الاتهام: {inv.subject}</p>
+                                                                <p className="text-[11px] text-slate-500 leading-relaxed">النتائج الفنية: {inv.results}</p>
+                                                                <div className="flex justify-between items-center pt-2 border-t text-[10px] font-bold">
+                                                                    <span className="text-indigo-600">المحقق: {inv.investigator}</span>
+                                                                    <span className="text-slate-500">العقوبة المقترحة: {inv.penaltyProposed}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </Card>
+
+                                            <Card className="shadow-sm border-slate-100 bg-white p-5 space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">إنذارات كتابية ملحقة مباشرة</h5>
+                                                {(!selectedEmployee.disciplinaryActions || selectedEmployee.disciplinaryActions.length === 0) ? (
+                                                    <p className="text-xs text-slate-400 text-center py-6">لم يتم توجيه إنذارات رسمية.</p>
+                                                ) : (
+                                                    selectedEmployee.disciplinaryActions.map(disc => (
+                                                        <div key={disc.id} className="p-4 bg-amber-50/40 dark:bg-amber-950/15 border border-amber-100 dark:border-amber-900/35 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                                                            <div>
+                                                                <p className="text-xs font-black text-amber-900 dark:text-amber-400">{disc.violationType}</p>
+                                                                <p className="text-[10px] text-slate-500 mt-0.5">{disc.violationDetails}</p>
+                                                                <p className="text-xs text-rose-600 dark:text-rose-450 font-black mt-2">الجزاء: {disc.penalty}</p>
+                                                            </div>
+                                                            <button onClick={() => handleOpenPrintDoc('warning', selectedEmployee)} className="h-10 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black px-4 whitespace-nowrap self-end sm:self-auto transition-all shadow-md shadow-amber-600/10">
+                                                                توليد إنذار كتابي رسمي
+                                                            </button>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* 6. Loans Tab */}
+                                    {activeDetailTab === 'loans' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right">
+                                            
+                                            <Card className="shadow-sm border-slate-100 bg-white p-6 space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">تقديم سلفة مالية إدارية عاجلة</h5>
+                                                
+                                                <div className="space-y-4">
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 block mb-1">قيمة السلفة التقديرية (دينار كويتي)</label>
+                                                        <input 
+                                                            id="loanAmtInputField"
+                                                            type="number" 
+                                                            placeholder="مثال: 1500" 
+                                                            className="w-full bg-slate-50 border-none rounded-xl text-xs h-11 px-4 text-right font-black"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-black text-slate-400 block mb-1">قيمة القسط الشهري الثابت</label>
+                                                        <input 
+                                                            id="loanInstInputField"
+                                                            type="number" 
+                                                            placeholder="مثال: 150" 
+                                                            className="w-full bg-slate-50 border-none rounded-xl text-xs h-11 px-4 text-right font-black"
+                                                        />
+                                                    </div>
+                                                    
+                                                    <button 
+                                                        onClick={() => {
+                                                            const amt = parseFloat((document.getElementById('loanAmtInputField') as HTMLInputElement).value || '0');
+                                                            const inst = parseFloat((document.getElementById('loanInstInputField') as HTMLInputElement).value || '0');
+                                                            handleCreateLoan(selectedEmployee.id, amt, inst);
+                                                            (document.getElementById('loanAmtInputField') as HTMLInputElement).value = '';
+                                                            (document.getElementById('loanInstInputField') as HTMLInputElement).value = '';
+                                                        }}
+                                                        className="w-full h-11 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-600/15 transition-all"
+                                                    >
+                                                        بناء وإصدار الاستقطاع المالي
+                                                    </button>
+                                                </div>
+                                            </Card>
+
+                                            <Card className="shadow-sm border-slate-100 bg-white p-6 space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">سجل السلف النشطة بالملف المالي</h5>
+                                                
+                                                <div className="space-y-3.5">
+                                                    {(!selectedEmployee.loans || selectedEmployee.loans.length === 0) ? (
+                                                        <p className="text-xs text-slate-400 text-center py-10">لا توجد سلف أو استقطاعات مالية سارية.</p>
+                                                    ) : (
+                                                        selectedEmployee.loans.map(ln => (
+                                                            <div key={ln.id} className="p-4 bg-indigo-50/40 dark:bg-indigo-950/15 border border-indigo-100 rounded-2xl relative">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-xs font-black text-slate-800 dark:text-white">السلفة المتبقية: {ln.balanceAmount} د.ك</p>
+                                                                    <span className="text-[9px] bg-indigo-600 text-white px-2 py-0.5 rounded-lg">{ln.status === 'Active' ? 'نشط' : 'مسجل'}</span>
+                                                                </div>
+                                                                <p className="text-[10px] text-slate-500 mt-1 font-mono">القسط الشهري: {ln.monthlyInstallment} د.ك • الاستحقاق: {ln.maturityDate}</p>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </Card>
+
+                                        </div>
+                                    )}
+
+                                    {/* 7. Documents Archive Tab */}
+                                    {activeDetailTab === 'docs' && (
+                                        <div className="space-y-6 text-right animate-in fade-in duration-300">
+                                            <Card className="shadow-sm border-slate-100 bg-white p-6 space-y-4">
+                                                <div className="flex items-center justify-between border-b pb-4">
+                                                    <div>
+                                                        <h5 className="text-sm font-black text-slate-800 dark:text-white">ملفات الأرشيف الرقمي المصدقة</h5>
+                                                        <p className="text-[10px] text-slate-400">تحقق ومعاينة المستندات المطلوبة من وزارة العمل</p>
+                                                    </div>
+                                                    <Button variant="outline" size="sm" className="rounded-xl border-slate-200" leftIcon={<CloudArrowUpIcon className="w-4 h-4" />}>
+                                                        رفع وثيقة جديدة
+                                                    </Button>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                    {[
+                                                        { filename: 'civil_id.png', label: 'صورة البطاقة المدنية الملونة', size: '2.4 MB', type: 'البطاقة المدنية' },
+                                                        { filename: 'passport.jpg', label: 'صفحة جواز السفر الرئيسية', size: '3.1 MB', type: 'جواز السفر' },
+                                                        { filename: 'degree.pdf', label: 'الشهادة الجامعية المصدقة', size: '4.7 MB', type: 'معادلة شهادة' },
+                                                        { filename: 'salary_details.pdf', label: 'تفاصيل عقد العمل المصدق', size: '1.2 MB', type: 'عقد العمل' }
+                                                    ].map((doc, i) => (
+                                                        <div key={i} className="bg-slate-50 dark:bg-slate-800/40 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-start justify-between">
+                                                            <div>
+                                                                <p className="text-xs font-black text-slate-800 dark:text-white truncate max-w-40">{doc.label}</p>
+                                                                <span className="text-[10px] text-slate-400 font-mono block mt-0.5">{doc.filename} • {doc.size}</span>
+                                                            </div>
+                                                            <div className="flex gap-1 shrink-0">
+                                                                <button onClick={() => handlePreviewDocument(doc.filename, doc.type)} className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all flex items-center justify-center">
+                                                                    <EyeIcon className="w-4 h-4" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </Card>
+                                        </div>
+                                    )}
+
+                                    {/* 8. Evaluations Tab */}
+                                    {activeDetailTab === 'evaluations' && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-right animate-in fade-in duration-300">
+                                            
+                                            <Card className="shadow-sm border-slate-100 bg-white p-6 space-y-4">
+                                                <h5 className="text-sm font-black text-slate-800 dark:text-white">سجل التقييمات والأداء السنوي</h5>
+                                                
+                                                <div className="space-y-4">
+                                                    {(!selectedEmployee.evaluations || selectedEmployee.evaluations.length === 0) ? (
+                                                        <p className="text-xs text-slate-400 text-center py-10">لا يوجد تقييمات مسجلة.</p>
+                                                    ) : (
+                                                        selectedEmployee.evaluations.map(ev => (
+                                                            <div key={ev.id} className="p-4 bg-slate-50 dark:bg-slate-800/40 rounded-3xl border border-slate-100 dark:border-slate-805 space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <p className="text-xs font-black text-indigo-600 dark:text-indigo-400">{ev.period}</p>
+                                                                    <span className="bg-emerald-50 text-emerald-700 text-[10px] px-2.5 py-0.5 rounded-full font-black font-mono">{ev.overallScore}%</span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-705 dark:text-slate-300 font-bold leading-relaxed">"{ev.qualitativeFeedback}"</p>
+                                                                <p className="text-[10px] text-slate-400 mt-2">المقيم المعتمد: {ev.evaluatorName}</p>
+                                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </Card>
+
+                                            <Card className="shadow-sm border-slate-100 bg-white p-6 space-y-4">
+                                                <h4 className="text-xs font-black text-indigo-500 uppercase tracking-widest">معايير أداء التقييم المفصلة</h4>
+                                                
+                                                <div className="space-y-4 pt-2">
+                                                    {[
+                                                        { label: 'الالتزام التشريعي والعملي', score: selectedEmployee.evaluations?.[0]?.criteriaScores.adherenceToLaw || 4.5 },
+                                                        { label: 'جودة صياغة الاستشارات والمذكرات', score: selectedEmployee.evaluations?.[0]?.criteriaScores.qualityOfWork || 4.3 },
+                                                        { label: 'العمل الجماعي ودبلوماسية الفريق', score: selectedEmployee.evaluations?.[0]?.criteriaScores.teamwork || 4.1 },
+                                                        { label: 'السرعة والاستجابة للمهام العاجلة', score: selectedEmployee.evaluations?.[0]?.criteriaScores.speed || 3.9 }
+                                                    ].map((item, index) => (
+                                                        <div key={index} className="space-y-1">
+                                                            <div className="flex justify-between items-center text-xs">
+                                                                <span className="font-extrabold text-slate-700 dark:text-slate-300">{item.label}</span>
+                                                                <span className="font-bold text-indigo-600 dark:text-indigo-400 font-mono">{item.score}/5</span>
+                                                            </div>
+                                                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                                                                <div className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full" style={{ width: `${(item.score / 5) * 100}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </Card>
+
+                                        </div>
+                                    )}
+
+                                </div>
+
                             </div>
                         ) : (
-                            <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-                                <table className="w-full border-collapse">
-                                    <thead>
-                                        <tr className="bg-slate-50/50 border-b border-slate-100">
-                                            <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">الموظف</th>
-                                            <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">المنصب والقسم</th>
-                                            <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">التوظيف</th>
-                                            <th className="px-6 py-5 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">الحالة</th>
-                                            <th className="px-6 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">الإجراءات</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-50">
+                            
+                            // ==========================================
+                            // FILES DIRECTORY STATE LIST / DASHBOARD
+                            // ==========================================
+                            <div className="space-y-6">
+                                
+                                {/* 1. Analytical HR Dashboard Layout */}
+                                {viewMode === 'dashboard' && (
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                        
+                                        <Card className="bg-indigo-600 dark:bg-indigo-500 text-white rounded-[2rem] p-6 shadow-xl flex flex-col justify-between">
+                                            <div>
+                                                <span className="bg-white/10 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">احصاء عام</span>
+                                                <h3 className="text-4xl font-black mt-4 font-mono">{employees.length}</h3>
+                                                <p className="text-indigo-100 text-xs mt-1">إجمالي الكوادر المسجلين بالملفات</p>
+                                            </div>
+                                            <div className="mt-6 pt-4 border-t border-white/10 flex justify-between items-center text-[10px]">
+                                                <span>الذكور: {employees.filter(e => e.gender === 'Male').length}</span>
+                                                <span>الإناث: {employees.filter(e => e.gender === 'Female').length}</span>
+                                            </div>
+                                        </Card>
+
+                                        <Card className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                                            <div>
+                                                <span className="bg-slate-50 dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 text-[10px] font-black px-2 py-0.5 rounded-full">الرواتب القياسية</span>
+                                                <h3 className="text-3xl font-black mt-4 font-mono">{(employees.reduce((sum, e) => sum + e.basicSalary, 0) / employees.length).toFixed(0)} د.ك</h3>
+                                                <p className="text-slate-400 text-xs mt-1">متوسط الرواتب الفردية الأساسية الكلية</p>
+                                            </div>
+                                            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-500">
+                                                <span>مجموع ميزانية الرواتب</span>
+                                                <span className="font-bold opacity-85">{(employees.reduce((sum, e) => sum + e.basicSalary, 0)).toLocaleString()} د.ك</span>
+                                            </div>
+                                        </Card>
+
+                                        <Card className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                                            <div>
+                                                <span className="bg-amber-50 dark:bg-amber-950 text-amber-600 dark:text-amber-400 text-[10px] font-black px-2 py-0.5 rounded-full">إجازات مستمرة</span>
+                                                <h3 className="text-3xl font-black mt-4 font-mono">{employees.filter(e => e.status === 'OnLeave').length}</h3>
+                                                <p className="text-slate-400 text-xs mt-1">الكوادر في إجازات رسمية حالياً</p>
+                                            </div>
+                                            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
+                                                <span>على رأس العمل لليوم</span>
+                                                <span className="font-bold text-emerald-600">{employees.filter(e => e.status === 'Active').length} موظف</span>
+                                            </div>
+                                        </Card>
+
+                                        <Card className="bg-white dark:bg-slate-900 rounded-[2rem] p-6 border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+                                            <div>
+                                                <span className="bg-rose-50 dark:bg-rose-950 text-rose-600 dark:text-rose-400 text-[10px] font-black px-2 py-0.5 rounded-full">الملفات التأديبية</span>
+                                                <h3 className="text-3xl font-black mt-4 font-mono">{employees.reduce((sum, e) => sum + (e.disciplinaryActions?.length || 0), 0)}</h3>
+                                                <p className="text-slate-400 text-xs mt-1">إنذارات وقرارات خصم الأداء الكلية</p>
+                                            </div>
+                                            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-[10px] text-slate-400">
+                                                <span>مخالفات قيد التحقيق</span>
+                                                <span className="font-bold text-rose-500">1 ملف</span>
+                                            </div>
+                                        </Card>
+
+                                    </div>
+                                )}
+
+                                {/* Advanced Filters & Search Controllers */}
+                                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2rem] p-5 shadow-sm flex flex-col md:flex-row items-center gap-4 text-right">
+                                    <div className="relative flex-1 w-full">
+                                        <MagnifyingGlassIcon className={`absolute ${isRtl ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400`} />
+                                        <input 
+                                            type="text" 
+                                            placeholder="ابحث تفصيلياً (الاسم، المسمى، الرقم المدني، رقم الهوية)..." 
+                                            className={`w-full h-12 ${isRtl ? 'pr-12 pl-4' : 'pl-12 pr-4'} rounded-2xl bg-slate-50 dark:bg-slate-850 border-none text-xs font-black text-slate-800 dark:text-white placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20`}
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-2 w-full md:w-auto shrink-0 justify-end">
+                                        <select 
+                                            className="h-12 px-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border-none text-xs font-black text-slate-700 dark:text-slate-300 pointer-events-auto"
+                                            value={selectedDept}
+                                            onChange={(e) => setSelectedDept(e.target.value)}
+                                        >
+                                            <option value="All">كافة الأقسام الرسمية</option>
+                                            {DEPARTMENTS_LIST.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                                        </select>
+                                        <select 
+                                            className="h-12 px-4 rounded-2xl bg-slate-50 dark:bg-slate-850 border-none text-xs font-black text-slate-700 dark:text-slate-300 pointer-events-auto"
+                                            value={selectedStatus}
+                                            onChange={(e) => setSelectedStatus(e.target.value)}
+                                        >
+                                            <option value="All">جميع حالات الدوام</option>
+                                            <option value="Active">على رأس العمل</option>
+                                            <option value="OnLeave">في إجازة</option>
+                                            <option value="Probation">تحت التجربة</option>
+                                        </select>
+
+                                        <div className="flex bg-slate-100 dark:bg-slate-800/80 p-1.5 rounded-2xl">
+                                            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-xl transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-450 hover:text-indigo-500'}`}>
+                                                <ViewColumnsIcon className="w-5 h-5" />
+                                            </button>
+                                            <button onClick={() => setViewMode('table')} className={`p-2 rounded-xl transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-450 hover:text-indigo-500'}`}>
+                                                <ListBulletIcon className="w-5 h-5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Directory Elements */}
+                                {viewMode === 'table' ? (
+                                    
+                                    // Table Display mode
+                                    <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[2.5rem] shadow-sm overflow-hidden">
+                                        <table className="w-full text-right divide-y divide-slate-100">
+                                            <thead>
+                                                <tr className="bg-slate-50/50 dark:bg-slate-850/50 text-[10px] font-black text-slate-450 uppercase tracking-widest border-b border-slate-100">
+                                                    <th className="px-6 py-5">المستند التعريفي</th>
+                                                    <th className="px-6 py-5">المنصب والدائرة</th>
+                                                    <th className="px-6 py-5">الهوية والبيانات</th>
+                                                    <th className="px-6 py-5">الرواتب المتراكمة</th>
+                                                    <th className="px-6 py-5 text-center">العمليات</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {filteredEmployees.map(emp => (
+                                                    <tr key={emp.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-850/20 cursor-pointer transition-colors" onClick={() => { setSelectedEmployee(emp); setActiveDetailTab('overview'); }}>
+                                                        <td className="px-6 py-4.5">
+                                                            <div className="flex items-center gap-4">
+                                                                <img src={emp.photoUrl || `https://ui-avatars.com/api/?name=${emp.fullNameAr}&background=random`} className="w-11 h-11 rounded-2xl object-cover border border-slate-100" />
+                                                                <div>
+                                                                    <p className="font-extrabold text-slate-800 dark:text-white text-xs">{emp.fullNameAr}</p>
+                                                                    <p className="text-[10px] text-slate-400 font-mono mt-0.5">{emp.employeeId}</p>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4.5 text-xs text-slate-700 dark:text-slate-300">
+                                                            <p className="font-extrabold">{emp.jobTitle}</p>
+                                                            <p className="text-[10px] text-slate-400 font-black">{DEPARTMENTS_LIST.find(d => d.value === emp.department)?.label || emp.department}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4.5 text-xs text-slate-600 dark:text-slate-450 font-mono">
+                                                            <p className="font-extrabold">الرقم المدني: {emp.civilId}</p>
+                                                            <p className="text-[10px] text-slate-400">تاريخ التعيين: {emp.joiningDate}</p>
+                                                        </td>
+                                                        <td className="px-6 py-4.5 font-mono text-xs font-black text-indigo-650">
+                                                            {emp.basicSalary.toLocaleString()} د.ك
+                                                        </td>
+                                                        <td className="px-6 py-4.5" onClick={(e) => e.stopPropagation()}>
+                                                            <div className="flex justify-center items-center gap-1.5">
+                                                                <button onClick={() => { setSelectedEmployee(emp); setActiveDetailTab('overview'); }} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all flex items-center justify-center">
+                                                                    <EyeIcon className="w-4.5 h-4.5" />
+                                                                </button>
+                                                                <button onClick={() => handleOpenForm(emp)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-all flex items-center justify-center">
+                                                                    <PencilIcon className="w-4.5 h-4.5" />
+                                                                </button>
+                                                                <button onClick={() => handleDuplicate(emp)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 transition-all flex items-center justify-center">
+                                                                    <DocumentDuplicateIcon className="w-4.5 h-4.5" />
+                                                                </button>
+                                                                <button onClick={() => handleDelete(emp.id, emp.fullNameAr)} className="w-9 h-9 rounded-xl bg-slate-50 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all flex items-center justify-center">
+                                                                    <TrashIcon className="w-4.5 h-4.5" />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                ) : (
+                                    
+                                    // Interactive Grid View
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                         {filteredEmployees.map(emp => (
-                                            <tr key={emp.id} className="hover:bg-slate-50/50 transition-all cursor-pointer group" onClick={() => handleView(emp)}>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-4">
-                                                        <img src={emp.photoUrl || `https://ui-avatars.com/api/?name=${emp.fullNameAr}&background=random`} className="w-11 h-11 rounded-2xl object-cover border border-slate-100" />
+                                            <div 
+                                                key={emp.id} 
+                                                onClick={() => { setSelectedEmployee(emp); setActiveDetailTab('overview'); }}
+                                                className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-6 rounded-[2.5rem] shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 cursor-pointer group text-right flex flex-col justify-between h-80"
+                                            >
+                                                <div>
+                                                    <div className="flex items-start justify-between mb-4">
+                                                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${emp.status === 'Active' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-amber-50 text-amber-600'}`}>
+                                                            {emp.status === 'Active' ? 'نشط' : 'إجازة / تجربة'}
+                                                        </span>
+                                                        <img 
+                                                            src={emp.photoUrl || `https://ui-avatars.com/api/?name=${emp.fullNameAr}&background=random`} 
+                                                            className="w-16 h-16 rounded-[1.5rem] object-cover border-2 border-slate-100 group-hover:scale-105 transition-transform" 
+                                                            alt={emp.fullNameAr}
+                                                        />
+                                                    </div>
+                                                    
+                                                    <h4 className="font-extrabold text-slate-850 dark:text-white text-md tracking-tight group-hover:text-indigo-600 transition-colors line-clamp-1">{emp.fullNameAr}</h4>
+                                                    <p className="text-[10px] text-indigo-500 font-extrabold mt-0.5 uppercase tracking-wide truncate">{emp.jobTitle}</p>
+                                                    <p className="text-[10px] text-slate-400 font-bold mt-1">{DEPARTMENTS_LIST.find(d => d.value === emp.department)?.label || emp.department}</p>
+                                                    
+                                                    <div className="grid grid-cols-2 gap-2 mt-4 text-[10px] bg-slate-50 dark:bg-slate-850 p-2.5 rounded-2xl">
                                                         <div>
-                                                            <p className="font-black text-slate-800 text-sm">{emp.fullNameAr}</p>
-                                                            <p className="text-[10px] text-slate-400 font-mono">ID: {emp.employeeId}</p>
+                                                            <span className="text-slate-400 block pb-0.5">البطاقة المدنية</span>
+                                                            <span className="font-bold text-slate-700 dark:text-slate-350">{emp.civilId}</span>
+                                                        </div>
+                                                        <div>
+                                                            <span className="text-slate-400 block pb-0.5">الراتب الأساسي</span>
+                                                            <span className="font-bold text-indigo-650 dark:text-indigo-400 font-mono">{emp.basicSalary} د.ك</span>
                                                         </div>
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-700 text-sm">{emp.jobTitle}</p>
-                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{emp.department}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <p className="font-bold text-slate-600 text-xs">{emp.contractType}</p>
-                                                    <p className="text-[10px] text-slate-400 tabular-nums">{emp.joiningDate}</p>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <EmployeeStatusBadge status={emp.status} />
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex justify-center gap-2">
-                                                        <button onClick={(e) => { e.stopPropagation(); handleOpenForm(emp); }} className="w-9 h-9 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors"><PencilIcon className="w-4.5"/></button>
-                                                        <button onClick={(e) => handleDelete(emp.id, e)} className="w-9 h-9 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-400 hover:text-rose-600 transition-colors"><TrashIcon className="w-4.5"/></button>
+                                                </div>
+
+                                                <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-4 mt-4" onClick={e => e.stopPropagation()}>
+                                                    <span className="text-[10.5px] text-slate-400 font-medium">الرمز: {emp.employeeId}</span>
+                                                    <div className="flex gap-1">
+                                                        <button onClick={() => { setSelectedEmployee(emp); setActiveDetailTab('overview'); }} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-all">
+                                                            <EyeIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleOpenForm(emp)} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-amber-600 flex items-center justify-center transition-all">
+                                                            <PencilIcon className="w-4 h-4" />
+                                                        </button>
+                                                        <button onClick={() => handleDelete(emp.id, emp.fullNameAr)} className="w-8 h-8 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-all">
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
                                                     </div>
-                                                </td>
-                                            </tr>
+                                                </div>
+                                            </div>
                                         ))}
-                                    </tbody>
-                                </table>
+                                    </div>
+                                )}
+
+                                {filteredEmployees.length === 0 && (
+                                    <div className="py-24 text-center">
+                                        <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                                            <IdentificationIcon className="w-10 h-10 text-slate-350" />
+                                        </div>
+                                        <h4 className="text-md font-black text-slate-700 dark:text-slate-300">لم يتم العثور على ملف للموظفين</h4>
+                                        <p className="text-xs text-slate-400 mt-1 pb-4">يرجى التأكد من الكلمات أو الفلاتر المدخلة والتحري</p>
+                                    </div>
+                                )}
+
                             </div>
                         )}
                     </div>
+
                 </main>
             </div>
 
-
-                {filteredEmployees.length === 0 && (
-                    <div className="py-32 text-center">
-                        <div className="w-24 h-24 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-6">
-                            <IdentificationIcon className="w-12 h-12 text-slate-300" />
-                        </div>
-                        <h3 className="text-xl font-black text-slate-800">لا توجد نتائج مطابقة</h3>
-                        <p className="text-slate-400 text-sm mt-1">حاول استخدام كلمات بحث أخرى أو تغيير الفلاتر</p>
-                    </div>
-                )}
-
-            {/* Modal: Add/Edit Form */}
+            {/* Modal: Comprehensive Registration Form */}
             <Modal
                 isOpen={isFormOpen}
                 onClose={() => setIsFormOpen(false)}
-                title={editingEmployee ? 'تعديل بيانات موظف' : 'تسجيل موظف جديد'}
+                title={editingEmployee ? `تعديل السيرة العمالية: ${formData.fullNameAr}` : 'إنشاء وتسجيل ملف موظف جديد'}
                 size="lg"
             >
-                <form onSubmit={handleSubmit} className="space-y-8 p-1">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Input label="الاسم الكامل (عربي)" value={formData.fullNameAr} onChange={e => setFormData({...formData, fullNameAr: e.target.value})} required />
-                        <Input label="الاسم الكامل (English)" value={formData.fullNameEn} onChange={e => setFormData({...formData, fullNameEn: e.target.value})} />
-                        <Input label="الرقم المدني" value={formData.civilId} onChange={e => setFormData({...formData, civilId: e.target.value})} required maxLength={12} />
-                        <Input label="الرقم الوظيفي" value={formData.employeeId} disabled />
+                <form onSubmit={handleFormSubmit} className="space-y-6 pt-1 text-right">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <Input label="الاسم الكامل الثنائي أو الثلاثي (بالعربي)" value={formData.fullNameAr} onChange={e => setFormData({ ...formData, fullNameAr: e.target.value })} required />
+                        <Input label="الاسم الكامل الموحد (English)" value={formData.fullNameEn} onChange={e => setFormData({ ...formData, fullNameEn: e.target.value })} />
+                        <Input label="الرقم المدني الكويتي (12 خانة رقمية)" value={formData.civilId} onChange={e => setFormData({ ...formData, civilId: e.target.value })} maxLength={12} required />
+                        <Input label="البريد الإلكتروني المخصص" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                        <Input label="رقم السكن أو الهاتف الشخصي" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} required />
+                        <Input label="الجنسية المعتمدة" value={formData.nationality} onChange={e => setFormData({ ...formData, nationality: e.target.value })} required />
+
+                        <Select 
+                            label="القسم الإداري"
+                            options={DEPARTMENTS_LIST}
+                            value={formData.department}
+                            onChange={e => setFormData({ ...formData, department: e.target.value })}
+                        />
+                        <Select 
+                            label="المسمى الحرفي والمهني"
+                            options={JOB_TITLES_LIST}
+                            value={formData.jobTitle}
+                            onChange={e => setFormData({ ...formData, jobTitle: e.target.value })}
+                        />
+
+                        <Input label="تاريخ الانضمام والتعيين" type="date" value={formData.joiningDate} onChange={e => setFormData({ ...formData, joiningDate: e.target.value })} required />
+                        <Input label="الراتب الأساسي الشهري (د.ك)" type="number" value={formData.basicSalary} onChange={e => setFormData({ ...formData, basicSalary: parseFloat(e.target.value) || 0 })} required />
+                        <Input label="تاريخ انتهاء البطاقة المدنية" type="date" value={formData.civilIdExpiry} onChange={e => setFormData({ ...formData, civilIdExpiry: e.target.value })} />
+                        <Input label="تاريخ انتهاء جواز السفر" type="date" value={formData.passportExpiry} onChange={e => setFormData({ ...formData, passportExpiry: e.target.value })} />
+                        <Input label="تاريخ انتهاء الإقامة السكنية" type="date" value={formData.residencyExpiry} onChange={e => setFormData({ ...formData, residencyExpiry: e.target.value })} />
                         
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">الجنس</label>
-                            <div className="flex bg-slate-50 p-1 rounded-2xl">
-                                <button type="button" onClick={() => setFormData({...formData, gender: 'Male'})} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${formData.gender === 'Male' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>ذكر</button>
-                                <button type="button" onClick={() => setFormData({...formData, gender: 'Female'})} className={`flex-1 py-3 text-xs font-bold rounded-xl transition-all ${formData.gender === 'Female' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>أنثى</button>
+                        <div className="flex flex-col gap-1">
+                            <label className="text-xs font-black text-slate-400 uppercase">الجنس الفعلي</label>
+                            <div className="flex bg-slate-50 p-1 rounded-xl">
+                                <button type="button" onClick={() => setFormData({ ...formData, gender: 'Male' })} className={`flex-grow py-2.5 text-xs font-extrabold rounded-lg transition-all ${formData.gender === 'Male' ? 'bg-white shadow text-indigo-600' : 'text-slate-450'}`}>ذكر</button>
+                                <button type="button" onClick={() => setFormData({ ...formData, gender: 'Female' })} className={`flex-grow py-2.5 text-xs font-extrabold rounded-lg transition-all ${formData.gender === 'Female' ? 'bg-white shadow text-indigo-600' : 'text-slate-450'}`}>أنثى</button>
                             </div>
                         </div>
-
-                        <Input label="الجنسية" value={formData.nationality} onChange={e => setFormData({...formData, nationality: e.target.value})} />
-                        <Input label="المسمى الوظيفي" value={formData.jobTitle} onChange={e => setFormData({...formData, jobTitle: e.target.value})} required />
-                        <Input label="القسم" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} required />
-                        <Input label="تاريخ التعيين" type="date" value={formData.joiningDate} onChange={e => setFormData({...formData, joiningDate: e.target.value})} required />
-                        <Input label="الراتب الأساسي (د.ك)" type="number" value={formData.basicSalary} onChange={e => setFormData({...formData, basicSalary: parseFloat(e.target.value)})} required />
-                        
-                        <Select 
-                            label="نوع العقد" 
-                            options={contractTypeKuwaitOptions} 
-                            value={formData.contractType} 
-                            onChange={e => setFormData({...formData, contractType: e.target.value as any})} 
-                        />
-                        <Select 
-                            label="الحالة الوظيفية" 
-                            options={[
-                                { value: 'Active', label: 'نشط' },
-                                { value: 'OnLeave', label: 'إجازة' },
-                                { value: 'Probation', label: 'تجربة' },
-                                { value: 'Terminated', label: 'ملغي' }
-                            ]} 
-                            value={formData.status} 
-                            onChange={e => setFormData({...formData, status: e.target.value as any})} 
-                        />
                     </div>
-                    <div className="flex justify-end gap-3 pt-6 border-t font-black">
-                        <Button variant="secondary" className="rounded-xl px-8 h-12" onClick={() => setIsFormOpen(false)}>إلغاء</Button>
-                        <Button type="submit" variant="primary" className="rounded-xl px-12 h-12 bg-indigo-600 shadow-lg shadow-indigo-600/20">{editingEmployee ? 'حفظ التغييرات' : 'إتمام التسجيل'}</Button>
+
+                    <div className="border-t pt-5 flex justify-end gap-2.5">
+                        <Button variant="secondary" className="rounded-xl px-6 h-11" onClick={() => setIsFormOpen(false)}>إلغاء التغيير</Button>
+                        <Button type="submit" className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-black px-10 h-11 shadow-lg shadow-indigo-650/15">
+                            {editingEmployee ? 'تحديث وحفظ التغييرات' : 'إتمام التثبيت العمالي'}
+                        </Button>
                     </div>
                 </form>
             </Modal>
 
-            {/* 5. Detailed HR Profile Modal */}
-            <Modal 
-                isOpen={!!selectedEmployee} 
-                onClose={() => setSelectedEmployee(null)} 
-                title={selectedEmployee ? `الملف الكامل للموظف: ${selectedEmployee.fullNameAr}` : ''}
-                size="xl"
+            {/* Modal: Professional Kuwaiti Law Compliant Print & Preview Generator */}
+            <Modal
+                isOpen={isPrintModalOpen}
+                onClose={() => setIsPrintModalOpen(false)}
+                title="معاينة نموذج الوثيقة قبل الطباعة الرسمية"
+                size="lg"
             >
-                {selectedEmployee && (
-                    <div className="flex flex-col h-full max-h-[85vh]">
-                        {/* Hero Section */}
-                        <div className="shrink-0 p-8 bg-gradient-to-br from-indigo-900 via-indigo-800 to-slate-900 text-white rounded-[3rem] mb-6 relative overflow-hidden shadow-2xl">
-                            <div className="absolute top-0 right-0 w-full h-full opacity-10 pointer-events-none">
-                                <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[120%] bg-white rounded-full blur-[120px]"></div>
-                                <div className="absolute bottom-[-20%] left-[-10%] w-[50%] h-[120%] bg-indigo-500 rounded-full blur-[120px]"></div>
+                {previewDocContent && (
+                    <div className="space-y-6 pt-1 text-right">
+                        
+                        {/* Interactive Edit before print */}
+                        <Card className="p-4 bg-slate-50 border-none space-y-4">
+                            <h5 className="text-xs font-black text-indigo-600">تعديل فوري تفصيلي على بيان الطباعة</h5>
+                            <div className="grid grid-cols-2 gap-4">
+                                <Input label="تاريخ البيان" type="date" value={previewDocContent.date} onChange={e => setPreviewDocContent({ ...previewDocContent, date: e.target.value })} />
+                                <Input label="رقم المرجع التسلسلي" value={previewDocContent.refNo} onChange={e => setPreviewDocContent({ ...previewDocContent, refNo: e.target.value })} />
+                                {printDocType === 'warning' && (
+                                    <div className="col-span-2">
+                                        <TextArea label="سبب الإنذار المباشر" value={previewDocContent.reason} onChange={e => setPreviewDocContent({ ...previewDocContent, reason: e.target.value })} />
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+
+                        {/* Visual Simulator of Letterhead */}
+                        <div id="printableArea" className="bg-white p-8 rounded-3xl border border-slate-200/50 shadow-inner text-slate-900 overflow-y-auto max-h-[50vh] scrollbar-none text-right">
+                            
+                            {/* Company Corporate Header */}
+                            <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-6 text-xs text-slate-700 leading-relaxed">
+                                <div className="text-left font-sans">
+                                    <p className="font-extrabold uppercase">AlWagayan, AlMansour Partners</p>
+                                    <p>Attorneys & Legal Consultants</p>
+                                    <p>State of Kuwait - Kuwait City</p>
+                                    <p>Ref: <span className="font-mono">{previewDocContent.refNo}</span></p>
+                                </div>
+                                <div className="text-center">
+                                    <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex items-center justify-center font-black mx-auto mb-1 text-md">الوقيان</div>
+                                    <p className="font-black text-slate-900">مكتب الوقيان والمنصور والزملاء</p>
+                                    <p className="font-extrabold text-[10px]">للمحاماة والاستشارات القانونية والشركات</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-bold">تاريخ البيان: {previewDocContent.date}</p>
+                                    <p>محكمة التمييز والدستورية</p>
+                                    <p>دولة الكويت، مدينة الكويت</p>
+                                </div>
                             </div>
 
-                            <div className="relative flex flex-col md:flex-row items-center md:items-end gap-8 text-center md:text-right">
-                                <div className="relative group mx-auto md:mx-0">
-                                    <img 
-                                        src={selectedEmployee.photoUrl || `https://ui-avatars.com/api/?name=${selectedEmployee.fullNameAr}&background=random`} 
-                                        className="w-44 h-44 rounded-[2.5rem] border-4 border-white/20 shadow-2xl object-cover"
-                                    />
-                                    <button className="absolute bottom-2 right-2 p-3 rounded-2xl bg-white text-indigo-600 shadow-xl opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0">
-                                        <CloudArrowUpIcon className="w-5 h-5"/>
-                                    </button>
-                                </div>
-                                <div className="flex-1">
-                                    <div className="flex flex-col md:flex-row md:items-center justify-center md:justify-start gap-4 mb-3">
-                                        <h2 className="text-4xl font-black tracking-tight">{selectedEmployee.fullNameAr}</h2>
-                                        <EmployeeStatusBadge status={selectedEmployee.status} />
-                                    </div>
-                                    <p className="text-indigo-200 text-lg font-medium mb-6 uppercase tracking-widest">{selectedEmployee.jobTitle} • {selectedEmployee.department}</p>
+                            {/* Main Document Content Area */}
+                            {printDocType === 'contract' && (
+                                <div className="space-y-4 text-xs">
+                                    <h4 className="text-center text-sm font-black underline">عقد عمل في القطاع الأهلي - موحد بموافقة الهيئة العامة</h4>
+                                    <p className="leading-relaxed font-extrabold">بموجب أحكام القانون رقم 6 لعام 2010 بشأن العمل في القطاع الأهلي بدولة الكويت، تم الاتفاق والارتباط الإرادي بين:</p>
                                     
-                                    <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                                        <HeroStat icon={<IdentificationIcon className="w-5 h-5"/>} label="رقم الموظف" value={selectedEmployee.employeeId} />
-                                        <HeroStat icon={<CalendarDaysIcon className="w-5 h-5"/>} label="تاريخ الانضمام" value={selectedEmployee.joiningDate} />
-                                        <HeroStat icon={<MapPinIcon className="w-5 h-5"/>} label="الفرع" value={selectedEmployee.branch || 'الرئيسي'} />
+                                    <div className="bg-slate-50 p-3.5 rounded-xl space-y-1 my-3 text-[11px] leading-relaxed">
+                                        <p><strong>الطرف الأول:</strong> مكتب الوقيان والمنصور والزملاء للمحاماة، ويمثله الشريك المدير أحمد محمود العبدالله.</p>
+                                        <p><strong>الطرف الثاني:</strong> السيّد/السيّدة: {previewDocContent.empName}، الرقم المدني: {previewDocContent.empCivilId}، بوظيفة: {previewDocContent.empJob} في قسم: {previewDocContent.empDept}.</p>
+                                    </div>
+                                    
+                                    <p className="leading-relaxed"><strong>البند الأول:</strong> يُعيّن الطرف الثاني لدى الطرف الأول بمسمى {previewDocContent.empJob} اعتباراً من تاريخ التثبيت {previewDocContent.joiningDate}.</p>
+                                    <p className="leading-relaxed"><strong>البند الثاني:</strong> يتقاضى الطرف الثاني بموجب هذا السند راتباً أساسياً يعادل {previewDocContent.basicSalary} ديناراً كويتياً، يتم تحويله الكترونياً للبنك المصدق بالصرف.</p>
+                                </div>
+                            )}
+
+                            {printDocType === 'payslip' && (
+                                <div className="space-y-4 text-xs font-mono">
+                                    <h4 className="text-center text-sm font-black font-sans underline">شهادة تفصيل الراتب والمستحقات والبدلات المعتمدة</h4>
+                                    <div className="grid grid-cols-2 gap-y-3.5 border-b pb-4 my-2 text-[11px]">
+                                        <p className="font-sans"><strong>اسم الموظف:</strong> {previewDocContent.empName}</p>
+                                        <p className="font-sans"><strong>رقم الملف:</strong> {previewDocContent.empId}</p>
+                                        <p className="font-sans"><strong>الرقم المدني:</strong> {previewDocContent.empCivilId}</p>
+                                        <p className="font-sans"><strong>المسمى الوظيفي:</strong> {previewDocContent.empJob}</p>
+                                    </div>
+
+                                    <div className="space-y-2 text-[11px] border-b pb-4 text-right">
+                                        <div className="flex justify-between">
+                                            <span>الراتب الأساسي المعتمد:</span>
+                                            <span>{previewDocContent.basicSalary} د.ك</span>
+                                        </div>
+                                        <div className="flex justify-between text-emerald-600 font-extrabold">
+                                            <span>إجمالي البدلات والمزايا المضافة:</span>
+                                            <span>+{previewDocContent.allowancesVal} د.ك</span>
+                                        </div>
+                                        <div className="flex justify-between text-rose-600 font-extrabold">
+                                            <span>استقطاع التأمينات والضمان (PIFSS):</span>
+                                            <span>-{previewDocContent.insDeduction} د.ك</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex justify-between font-black font-sans text-xs bg-slate-50 p-3 rounded-lg">
+                                        <span>الراتب الصافي الفعلي (Net Cash Pay)</span>
+                                        <span>{previewDocContent.net} دينار كويتي</span>
                                     </div>
                                 </div>
-                                <div className="flex flex-wrap justify-center gap-2 mt-6 md:mt-0 md:self-center">
-                                    <Button variant="outline" className="h-12 border-white/20 text-white hover:bg-white/10 rounded-2xl border-2" leftIcon={<PrinterIcon className="w-5"/>}>طباعة الملف</Button>
-                                    <Button className="h-12 bg-white text-indigo-900 hover:bg-indigo-50 rounded-2xl font-black px-6 border-none" onClick={() => handleOpenForm(selectedEmployee)}>تعديل البيانات</Button>
+                            )}
+
+                            {printDocType === 'warning' && (
+                                <div className="space-y-4 text-xs leading-relaxed">
+                                    <h4 className="text-center text-sm font-black underline text-rose-900 font-sans">إنذار كتابي نهائي رسمي - مخالفة اللوائح</h4>
+                                    <p><strong>تنبيه وإرشاد صادر من الموارد البشرية والشؤون القانونية للموظف:</strong></p>
+                                    <p className="bg-rose-50 p-2 text-rose-900 font-extrabold rounded-lg">السيّد/السيّدة: {previewDocContent.empName}، الرقم الوظيفي الموحد: {previewDocContent.empId}</p>
+                                    <p><strong>أسباب المخالفة والدواعي:</strong> {previewDocContent.reason}</p>
+                                    <p>بموجب أحكام <strong>{previewDocContent.lawClause}</strong>، نود إعلامكم بضرورة التقيد ببروتوكول المكتب وصياغة مهام دفاع المحكمة بالانضباط التام.</p>
+                                    <p className="font-extrabold text-rose-700 text-[11px]">الجزاء الإداري المتفق: {previewDocContent.penalty}</p>
+                                </div>
+                            )}
+
+                            {printDocType === 'id' && (
+                                <div className="border-2 border-slate-900 p-4 rounded-xl flex items-center justify-between text-xs max-w-md mx-auto">
+                                    <div>
+                                        <h5 className="font-black">مكتب الوقيان والمنصور للمحاماة</h5>
+                                        <p className="text-[10px] text-slate-500 font-sans uppercase">Attorneys & Legal Consultants</p>
+                                        <div className="space-y-1 mt-3">
+                                            <p><strong>الاسم:</strong> {previewDocContent.empName}</p>
+                                            <p><strong>الوظيفة:</strong> {previewDocContent.empJob}</p>
+                                            <p><strong>الرقم:</strong> {previewDocContent.empId}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-center shrink-0">
+                                        <div className="w-16 h-16 bg-slate-100 border rounded-xl flex items-center justify-center font-bold text-slate-400">صورة</div>
+                                        <span className="text-[8px] uppercase font-mono block mt-2">KWT AUTH REGISTERED</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Signatures & Official Stamp Grid */}
+                            <div className="grid grid-cols-2 text-center mt-10 pt-5 border-t border-dashed text-[10px] font-extrabold leading-loose text-slate-700">
+                                <div>
+                                    <p>صاحب العمل / الطرف الأول</p>
+                                    <p className="mt-4 text-indigo-700 italic">أحمد محمود العبدالله</p>
+                                    <p className="text-[8px] text-slate-400">التوقيع والاعتماد الرقمي</p>
+                                </div>
+                                <div className="border-r">
+                                    <p>توقيع الموظف / الطرف الثاني</p>
+                                    <p className="mt-8 text-slate-350">.........................................................</p>
+                                    <p className="text-[8px] text-slate-400">الإقرار بالاستلام ومضمون السند</p>
                                 </div>
                             </div>
+
+                            {/* Official Stamps / QR footer */}
+                            <div className="flex items-center justify-between pt-5 mt-5 border-t text-[8px] text-slate-400">
+                                <span>المنظومة القانونية الموحدة v3 — عدالة</span>
+                                <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-md">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+                                    <span className="text-[8px] font-bold text-emerald-600 font-mono">STAMP VALID STATE OF KUWAIT</span>
+                                </div>
+                                <span>رمز الاستجابة السريعة: QR-A7B8C9</span>
+                            </div>
+
                         </div>
 
-                        {/* Horizontal Scrollable Tabs */}
-                        <div className="flex gap-2 overflow-x-auto py-2 scrollbar-none px-4 bg-slate-50/50 border-y border-slate-100">
-                            <TabBtn id="profile" icon={<UserCircleIcon/>} label="البيانات الأساسية" active={activeDetailTab === 'profile'} onClick={() => setActiveDetailTab('profile')} />
-                            <TabBtn id="contract" icon={<BriefcaseIcon/>} label="العقد الوظيفي" active={activeDetailTab === 'contract'} onClick={() => setActiveDetailTab('contract')} />
-                            <TabBtn id="payroll" icon={<BanknotesIcon/>} label="الراتب والبدلات" active={activeDetailTab === 'payroll'} onClick={() => setActiveDetailTab('payroll')} />
-                            <TabBtn id="leaves" icon={<CalendarDaysIcon/>} label="الإجازات" active={activeDetailTab === 'leaves'} onClick={() => setActiveDetailTab('leaves')} />
-                            <TabBtn id="attendance" icon={<ClockIcon/>} label="الحضور والدوام" active={activeDetailTab === 'attendance'} onClick={() => setActiveDetailTab('attendance')} />
-                            <TabBtn id="docs" icon={<FolderIcon/>} label="المستندات" active={activeDetailTab === 'docs'} onClick={() => setActiveDetailTab('docs')} />
-                            <TabBtn id="evaluations" icon={<AcademicCapIcon/>} label="التقييمات" active={activeDetailTab === 'evaluations'} onClick={() => setActiveDetailTab('evaluations')} />
-                            <TabBtn id="alerts" icon={<BellIcon/>} label="التنبيهات" active={activeDetailTab === 'alerts'} onClick={() => setActiveDetailTab('alerts')} />
-                            <TabBtn id="history" icon={<HistoryIcon/>} label="السجل الوظيفي" active={activeDetailTab === 'history'} onClick={() => setActiveDetailTab('history')} />
-                            <TabBtn id="notes" icon={<PencilIcon/>} label="الملاحظات" active={activeDetailTab === 'notes'} onClick={() => setActiveDetailTab('notes')} />
-                            <TabBtn id="changelog" icon={<ArrowPathIcon/>} label="سجل التعديلات" active={activeDetailTab === 'changelog'} onClick={() => setActiveDetailTab('changelog')} />
-                        </div>
-
-                        {/* Detail Content Area */}
-                        <div className="flex-1 overflow-y-auto min-h-0 pt-4 px-2">
-                             {activeDetailTab === 'profile' && <DetailsTabProfile emp={selectedEmployee} />}
-                             {activeDetailTab === 'contract' && <DetailsTabContract emp={selectedEmployee} />}
-                             {activeDetailTab === 'payroll' && <DetailsTabPayroll emp={selectedEmployee} />}
-                             {activeDetailTab === 'leaves' && <DetailsTabLeaves emp={selectedEmployee} />}
-                             {activeDetailTab === 'attendance' && <DetailsTabAttendance emp={selectedEmployee} />}
-                             {activeDetailTab === 'docs' && <DetailsTabDocs emp={selectedEmployee} />}
-                             {activeDetailTab === 'evaluations' && <DetailsTabReports emp={selectedEmployee} />}
-                             {activeDetailTab === 'alerts' && <DetailsTabAlerts emp={selectedEmployee} />}
-                             {activeDetailTab === 'history' && <DetailsTabHistory emp={selectedEmployee} />}
-                             {activeDetailTab === 'notes' && <DetailsTabNotes emp={selectedEmployee} />}
-                             {activeDetailTab === 'changelog' && <DetailsTabChangeLog emp={selectedEmployee} />}
+                        <div className="flex justify-end gap-2 text-xs font-black">
+                            <Button variant="secondary" className="rounded-xl px-4 h-11" onClick={() => setIsPrintModalOpen(false)}>إغلاق</Button>
+                            <Button onClick={triggerSystemPrint} className="rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-8 h-11 shadow-lg shadow-indigo-650/15">
+                                بدء الطباعة الفورية
+                            </Button>
                         </div>
                     </div>
                 )}
             </Modal>
+
+            {/* Modal: Interactive Document Previewer Mockup */}
+            <Modal
+                isOpen={isPreviewDocOpen}
+                onClose={() => setIsPreviewDocOpen(false)}
+                title={previewFileMeta ? `معاينة وثيقة: ${previewFileMeta.title}` : ''}
+                size="md"
+            >
+                {previewFileMeta && (
+                    <div className="space-y-4 pt-1 text-right">
+                        
+                        {previewFileMeta.type === 'civil_id' && (
+                            <div className="bg-gradient-to-br from-indigo-100 via-white to-sky-100 p-5 rounded-3xl border border-indigo-200 text-indigo-950 font-bold relative mx-auto max-w-sm shadow-xl font-sans">
+                                <div className="flex justify-between items-start border-b pb-2 mb-3">
+                                    <div className="text-[8px] text-indigo-800">
+                                        <p>الهيئة العامة للمعلومات المدنية</p>
+                                        <p className="uppercase">Public Authority for Civil Information</p>
+                                    </div>
+                                    <div className="w-6 h-6 bg-indigo-800 rounded-full text-white font-black text-center leading-6 text-xs shrink-0 flex items-center justify-center">ك</div>
+                                </div>
+
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="space-y-2 text-[10px]">
+                                        <p><strong>اسم حامل البطاقة / Name:</strong></p>
+                                        <p className="font-sans text-xs font-black text-indigo-900 bg-white/60 p-1 rounded-md">{selectedEmployee?.fullNameAr}</p>
+                                        <p><strong>رقم الهوية المدنية / CIVIL ID:</strong></p>
+                                        <p className="font-mono text-xs font-black tracking-widest text-indigo-900 bg-white/60 p-1 rounded-md">{selectedEmployee?.civilId}</p>
+                                        <p><strong>تاريخ انتهاء البطاقة / Expiry:</strong> {selectedEmployee?.civilIdExpiry || '2028-12-30'}</p>
+                                    </div>
+                                    <div className="w-20 h-24 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center justify-center text-[10px] text-indigo-400 font-extrabold shrink-0">
+                                        صورة شخصية الكترونية
+                                    </div>
+                                </div>
+                                <div className="text-center border-t pt-2 mt-4 text-[7px] text-indigo-500 font-mono tracking-tighter">
+                                    STATE OF KUWAIT CIVIL ID - APPROVED REGISTERED DOC
+                                </div>
+                            </div>
+                        )}
+
+                        {previewFileMeta.type === 'passport' && (
+                            <div className="bg-slate-900 p-5 rounded-3xl text-amber-100 relative mx-auto max-w-sm shadow-2xl font-sans text-left">
+                                <div className="border-b border-amber-500/30 pb-3 mb-4 text-xs">
+                                    <div className="flex justify-between">
+                                        <span>دولة الكويت</span>
+                                        <span className="uppercase font-mono">State of Kuwait</span>
+                                    </div>
+                                    <div className="flex justify-between text-[9px] mt-1 text-amber-500">
+                                        <span>جواز سفر</span>
+                                        <span className="uppercase font-mono">PASSPORT</span>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 text-[10px] font-mono leading-relaxed">
+                                    <p><strong>اسم صاحب الجواز / Holder:</strong></p>
+                                    <p className="text-white font-sans text-xs font-black tracking-wide">{selectedEmployee?.fullNameEn || selectedEmployee?.fullNameAr}</p>
+                                    
+                                    <div className="grid grid-cols-2 gap-2 mt-2">
+                                        <div>
+                                            <span className="text-amber-500/70 block">رقم الجواز / Passport No.</span>
+                                            <span className="text-white font-black">N-0098711A</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-amber-500/70 block">تاريخ الصلاحية / Expiration</span>
+                                            <span className="text-white font-black">{selectedEmployee?.passportExpiry || '2029-01-01'}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {previewFileMeta.type === 'degree' && (
+                            <div className="bg-yellow-50/50 p-6 rounded-3xl border-4 border-double border-yellow-600/50 text-slate-800 text-center relative max-w-md mx-auto shadow-lg leading-relaxed font-sans">
+                                <span className="font-bold underline uppercase block mb-2 text-amber-800 text-xs">وزارة التعليم العالي بدولة الكويت</span>
+                                <h4 className="text-sm font-black underline mb-4">شهادة تخرج جامعية ومعادلة مصدقة</h4>
+                                <p className="text-xs">نشهد نحن لجنة تقييم الشهادات والمعادلات بأن السيّد/السيّدة:</p>
+                                <p className="font-black text-slate-900 border-b-2 inline-block px-4 py-1 my-2 text-sm">{selectedEmployee?.fullNameAr}</p>
+                                <p className="text-xs">قد أكمل متطلبات نيل درجة الليسانس في الحقوق والشريعة القانونية بتقدير ممتاز من جامعة الكويت معترف بها رسمياً ومزكاة إدارياً.</p>
+                            </div>
+                        )}
+
+                        {previewFileMeta.type === 'text' && (
+                            <pre className="p-4 bg-slate-50 dark:bg-slate-850 rounded-2xl text-xs font-mono whitespace-pre-wrap text-slate-700 leading-6 text-right font-sans">
+                                {previewFileMeta.content}
+                            </pre>
+                        )}
+
+                        <div className="flex justify-end gap-2">
+                            <Button className="rounded-xl px-6 h-11 bg-slate-900 hover:bg-slate-800 text-white" onClick={() => setIsPreviewDocOpen(false)}>تمت المراجعة</Button>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
         </div>
     );
 };

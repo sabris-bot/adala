@@ -468,9 +468,11 @@ const HearingForm: React.FC<{
     );
 };
 
-const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ caseItem, onClose, onUpdateCase }) => {
+const CaseDetailsModal: React.FC<CaseDetailsModalProps> = ({ caseItem, onClose, onUpdateCase, onPrint }) => {
     const { t } = useTranslation();
-    const [activeTab, setActiveTab] = useState<'details' | 'legal' | 'hearings' | 'archive' | 'execution' | 'financials' | 'notes' | 'ai'>('details');
+    const { addToast } = useToast();
+    const [activeTab, setActiveTab] = useState<'details' | 'legal' | 'hearings' | 'archive' | 'execution' | 'financials' | 'timeline' | 'notes' | 'ai'>('details');
+    const [isFullScreen, setIsFullScreen] = useState(false);
 
     // --- State for Execution & Expert ---
     const [isAddingExecAction, setIsAddingExecAction] = useState(false);
@@ -1435,6 +1437,160 @@ ${JSON.stringify(context, null, 2)}`;
         </div>
     );
 
+    const renderTimelineTab = () => {
+        const events: { date: string; title: string; desc: string; icon: any; iconColor: string; label: string }[] = [];
+
+        if (caseItem.filingDate) {
+            events.push({
+                date: caseItem.filingDate,
+                title: 'رفع الدعوى القضائية الأساسية',
+                desc: 'تم تسجيل العريضة ومباشرتها وقيدها بجدول المحكمة المختصة بفرز وتوزيع الخصومة.',
+                icon: BriefcaseIcon,
+                iconColor: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400',
+                label: 'قيد الدعوى'
+            });
+        }
+
+        if (caseItem.registrationDate) {
+            events.push({
+                date: caseItem.registrationDate,
+                title: 'تحضير وقيد ملف الدفاع والمراجعة',
+                desc: 'تم البدء في صياغة المستندات وتحضير الأدلة والمطالبات وتوثيق ملف الموكل بالمكتب.',
+                icon: ClipboardIcon,
+                iconColor: 'bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400',
+                label: 'تحضير الملف'
+            });
+        }
+
+        if (caseItem.hearings && caseItem.hearings.length > 0) {
+            caseItem.hearings.forEach(h => {
+                const isCompleted = (h.status as string) === 'Completed' || (h.status as string) === 'Judgment';
+                events.push({
+                    date: h.date,
+                    title: `جلسة قضائية بجدول المحكمة: ${h.type || 'مرافعة عامة'}`,
+                    desc: `حالة الجلسة المنظورة: ${h.status === 'Completed' ? 'تمت بنجاح' : h.status === 'Scheduled' ? 'مقررة وقادمة للمكتب' : h.status}. القرار الصادر: ${h.notes || 'بانتظار قرار الهيئة الموقرة.'}`,
+                    icon: GavelIcon,
+                    iconColor: isCompleted 
+                        ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400' 
+                        : 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400',
+                    label: isCompleted ? 'جلسة منقضية' : 'جلسة قادمة'
+                });
+            });
+        }
+
+        if (caseItem.expertActions && caseItem.expertActions.length > 0) {
+            caseItem.expertActions.forEach(exp => {
+                events.push({
+                    date: exp.referralDate,
+                    title: `إحالة لوزارة العدل: إدارة الخبراء (${exp.expertField})`,
+                    desc: `المهمة المنتدبة رسمياً: ${exp.assignedTask}. الخبير المنتدب: ${exp.expertName || 'لجنة خبراء وزارة العدل'}. حالة الإجراء: ${exp.status}. الملحوظة الأساسية: ${exp.notes || 'لا يوجد ملاحظات مسجلة.'}`,
+                    icon: ScaleIcon,
+                    iconColor: 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-400',
+                    label: 'إدارة الخبراء'
+                });
+            });
+        }
+
+        if (caseItem.executionActions && caseItem.executionActions.length > 0) {
+            caseItem.executionActions.forEach(exec => {
+                const eAny = exec as any;
+                events.push({
+                    date: eAny.date || eAny.actionDate || '',
+                    title: `إجراء إدارة التنفيذ الجبري: ${eAny.type || eAny.actionType || ''}`,
+                    desc: `الحالة التنفيذية للإشعار: ${eAny.status}. التفاصيل والتنسيق: ${eAny.notes || 'لا يوجد تفاصيل إضافية مضافة.'}`,
+                    icon: ActivityIcon,
+                    iconColor: 'bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400',
+                    label: 'إجراء تنفيذ'
+                });
+            });
+        }
+
+        if (caseItem.caseFiles && caseItem.caseFiles.length > 0) {
+            caseItem.caseFiles.forEach(f => {
+                events.push({
+                    date: f.uploadedAt,
+                    title: `إيداع وأرشفة مستند رسمي: ${f.fileName}`,
+                    desc: `تم توثيق ورفع الملف بنجاح في النظام لحفظ الحقوق. نوعه: ${f.fileType}. الغرض: ${f.description || 'حفظ في ملف الخصومة.'}`,
+                    icon: FolderIcon,
+                    iconColor: 'bg-slate-100 text-slate-600 dark:bg-slate-900/50 dark:text-slate-400',
+                    label: 'أرشفة مستند'
+                });
+            });
+        }
+
+        if (caseItem.caseNotes && caseItem.caseNotes.length > 0) {
+            caseItem.caseNotes.forEach(n => {
+                const nAny = n as any;
+                events.push({
+                    date: nAny.createdAt || nAny.date || '',
+                    title: `ملحوظة داخلية بمكتب صبري شطا`,
+                    desc: `المستشار المسؤول: ${nAny.createdBy || nAny.author || ''}. التفاصيل المضافة: "${nAny.content || nAny.note || nAny.text || ''}"`,
+                    icon: DocumentTextIcon,
+                    iconColor: 'bg-blue-50 text-blue-500 dark:bg-blue-950/40 dark:text-blue-400 border border-blue-100',
+                    label: 'ملحوظة تتبع'
+                });
+            });
+        }
+
+        events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return (
+            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 font-tajawal text-right" dir="rtl">
+                <div>
+                    <h4 className="font-tajawal font-black text-lg text-slate-900 dark:text-white">الجدول الزمني التفاعلي وإجراءات التقاضي</h4>
+                    <p className="text-xs text-slate-400 font-bold">تتبع زمني متطور وحصري للقرارات، المستندات، الجلسات، والمعاينات الميدانية لقضية الموكل</p>
+                </div>
+
+                {events.length === 0 ? (
+                    <div className="p-12 text-center bg-white dark:bg-dm-card rounded-[2rem] border border-slate-100 dark:border-slate-800">
+                        <HistoryIcon className="w-12 h-12 text-slate-300 mx-auto mb-3 opacity-30 animate-pulse" />
+                        <p className="text-sm font-bold text-slate-400">لا توجد وقائع تتبع إجرائي مضافة في ملف هذه القضية بعد.</p>
+                    </div>
+                ) : (
+                    <div className="relative border-r-2 border-slate-200/60 dark:border-slate-800/85 mr-4 pr-6 space-y-8 text-right">
+                        {events.map((ev, index) => {
+                            const IconC = ev.icon;
+                            return (
+                                <motion.div 
+                                    key={index}
+                                    initial={{ opacity: 0, x: 15 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                                    className="relative flex flex-col md:flex-row md:items-start justify-between gap-4"
+                                >
+                                    <div className="absolute right-0 translate-x-[41px] top-1.5 flex items-center justify-center">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm border-4 border-white dark:border-dm-background ${ev.iconColor}`}>
+                                            <IconC className="w-4 h-4" />
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 bg-white dark:bg-dm-card p-6 rounded-2xl border border-slate-100 dark:border-slate-800/80 shadow-sm sm:mr-6 hover:shadow-md transition-shadow">
+                                        <div className="flex flex-wrap justify-between items-start gap-2 mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-accent/20 text-primary-dark">
+                                                    {ev.label}
+                                                </span>
+                                                <h5 className="font-extrabold text-xs sm:text-sm text-slate-800 dark:text-white">
+                                                    {ev.title}
+                                                </h5>
+                                            </div>
+                                            <span className="text-[10px] font-black text-slate-400 tabular-nums bg-slate-50 dark:bg-slate-900 px-2 py-1 rounded">
+                                                {ev.date}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed font-bold">
+                                            {ev.desc}
+                                        </p>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     return (
         <Modal 
             isOpen={!!caseItem} 
@@ -1472,12 +1628,50 @@ ${JSON.stringify(context, null, 2)}`;
                                 )}
                               </div>
                          </div>
-                         <button 
-                             onClick={onClose}
-                             className="p-4 bg-white hover:bg-slate-900 hover:text-white rounded-[20px] text-slate-400 transition-all duration-500 shadow-sm border border-slate-50"
-                         >
-                             <XCircleIcon className="w-6 h-6"/>
-                         </button>
+                         {/* Action Tools: Print, Share, Full Screen, Close */}
+                         <div className="flex flex-wrap items-center gap-3 font-tajawal">
+                             {onPrint && (
+                                 <button 
+                                     onClick={onPrint}
+                                     className="px-5 py-2.5 bg-accent/20 hover:bg-accent text-primary-dark hover:text-white rounded-[16px] border border-accent/20 transition-all duration-300 flex items-center gap-2 text-[10px] font-black tracking-widest uppercase italic shadow-sm"
+                                     title="طباعة وإصدار تقرير ملف الدعوة القضائية"
+                                 >
+                                     <PrinterIcon className="w-4 h-4" />
+                                     <span>إصدار تقرير</span>
+                                 </button>
+                             )}
+                             <button
+                                 onClick={() => {
+                                     navigator.clipboard.writeText(window.location.origin + window.location.pathname + '?case=' + caseItem.id);
+                                     addToast({
+                                         type: 'success',
+                                         title: 'تم مشاركة الرابط',
+                                         message: 'تم نسخ ملف الدعوة الإلكتروني الموحد ورمز الاستجابة السريع لنظام الموكل.'
+                                     });
+                                 }}
+                                 className="p-3 bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-slate-600 rounded-[16px] border border-slate-100 dark:border-slate-800 transition-all duration-300 flex items-center justify-center shadow-xs"
+                                 title="مشاركة رابط ملف القضية"
+                             >
+                                 <DocumentDuplicateIcon className="w-4 h-4" />
+                             </button>
+                             <button
+                                 onClick={() => setIsFullScreen(!isFullScreen)}
+                                 className={`p-3 rounded-[16px] border transition-all duration-300 flex items-center justify-center shadow-xs ${isFullScreen ? 'bg-indigo-600 border-indigo-700 text-white hover:bg-indigo-700' : 'bg-slate-50 dark:bg-slate-950 text-slate-400 hover:text-slate-600 border-slate-100 dark:border-slate-800'}`}
+                                 title={isFullScreen ? 'تصغير الشاشة' : 'ملء الشاشة بالكامل'}
+                             >
+                                 {isFullScreen ? (
+                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M9 9L4 4m0 0V9m0-5h5m6 5l5-5m0 0V4m0 0h-5M9 15l-5 5m0 0v-5m0 5h5m6-5l5 5m0 0v-5m0 5h-5"/></svg>
+                                 ) : (
+                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m-11.25 11.25v-4.5m0 4.5h4.5m-4.5 0L9 15m11.25 5.25v-4.5m0 4.5h-4.5m4.5 0L15 15"/></svg>
+                                 )}
+                             </button>
+                             <button 
+                                 onClick={onClose}
+                                 className="p-3 bg-slate-50 dark:bg-slate-950 hover:bg-slate-900 dark:hover:bg-slate-800 hover:text-white rounded-[16px] text-slate-400 transition-all duration-300 border border-slate-100 dark:border-slate-800 flex items-center justify-center shadow-xs"
+                             >
+                                 <XCircleIcon className="w-4 h-4"/>
+                             </button>
+                         </div>
                     </div>
 
                     {/* Premium Navigation Tabs - Coordinated & Refined */}
@@ -1486,6 +1680,7 @@ ${JSON.stringify(context, null, 2)}`;
                             { id: 'details', label: t('case_summary', { defaultValue: 'ملف القضية' }), icon: BriefcaseIcon },
                             { id: 'legal', label: t('legal_mission', { defaultValue: 'المهمة' }), icon: ScaleIcon },
                             { id: 'hearings', label: t('chronos', { defaultValue: 'الجدول الزمني' }), icon: GavelIcon },
+                            { id: 'timeline', label: t('case_timeline', { defaultValue: 'مسار التقاضي' }), icon: HistoryIcon },
                             { id: 'archive', label: t('archive', { defaultValue: 'الأرشيف' }), icon: FolderIcon },
                             { id: 'execution', label: t('enforcement', { defaultValue: 'التنفيذ والخبراء' }), icon: ActivityIcon },
                             { id: 'financials', label: t('financials', { defaultValue: 'المالية' }), icon: BanknotesIcon },
@@ -1520,6 +1715,7 @@ ${JSON.stringify(context, null, 2)}`;
                     {activeTab === 'details' && renderDetailsTab()}
                     {activeTab === 'legal' && renderLegalTab()}
                     {activeTab === 'hearings' && renderHearingsTab()}
+                    {activeTab === 'timeline' && renderTimelineTab()}
                     {activeTab === 'archive' && renderSmartArchiveTab()}
                     {activeTab === 'execution' && renderExecutionTab()}
                     {activeTab === 'financials' && renderFinancialsTab()}
@@ -1839,45 +2035,374 @@ interface PrintableCaseReportModalProps {
 
 const PrintableCaseReportModal: React.FC<PrintableCaseReportModalProps> = ({ isOpen, onClose, caseItem }) => {
     const { t } = useTranslation();
+    const { addToast } = useToast();
+    const [reportType, setReportType] = useState<'summary' | 'details' | 'hearings' | 'client_file' | 'official'>('summary');
+    const [showSystemStamps, setShowSystemStamps] = useState(true);
+    const [signatureImg, setSignatureImg] = useState<string | null>(null);
+    const [isSignaturePadOpen, setIsSignaturePadOpen] = useState(false);
+
     if (!caseItem) return null;
 
     const handlePrint = () => {
         window.print();
     };
 
-    return (
-        <Modal isOpen={isOpen} onClose={onClose} title={t('case_report_print', { defaultValue: 'طباعة تقرير القضية' })} size="xl">
-            <div className="space-y-6 max-h-[70vh] overflow-y-auto p-4 printable-area">
-                <PrintHeader 
-                    title={t('legal_case_report', { defaultValue: 'تقرير ملف قضية قانونية' })} 
-                    subtitle={`${caseItem.title} - ${caseItem.internalCaseNumber}`} 
-                />
+    // Calculate dynamic financials
+    const totalFees = caseItem.financials?.totalFees || 0;
+    const paidFees = caseItem.financials?.paid || 0;
+    const remainingFees = totalFees - paidFees;
 
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                    <div className="space-y-2 text-right text-black">
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('case_title', { defaultValue: 'موضوع القضية' })}:</span> <span>{caseItem.title}</span></p>
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('case_number', { defaultValue: 'رقم القضية' })}:</span> <span className="tabular-nums">{caseItem.caseNumber}</span></p>
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('client_name', { defaultValue: 'الموكل' })}:</span> <span>{caseItem.clientName}</span></p>
+    return (
+        <Modal 
+            isOpen={isOpen} 
+            onClose={onClose} 
+            title="نظام معاينة وإصدار مستندات ملف الدعوى" 
+            size="xl"
+            footer={
+                <div className="flex justify-between items-center w-full no-print p-4 border-t">
+                    <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                        <span>نوع التقرير الحالي:</span>
+                        <span className="text-indigo-600 font-black">
+                            {reportType === 'summary' && 'ملخص مقتضب للخصومة'}
+                            {reportType === 'details' && 'مذكرة تفصيلية شاملة'}
+                            {reportType === 'hearings' && 'جدول ضبط الجلسات والمواعيد'}
+                            {reportType === 'client_file' && 'ملف الموكل الفني والإجراءات'}
+                            {reportType === 'official' && 'التقرير القانوني القضائي الرسمي'}
+                        </span>
                     </div>
-                    <div className="space-y-2 text-right text-black">
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('opponent_name', { defaultValue: 'الخصم' })}:</span> <span>{caseItem.opposingPartyName}</span></p>
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('court_name', { defaultValue: 'المحكمة' })}:</span> <span>{caseItem.courtName}</span></p>
-                        <p className="flex justify-between border-b pb-1 font-medium"><span className="text-gray-500">{t('court_level', { defaultValue: 'درجة التقاضي' })}:</span> <span>{caseItem.courtLevel}</span></p>
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="rounded-xl" onClick={onClose}>إغلاق المعاينة</Button>
+                        <Button className="rounded-xl shadow-md" onClick={handlePrint} leftIcon={<PrinterIcon className="w-4 h-4" />}>طباعة المستند الحالي</Button>
+                    </div>
+                </div>
+            }
+        >
+            <div className="space-y-6 max-h-[85vh] overflow-y-auto p-2 leading-relaxed text-right dark:text-slate-100" dir="rtl">
+                {/* Report Type Selector Panel */}
+                <div className="bg-slate-50 dark:bg-slate-900/60 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 no-print">
+                    <p className="text-xs font-black text-slate-400 mb-3 uppercase tracking-wider">حدد فئة وصيغة التقرير المطلوب طباعته:</p>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+                        {[
+                            { type: 'summary', name: 'ملخص القضية' },
+                            { type: 'details', name: 'تقرير تفصيلي' },
+                            { type: 'hearings', name: 'جدول الجلسات' },
+                            { type: 'client_file', name: 'ملف الموكل' },
+                            { type: 'official', name: 'التمثيل الرسمي' }
+                        ].map(r => (
+                            <button
+                                key={r.type}
+                                onClick={() => setReportType(r.type as any)}
+                                className={`px-4 py-2.5 text-xs font-tajawal font-black rounded-xl border transition-all ${reportType === r.type ? 'bg-indigo-600 border-indigo-700 text-white shadow-sm' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-slate-50'}`}
+                            >
+                                {r.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-6 mt-4 pt-3 border-t border-slate-200/50 justify-between">
+                        <div className="flex items-center gap-4">
+                            <label className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                                <input 
+                                    type="checkbox" 
+                                    checked={showSystemStamps} 
+                                    onChange={(e) => setShowSystemStamps(e.target.checked)} 
+                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-4 h-4"
+                                />
+                                <span>إدراج أختام الصلاحية والتحقق الرقمي للوزارة</span>
+                            </label>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                            {signatureImg ? (
+                                <div className="flex items-center gap-2 font-tajawal">
+                                    <span className="text-[10px] text-emerald-600 font-extrabold flex items-center gap-1">✔ تم توقيع المستند</span>
+                                    <button onClick={() => setSignatureImg(null)} className="text-[10px] text-red-500 hover:underline">إلغاء التوقيع</button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => setIsSignaturePadOpen(true)}
+                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-400 text-[10px] font-black rounded-lg transition-colors border border-indigo-100 dark:border-indigo-900"
+                                >
+                                    إدراج توقيع خطي معتمد
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {caseItem.description && (
-                    <div className="p-4 bg-gray-50 rounded-xl text-right text-black">
-                        <h4 className="font-bold text-sm mb-2">{t('case_description', { defaultValue: 'وصف الدعوى' })}</h4>
-                        <p className="text-xs text-gray-700 leading-relaxed">{caseItem.description}</p>
-                    </div>
-                )}
+                {/* Printable Paper A4 Page Layout */}
+                <div className="bg-white text-black p-12 rounded-2xl border border-slate-200 shadow-lg relative mx-auto max-w-4xl printable-area font-sans" style={{ minHeight: '297mm' }}>
+                    {/* Official Dynamic Office Header */}
+                    <PrintHeader 
+                        title={
+                            reportType === 'summary' ? 'ملخص مقتضب لبطاقة الخصومة' :
+                            reportType === 'details' ? 'تقرير تفصيلي شامل لوقائع القضية ومستجداتها' :
+                            reportType === 'hearings' ? 'جدول ضبط وقرارات الجلسات والخصومة' :
+                            reportType === 'client_file' ? 'البيان الإيجابي لملف ومستندات الموكل الفني' :
+                            'التقرير القانوني والاعتماد القضائي الموحد'
+                        } 
+                        subtitle={`${caseItem.title} - ${caseItem.internalCaseNumber}`} 
+                    />
 
-                <div className="flex justify-end gap-3 no-print pt-4 border-t">
-                    <Button variant="outline" onClick={onClose}>{t('close', { defaultValue: 'إغلاق' })}</Button>
-                    <Button onClick={handlePrint}>{t('print', { defaultValue: 'طباعة' })}</Button>
+                    {/* Report ID Number and Barcode Decorative line */}
+                    <div className="flex justify-between items-center border-b border-rose-900/10 pb-3 mb-6 text-[10px] text-slate-500">
+                        <span className="font-mono">REF: ADR-ST-{caseItem.internalCaseNumber}-{reportType.toUpperCase()}</span>
+                        <span>تاريخ الطباعة: {new Date().toLocaleDateString('ar-KW', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+
+                    {/* CONTENT ACCORDING TO REPORT TYPES */}
+
+                    {/* 1. SUMMARY REPORT */}
+                    {reportType === 'summary' && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-rose-900/70 border-r-4 border-rose-900 pr-2 mb-4">تعريف الخصومة القضائية</h3>
+                                <div className="grid grid-cols-2 gap-y-3 gap-x-8 text-xs font-medium text-slate-800">
+                                    <p className="flex justify-between border-b pb-1"><span>عنوان القضية:</span> <span className="font-extrabold">{caseItem.title}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>الرقم الآلي للمحكمة:</span> <span className="font-extrabold tabular-nums">{caseItem.caseNumber}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>رقم ملف الدعوى الداخلي:</span> <span className="font-extrabold tabular-nums">{caseItem.internalCaseNumber}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>نوع وتصنيف القضية:</span> <span className="font-extrabold text-indigo-600">{caseItem.caseMainType}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>درجة ومستوى التقاضي:</span> <span className="font-extrabold">{caseItem.courtLevel}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>حالة الملف الحالي:</span> <span className="font-extrabold">{caseItem.status}</span></p>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                    <h3 className="text-xs font-black text-emerald-900/70 border-r-4 border-emerald-900 pr-2 mb-4">طرف الموكل</h3>
+                                    <div className="space-y-2 text-xs">
+                                        <p className="flex justify-between"><span>الاسم بالكامل:</span> <span className="font-extrabold">{caseItem.clientName}</span></p>
+                                        <p className="flex justify-between"><span>الصفة القانونية بالدعوى:</span> <span className="font-extrabold text-emerald-600">{caseItem.clientRole}</span></p>
+                                    </div>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                    <h3 className="text-xs font-black text-red-900/70 border-r-4 border-red-900 pr-2 mb-4">طرف الخصم</h3>
+                                    <div className="space-y-2 text-xs">
+                                        <p className="flex justify-between"><span>الاسم بالكامل:</span> <span className="font-extrabold">{caseItem.opposingPartyName}</span></p>
+                                        <p className="flex justify-between"><span>الصفة القانونية بالدعوى:</span> <span className="font-extrabold text-red-600">{caseItem.opponentRole}</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 2. DETAILS REPORT */}
+                    {reportType === 'details' && (
+                        <div className="space-y-6">
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-indigo-900 border-r-4 border-indigo-600 pr-2 mb-4">بيان كلي بموضوع وقائع الخصومة</h3>
+                                <p className="text-xs text-slate-700 leading-relaxed italic pr-2 font-medium">
+                                    {caseItem.description || 'لم يتم تدوين ملخص موضوع الدعوى في النظام حتى تاريخه.'}
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-rose-900/70 border-r-4 border-rose-900 pr-2 mb-4">بيانات الضبط والمشرف المسؤول</h3>
+                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                    <p className="flex justify-between border-b pb-1"><span>المستشار المترافع:</span> <span className="font-extrabold">{caseItem.assignedLawyer}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>الدائرة القضائية المختصة:</span> <span className="font-extrabold">{caseItem.circuit || 'لا يوجد'}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>تاريخ القيد الأولي:</span> <span className="font-extrabold tabular-nums">{caseItem.filingDate}</span></p>
+                                    <p className="flex justify-between border-b pb-1"><span>مقر المحكمة المنظورة:</span> <span className="font-extrabold text-indigo-600">{caseItem.courtName}</span></p>
+                                </div>
+                            </div>
+
+                            {/* Financial Summary Inside Details */}
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-emerald-950/70 border-r-4 border-emerald-900 pr-2 mb-4">الحسابات والذمم المالية المقيدة للملف</h3>
+                                <div className="grid grid-cols-3 gap-4 text-center">
+                                    <div className="p-3 bg-white rounded-xl border border-slate-200">
+                                        <span className="text-[10px] font-black text-slate-400 block mb-1">إجمالي الأتعاب التعاقدية</span>
+                                        <span className="text-sm font-extrabold text-slate-800 tabular-nums">{totalFees.toLocaleString()} د.ك</span>
+                                    </div>
+                                    <div className="p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                                        <span className="text-[10px] font-black text-emerald-600 block mb-1">المحقق المدفوع فعلاً</span>
+                                        <span className="text-sm font-extrabold text-emerald-700 tabular-nums">{paidFees.toLocaleString()} د.ك</span>
+                                    </div>
+                                    <div className={`p-3 rounded-xl border ${remainingFees > 0 ? 'bg-amber-50 border-amber-100 text-amber-900' : 'bg-slate-50 border-slate-100 text-slate-800'}`}>
+                                        <span className="text-[10px] font-black block mb-1">المبلغ المتبقي بالذمة</span>
+                                        <span className="text-sm font-extrabold tabular-nums">{remainingFees.toLocaleString()} د.ك</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 3. HEARINGS SCHEDULE REPORT */}
+                    {reportType === 'hearings' && (
+                        <div className="space-y-6">
+                            <div className="border border-slate-300 rounded-xl overflow-hidden">
+                                <table className="w-full text-right text-xs">
+                                    <thead className="bg-slate-900 text-white">
+                                        <tr>
+                                            <th className="p-3 font-extrabold">تاريخ الجلسة</th>
+                                            <th className="p-3 font-extrabold">النوع والغرض</th>
+                                            <th className="p-3 font-extrabold">حالة الحضور</th>
+                                            <th className="p-3 font-extrabold">القرارات والتوجيهات الصادرة</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-200 bg-white">
+                                        {caseItem.hearings && caseItem.hearings.length > 0 ? (
+                                            caseItem.hearings.map(h => (
+                                                <tr key={h.id}>
+                                                    <td className="p-3 font-extrabold tabular-nums">{h.date}</td>
+                                                    <td className="p-3 font-bold">{h.type || 'مرافعة'}</td>
+                                                    <td className="p-3">
+                                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${h.status === 'Completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                                                            {h.status === 'Completed' ? 'منقضية' : 'مقررة'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="p-3 text-slate-600 font-semibold">{h.notes || 'لا يوجد قرارات من الهيئة القضائية بعد.'}</td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={4} className="p-6 text-center font-extrabold text-slate-400">لا يوجد جلسات مسجلة على هذا الملف بعد.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 4. CLIENT CASE FILE */}
+                    {reportType === 'client_file' && (
+                        <div className="space-y-6">
+                            {/* Expert actions */}
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-purple-900 border-r-4 border-purple-600 pr-2 mb-4">إجراءات ومعاينات إدارة الخبراء</h3>
+                                {caseItem.expertActions && caseItem.expertActions.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {caseItem.expertActions.map(exp => (
+                                            <div key={exp.id} className="bg-white p-3 rounded-lg border border-slate-200 text-xs">
+                                                <div className="flex justify-between font-extrabold text-slate-800 mb-1">
+                                                    <span>إحالة إلى: {exp.expertField} ({exp.expertName || 'مستشار الخبراء'})</span>
+                                                    <span className="text-purple-600">الحالة: {exp.status}</span>
+                                                </div>
+                                                <p className="text-slate-500 font-semibold">المهمة: {exp.assignedTask}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 font-extrabold">لا يوجد إحالات لوزارة العدل - إدارة الخبراء لهذا الملف القضائي.</p>
+                                )}
+                            </div>
+
+                            {/* Execution procedures */}
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                                <h3 className="text-xs font-black text-rose-900 border-r-4 border-rose-600 pr-2 mb-4">إجراءات إدارة التنفيذ الجبري والمنطوق</h3>
+                                {caseItem.executionActions && caseItem.executionActions.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {caseItem.executionActions.map(exec => (
+                                            <div key={exec.id} className="bg-white p-3 rounded-lg border border-slate-200 text-xs">
+                                                <div className="flex justify-between font-extrabold text-slate-800 mb-1">
+                                                    <span>الإجراء: {exec.actionType}</span>
+                                                    <span className="text-rose-600">الحالة: {exec.status}</span>
+                                                </div>
+                                                <p className="text-slate-500 font-semibold">تفاصيل: {exec.notes || 'لا يوجد ملاحظات إضافية.'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-slate-400 font-extrabold">لا يوجد إجراءات تنفيذية مقيدة على هذا الملف حتى اللحظة.</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 5. OFFICIAL LEGAL REPORT */}
+                    {reportType === 'official' && (
+                        <div className="space-y-6">
+                            <div className="p-6 border border-slate-400 rounded-xl text-xs bg-slate-50 leading-relaxed">
+                                <h3 className="text-sm font-black text-center mb-4 text-slate-900">شهادة واعتراف بموقف الخصومة القضائية</h3>
+                                <p className="mb-4 pr-1 font-extrabold leading-loose text-slate-800">
+                                    يشهد مكتب صبري شطا للمحاماة والاستشارات القانونية والتحكيم الموثق بدولة الكويت، بأن القضية المرفوعة من الموكل الموضح بياناته أدناه منظورة تحت قيد الترافع والمطالبة الجارية. وقد صدر هذا التقرير بناءً على الفحص المتأني لأوراق الخصومة والمحاضر المودعة بمقام المحكمة الموقرة.
+                                </p>
+                                <div className="border-t border-slate-300 pt-4 space-y-2 text-slate-800">
+                                    <p className="flex justify-between"><span>المدعي (الموكل المعتمد في الدعوى):</span> <span className="font-extrabold">{caseItem.clientName} ({caseItem.clientRole})</span></p>
+                                    <p className="flex justify-between"><span>المدعى عليه (الخصم المقيد):</span> <span className="font-extrabold">{caseItem.opposingPartyName} ({caseItem.opponentRole})</span></p>
+                                    <p className="flex justify-between"><span>الرقم الموحد للملف الداخلي:</span> <span className="font-extrabold tabular-nums">{caseItem.internalCaseNumber}</span></p>
+                                    <p className="flex justify-between"><span>المحكمة ومقر نظر الخصومة:</span> <span className="font-extrabold">{caseItem.courtName} - {caseItem.courtLevel}</span></p>
+                                    <p className="flex justify-between"><span>الدائرة القضائية المستشارة:</span> <span className="font-extrabold">{caseItem.circuit || 'لا يوجد'}</span></p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Report Footer Area - Seal, signature image, barcode, stamps */}
+                    <div className="mt-16 pt-8 border-t border-slate-300 grid grid-cols-2 gap-6 relative">
+                        {/* Right: Signature Area */}
+                        <div className="flex flex-col items-start space-y-3">
+                            <span className="text-[10px] font-black text-slate-400">توقيع المستشار المسؤول والاعتماد المخول:</span>
+                            {signatureImg ? (
+                                <img src={signatureImg} alt="Signature" className="h-16 object-contain border-b border-dashed border-slate-300 mix-blend-multiply" />
+                            ) : (
+                                <div className="h-16 w-44 border border-dashed border-slate-200 rounded-lg flex items-center justify-center text-[9px] text-slate-400 italic">
+                                    بانتظار توقيع المستشار المعتمد
+                                </div>
+                            )}
+                            <span className="text-[10px] font-extrabold text-slate-800">المكتب التجاري العام - دولة الكويت</span>
+                        </div>
+
+                        {/* Left: Stamp and QR Verification Code */}
+                        <div className="flex justify-end items-center gap-6">
+                            {showSystemStamps && (
+                                <div className="flex flex-col items-center">
+                                    {/* Procedural Visual Stamp */}
+                                    <div className="w-16 h-16 border-4 border-rose-900/60 rounded-full flex flex-col items-center justify-center text-rose-900/70 p-1 select-none rotate-[-12deg] mb-1">
+                                        <span className="text-[7px] font-black leading-none">مكتب صبري شطا</span>
+                                        <span className="text-[5px] font-black mt-0.5 border-t border-b border-rose-900/60 py-0.5 uppercase tracking-widest scale-90">شعبة التوثيق</span>
+                                        <span className="text-[7px] font-black leading-none">مقبول</span>
+                                    </div>
+                                    <span className="text-[8px] text-slate-400 font-extrabold scale-90">ختم الاعتماد الرقمي</span>
+                                </div>
+                            )}
+
+                            {/* Secure verification QR Code representation */}
+                            <div className="flex flex-col items-center">
+                                <div className="grid grid-cols-6 gap-0.5 w-[64px] h-[64px] p-1 border-2 border-slate-900 rounded bg-white">
+                                    <div className="bg-slate-900 rounded-xs col-span-2 row-span-2"></div>
+                                    <div className="bg-transparent col-span-2"></div>
+                                    <div className="bg-slate-900 rounded-xs col-span-2 row-span-2"></div>
+                                    <div className="bg-transparent col-span-2"></div>
+                                    <div className="bg-slate-900 col-span-2"></div>
+                                    <div className="bg-slate-900 rounded-xs col-span-2 row-span-2"></div>
+                                    <div className="bg-transparent col-span-2"></div>
+                                    <div className="bg-slate-900 col-span-2"></div>
+                                </div>
+                                <span className="text-[8px] text-slate-400 font-extrabold mt-1">رمز التحقق الإلكتروني</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Official System Mini branding tagline */}
+                    <div className="absolute bottom-6 left-12 right-12 flex justify-between items-center text-[8px] text-slate-400 border-t border-slate-100 pt-2 print:flex hidden leading-none">
+                        <span>التقرير صادر إلكترونياً من "منظومة العدالة الذكية الكويتية" ولا يتطلب تعديلاً يدوياً.</span>
+                        <span className="tabular-nums">صفحة 1 من 1</span>
+                    </div>
                 </div>
             </div>
+
+            {/* SignaturePad Overlay Modal */}
+            {isSignaturePadOpen && (
+                <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[70] flex items-center justify-center p-6 no-print">
+                    <div className="bg-white dark:bg-dm-card p-6 rounded-3xl max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 relative z-20">
+                        <SignaturePad 
+                            title="التوقيع الخطّي للمستشار المسؤول"
+                            onSave={(dataUrl) => {
+                                setSignatureImg(dataUrl);
+                                setIsSignaturePadOpen(false);
+                                addToast({
+                                    type: 'success',
+                                    title: 'تم التوقيع',
+                                    message: 'تم تملئة وإرفاق التوقيع بنجاح داخل هذا التقرير الجاري.'
+                                });
+                            }}
+                            onCancel={() => setIsSignaturePadOpen(false)}
+                        />
+                    </div>
+                </div>
+            )}
         </Modal>
     );
 };

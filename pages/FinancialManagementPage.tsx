@@ -61,6 +61,15 @@ import {
 } from '../constants';
 import { initialCases } from '../data/caseData';
 
+// --- ADVANCED MODULES ---
+import { DashboardTab } from '../components/FinancialManagement/DashboardTab';
+import { EscrowTab } from '../components/FinancialManagement/EscrowTab';
+import { InvoicesTab } from '../components/FinancialManagement/InvoicesTab';
+import { EarningsTab } from '../components/FinancialManagement/EarningsTab';
+import { ExpensesTab } from '../components/FinancialManagement/ExpensesTab';
+import { CasesFinanceTab } from '../components/FinancialManagement/CasesFinanceTab';
+import { AuditNotifyTab } from '../components/FinancialManagement/AuditNotifyTab';
+
 // --- MOCK DATA ---
 export const mockFinancialTransactions: FinancialTransaction[] = [
   {
@@ -308,7 +317,8 @@ const mockTrustAccounts = [
 
 const FinancialManagementPage: React.FC = () => {
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'journal' | 'analytics' | 'invoices' | 'trust' | 'banks' | 'reports' | 'documents' | 'ai'>('journal');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'journal' | 'analytics' | 'invoices' | 'trust' | 'escrow' | 'earnings' | 'expenses' | 'cases_finance' | 'banks' | 'reports' | 'documents' | 'ai' | 'audit'>('dashboard');
+  const [userRole, setUserRole] = useState<'admin' | 'finance_manager' | 'lawyer' | 'consultant'>('admin');
   const [transactions, setTransactions] = useState<FinancialTransaction[]>(mockFinancialTransactions);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('');
@@ -540,58 +550,76 @@ const FinancialManagementPage: React.FC = () => {
 
       {/* Quick Stats Grid */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10 no-print">
-          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-gradient-to-br from-indigo-600 to-primary text-white relative overflow-hidden group">
+          {/* 1. Revenues Card */}
+          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-gradient-to-br from-[#004D40] to-[#00796B] text-white relative overflow-hidden group hover:scale-[1.02] hover:shadow-2xl transition-all duration-300">
               <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-110 transition-transform" />
-              <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-4">
+              <div className="relative z-10 flex flex-col justify-between h-full">
+                  <div className="flex justify-between items-start mb-6">
                       <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
-                          <BanknotesIcon className="w-6 h-6" />
+                          <BanknotesIcon className="w-6 h-6 text-white" />
                       </div>
                       <Badge variant="success" size="xs" text="+12.5%" className="bg-white/20 border-none text-white font-black" />
                   </div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">إجمالي الإيرادات</p>
-                  <h3 className="text-3xl font-black font-mono tracking-tighter">
-                    {formatCurrency(transactions.filter(t => t.amount > 0).reduce((acc, t) => acc + t.amount, 0))}
-                  </h3>
+                  <div>
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">إجمالي الإيرادات</p>
+                      <h3 className="text-3xl font-black font-mono tracking-tighter">
+                        {formatCurrency(transactions.filter(t => t.amount > 0).reduce((acc, t) => acc + t.amount, 0))}
+                      </h3>
+                  </div>
               </div>
           </Card>
 
-          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-white dark:bg-dm-card group hover:scale-[1.02] transition-all border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-4">
-                  <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl group-hover:bg-rose-600 group-hover:text-white transition-all">
-                      <ArrowDownRightIcon className="w-6 h-6" />
+          {/* 2. Expenses Card */}
+          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-gradient-to-br from-rose-950 to-rose-800 text-white relative overflow-hidden group hover:scale-[1.02] hover:shadow-2xl transition-all duration-300">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-110 transition-transform" />
+              <div className="relative z-10 flex flex-col justify-between h-full">
+                  <div className="flex justify-between items-start mb-6">
+                      <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                          <ArrowDownRightIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <Badge variant="danger" size="xs" text="-3.1%" className="bg-white/20 border-none text-white font-black" />
                   </div>
                   <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">إجمالي المصروفات</p>
-                      <h3 className="text-3xl font-black text-rose-600 font-mono tracking-tighter">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">إجمالي المصروفات</p>
+                      <h3 className="text-3xl font-black font-mono tracking-tighter">
                         {formatCurrency(Math.abs(transactions.filter(t => t.amount < 0).reduce((acc, t) => acc + t.amount, 0)))}
                       </h3>
                   </div>
               </div>
           </Card>
 
-          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-white dark:bg-dm-card group hover:scale-[1.02] transition-all border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-4">
-                  <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                      <PresentationChartLineIcon className="w-6 h-6" />
+          {/* 3. Pure Profit Card */}
+          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-gradient-to-br from-indigo-950 to-indigo-800 text-white relative overflow-hidden group hover:scale-[1.02] hover:shadow-2xl transition-all duration-300">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-110 transition-transform" />
+              <div className="relative z-10 flex flex-col justify-between h-full">
+                  <div className="flex justify-between items-start mb-6">
+                      <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                          <PresentationChartLineIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <Badge variant="info" size="xs" text="+18.5%" className="bg-white/20 border-none text-white font-black" />
                   </div>
                   <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">صافي الأرباح</p>
-                      <h3 className="text-3xl font-black text-emerald-600 font-mono tracking-tighter">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-1">صافي الأرباح</p>
+                      <h3 className="text-3xl font-black font-mono tracking-tighter">
                         {formatCurrency(transactions.reduce((acc, t) => acc + t.amount, 0))}
                       </h3>
                   </div>
               </div>
           </Card>
 
-          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-white dark:bg-dm-card group hover:scale-[1.02] transition-all border border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-4">
-                  <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-all">
-                      <ShieldCheckIcon className="w-6 h-6" />
+          {/* 4. Client Trust Card */}
+          <Card className="p-8 rounded-[2.5rem] border-none shadow-xl bg-gradient-to-br from-amber-700 to-amber-600 text-amber-950 relative overflow-hidden group hover:scale-[1.02] hover:shadow-2xl transition-all duration-300">
+              <div className="absolute right-0 top-0 w-32 h-32 bg-white/15 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl group-hover:scale-110 transition-transform" />
+              <div className="relative z-10 flex flex-col justify-between h-full">
+                  <div className="flex justify-between items-start mb-6">
+                      <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-md">
+                          <ShieldCheckIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <Badge variant="warning" size="xs" text="مؤمن" className="bg-white/20 border-none text-amber-950 font-black" />
                   </div>
                   <div>
-                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">أمانات الموكلين</p>
-                      <h3 className="text-3xl font-black text-amber-600 font-mono tracking-tighter">
+                      <p className="text-[10px] font-black uppercase tracking-widest opacity-85 mb-1 text-white">أمانات الموكلين</p>
+                      <h3 className="text-3xl font-black font-mono tracking-tighter text-white">
                         {formatCurrency(182450.000)}
                       </h3>
                   </div>
@@ -603,24 +631,30 @@ const FinancialManagementPage: React.FC = () => {
       <div className="max-w-7xl mx-auto mb-10 no-print overflow-x-auto no-scrollbar">
           <div className="flex items-center gap-1 bg-white dark:bg-dm-card p-2 rounded-[2rem] shadow-2xl border border-gray-100 dark:border-gray-800 w-fit">
               {[
-                  { id: 'journal', label: 'دفتر اليومية', icon: ChartBarIcon },
-                  { id: 'invoices', label: 'الفواتير الإلكترونية', icon: DocumentTextIcon },
-                  { id: 'trust', label: 'حسابات الأمانة', icon: ShieldCheckIcon },
+                  { id: 'dashboard', label: 'البوابة الرئيسيّة', icon: PresentationChartLineIcon },
+                  { id: 'journal', label: 'دفتر اليومية المطور', icon: CalculatorIcon },
+                  { id: 'invoices', label: 'الفواتير والفوترة الكلية', icon: DocumentTextIcon },
+                  { id: 'trust', label: 'حسابات الأمانة', icon: BuildingLibraryIcon },
+                  { id: 'escrow', label: 'بوابة الضمان ESCROW', icon: ShieldCheckIcon },
+                  { id: 'earnings', label: 'توزيع العمولات %', icon: ReceiptPercentIcon },
+                  { id: 'expenses', label: 'النفقات وتشغيل البيوت', icon: BanknotesIcon },
+                  { id: 'cases_finance', label: 'التدقيق المالي لملفات التقاضي', icon: ScaleIcon },
                   { id: 'banks', label: 'الحسابات البنكية', icon: CreditCardIcon },
-                  { id: 'reports', label: 'التقارير المالية', icon: DocumentDuplicateIcon },
-                  { id: 'documents', label: 'الأرشيف المالي', icon: DocumentTextIcon },
-                  { id: 'ai', label: 'المساعد الذكي AI', icon: SparklesIcon },
+                  { id: 'reports', label: 'التقارير الإحصائية', icon: DocumentDuplicateIcon },
+                  { id: 'documents', label: 'الأرشيف والوثائق', icon: ArrowDownTrayIcon },
+                  { id: 'ai', label: 'المساعد المعتمد AI', icon: SparklesIcon },
+                  { id: 'audit', label: 'الأمان وبوابة التدقيق', icon: CheckCircleIcon },
               ].map(tab => (
                   <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as any)}
-                      className={`flex items-center gap-3 px-8 py-4 rounded-[1.5rem] text-sm font-black transition-all duration-300 whitespace-nowrap ${
+                      className={`flex items-center gap-2.5 px-5 py-3 rounded-[1.25rem] text-xs font-black transition-all duration-300 whitespace-nowrap ${
                           activeTab === tab.id 
-                          ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-105' 
-                          : 'text-gray-400 hover:text-primary hover:bg-primary/5'
+                          ? 'bg-primary text-white shadow-lg shadow-primary/25 scale-[1.03] dark:bg-primary-light dark:text-primary-dark' 
+                          : 'text-gray-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary-light hover:bg-primary/5 dark:hover:bg-primary/10'
                       }`}
                   >
-                        <tab.icon className="w-5 h-5" />
+                        <tab.icon className="w-4 h-4" />
                         {tab.label}
                   </button>
               ))}
@@ -629,6 +663,72 @@ const FinancialManagementPage: React.FC = () => {
 
       <div className="max-w-7xl mx-auto">
         <AnimatePresence mode="wait">
+          {activeTab === 'dashboard' && (
+            <motion.div
+              key="advanced-dashboard"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <DashboardTab transactions={transactions} formatCurrency={formatCurrency} />
+            </motion.div>
+          )}
+
+          {activeTab === 'escrow' && (
+            <motion.div
+              key="advanced-escrow"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <EscrowTab formatCurrency={formatCurrency} />
+            </motion.div>
+          )}
+
+          {activeTab === 'earnings' && (
+            <motion.div
+              key="advanced-earnings"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <EarningsTab formatCurrency={formatCurrency} />
+            </motion.div>
+          )}
+
+          {activeTab === 'expenses' && (
+            <motion.div
+              key="advanced-expenses"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <ExpensesTab formatCurrency={formatCurrency} />
+            </motion.div>
+          )}
+
+          {activeTab === 'cases_finance' && (
+            <motion.div
+              key="advanced-cases-finance"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <CasesFinanceTab formatCurrency={formatCurrency} />
+            </motion.div>
+          )}
+
+          {activeTab === 'audit' && (
+            <motion.div
+              key="advanced-audit"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <AuditNotifyTab userRole={userRole} setUserRole={setUserRole} />
+            </motion.div>
+          )}
+
           {activeTab === 'journal' && (
             <motion.div 
               key="journal"
@@ -655,7 +755,7 @@ const FinancialManagementPage: React.FC = () => {
                 </div>
 
                 {/* Search & Filter */}
-                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 bg-white dark:bg-dm-card p-6 rounded-3xl border border-gray-100 dark:border-gray-800 shadow-xl no-print">
+                <div className="grid grid-cols-1 md:grid-cols-6 gap-4 bg-white dark:bg-dm-card p-6 rounded-[2rem] border border-gray-100 dark:border-gray-800 shadow-xl no-print">
                     <div className="md:col-span-2">
                         <Input 
                             placeholder="ابحث في التاريخ، الوصف، المستفيد..." 
@@ -694,7 +794,7 @@ const FinancialManagementPage: React.FC = () => {
                         {(startDate || endDate || filterType || searchQuery) && (
                             <button 
                                 onClick={() => { setStartDate(''); setEndDate(''); setFilterType(''); setSearchQuery(''); }}
-                                className="text-xs font-bold text-rose-500 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all"
+                                className="text-xs font-bold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 px-3 py-2 rounded-xl transition-all"
                             >
                                 مسح التصفية
                             </button>
@@ -703,65 +803,65 @@ const FinancialManagementPage: React.FC = () => {
                 </div>
 
                 {/* Desktop Table / Mobile Cards */}
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
+                <div className="bg-white dark:bg-dm-card rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto overflow-y-visible">
                         <table className="w-full text-right border-collapse">
                             <thead>
-                                <tr className="bg-gray-50/50 border-b border-gray-100">
-                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">التاريخ</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">النوع / التصنيف</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider">البيان</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-left">المبلغ</th>
-                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-center">التحكم</th>
+                                <tr className="bg-gray-50/50 dark:bg-slate-900/40 border-b border-gray-100 dark:border-gray-800">
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">التاريخ</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">النوع / التصنيف</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider">البيان</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider text-left">المبلغ</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-gray-400 dark:text-slate-500 uppercase tracking-wider text-center">التحكم</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
+                            <tbody className="divide-y divide-gray-50 dark:divide-slate-800/50">
                                 {filteredTransactions.map((tx) => (
-                                    <tr key={tx.id} className="hover:bg-gray-50/30 transition-colors group">
+                                    <tr key={tx.id} className="hover:bg-gray-50/30 dark:hover:bg-slate-900/30 transition-colors group">
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-gray-700">{tx.transactionDate}</span>
-                                                <span className="text-[10px] text-gray-400 font-mono italic">#{tx.id}</span>
+                                                <span className="text-sm font-bold text-gray-700 dark:text-slate-300">{tx.transactionDate}</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-slate-500 font-mono italic">#{tx.id}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex flex-col">
                                                 <Badge variant={tx.amount > 0 ? 'success' : 'danger'} size="sm" text={getTxTypeLabel(tx.type)} className="w-fit mb-1" />
-                                                <span className="text-[10px] text-gray-400 font-bold">{tx.category}</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-slate-500 font-bold">{tx.category}</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-medium text-gray-900 leading-relaxed">{tx.description}</span>
-                                                <span className="text-[10px] text-gray-500 flex items-center gap-1 mt-1">
+                                            <div className="flex flex-col flex-wrap max-w-lg">
+                                                <span className="text-sm font-medium text-gray-900 dark:text-slate-200 leading-relaxed break-words">{tx.description}</span>
+                                                <span className="text-[10px] text-gray-500 dark:text-slate-400 flex items-center gap-1 mt-1">
                                                     <UsersIcon className="w-3 h-3" />
                                                     {tx.vendorOrPayee || 'غير محدد'}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-left">
-                                            <span className={`text-sm font-black font-mono ${tx.amount > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                            <span className={`text-sm font-black font-mono ${tx.amount > 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                                 {tx.amount > 0 ? '+' : ''}{formatCurrency(tx.amount, tx.currency)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button 
-                                                    className="p-2 hover:bg-primary/5 rounded-full text-primary transition-all active:scale-90"
+                                                    className="p-2 hover:bg-primary/5 dark:hover:bg-primary/10 rounded-full text-primary dark:text-primary-light transition-all active:scale-90"
                                                     onClick={() => setSelectedTxForPreview(tx)}
                                                     title="معاينة وطباعة"
                                                 >
                                                     <PrinterIcon className="w-5 h-5" />
                                                 </button>
                                                 <button 
-                                                    className="p-2 hover:bg-amber-50 rounded-full text-amber-500 transition-all active:scale-90"
+                                                    className="p-2 hover:bg-amber-50 dark:hover:bg-amber-950/20 rounded-full text-amber-500 transition-all active:scale-90"
                                                     onClick={() => handleEdit(tx)}
                                                     title="تعديل"
                                                 >
                                                     <PencilIcon className="w-5 h-5" />
                                                 </button>
                                                 <button 
-                                                    className="p-2 hover:bg-rose-50 rounded-full text-rose-500 transition-all active:scale-90"
+                                                    className="p-2 hover:bg-rose-50 dark:hover:bg-rose-955/20 rounded-full text-rose-500 transition-all active:scale-90"
                                                     onClick={() => handleDelete(tx.id)}
                                                     title="حذف"
                                                 >
@@ -775,10 +875,10 @@ const FinancialManagementPage: React.FC = () => {
                         </table>
                     </div>
                     {filteredTransactions.length === 0 && (
-                        <div className="text-center py-20">
-                            <BanknotesIcon className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900">لا توجد سجلات مالية</h3>
-                            <p className="text-gray-400 text-sm">جرب تغيير معايير البحث أو أضف قيداً جديداً</p>
+                        <div className="text-center py-20 bg-white dark:bg-dm-card">
+                            <BanknotesIcon className="w-16 h-16 text-gray-200 dark:text-slate-700 mx-auto mb-4" />
+                            <h3 className="text-lg font-medium text-gray-900 dark:text-white">لا توجد سجلات مالية</h3>
+                            <p className="text-gray-400 dark:text-slate-500 text-sm">جرب تغيير معايير البحث أو أضف قيداً جديداً</p>
                         </div>
                     )}
                 </div>
@@ -939,85 +1039,12 @@ const FinancialManagementPage: React.FC = () => {
 
           {activeTab === 'invoices' && (
              <motion.div 
-               key="invoices"
+               key="advanced-invoices"
                initial={{ opacity: 0, y: 10 }}
                animate={{ opacity: 1, y: 0 }}
                exit={{ opacity: 0, y: -10 }}
-               className="space-y-8"
              >
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 no-print">
-                    {[
-                        { label: 'إجمالي المفوتر', value: 30200, icon: DocumentTextIcon, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                        { label: 'المحصل فعلياً', value: 5700, icon: CheckCircleIcon, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                        { label: 'بانتظار السداد', value: 8900, icon: ClockIcon, color: 'text-amber-600', bg: 'bg-amber-50' },
-                        { label: 'فواتير متأخرة', value: 15600, icon: ExclamationTriangleIcon, color: 'text-rose-600', bg: 'bg-rose-50' },
-                    ].map((s, i) => (
-                        <Card key={i} className="p-8 rounded-[2.5rem] border-none shadow-xl bg-white dark:bg-dm-card">
-                            <div className="flex justify-between items-start mb-6">
-                                <div className={`p-4 ${s.bg} ${s.color} rounded-2xl`}>
-                                    <s.icon className="w-6 h-6" />
-                                </div>
-                                <Badge variant="info" size="xs" text="2024" />
-                            </div>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">{s.label}</p>
-                            <h4 className="text-3xl font-black text-gray-900 dark:text-dm-text font-mono tracking-tighter">{formatCurrency(s.value)}</h4>
-                        </Card>
-                    ))}
-                </div>
-
-                <Card className="rounded-[3rem] overflow-hidden border-none shadow-xl bg-white dark:bg-dm-card">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-right" dir="rtl">
-                            <thead>
-                                <tr className="bg-gray-50/50 dark:bg-dm-background/50 border-b border-gray-100 dark:border-gray-800">
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">رقم الفاتورة</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">العميل والبيان</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">المبلغ</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">الاستحقاق</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">الحالة</th>
-                                    <th className="px-6 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">الإجراءات</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-                                {mockInvoices.map(inv => (
-                                    <tr key={inv.id} className="hover:bg-primary/5 transition-colors group">
-                                        <td className="px-6 py-5">
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-3 bg-gray-50 dark:bg-dm-background rounded-xl text-primary"><DocumentTextIcon className="w-5 h-5" /></div>
-                                                <span className="font-mono font-black text-xs">{inv.id}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-black text-gray-900 dark:text-dm-text">{inv.clientName}</span>
-                                                <span className="text-[10px] text-gray-400 font-bold">{inv.type}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5 text-left">
-                                            <span className="text-lg font-black text-primary font-mono">{formatCurrency(inv.amount)}</span>
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <span className="text-xs font-bold text-gray-400">{inv.dueDate}</span>
-                                        </td>
-                                        <td className="px-6 py-5 text-center">
-                                            <Badge 
-                                                variant={inv.status === 'paid' ? 'success' : inv.status === 'overdue' ? 'danger' : 'info'} 
-                                                size="sm" 
-                                                text={inv.status === 'paid' ? 'تم تحصيلها' : inv.status === 'overdue' ? 'متأخرة' : 'قيد الانتظار'} 
-                                            />
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <button className="p-2 hover:bg-white rounded-xl shadow-sm text-primary transition-all active:scale-90"><PrinterIcon className="w-5 h-5" /></button>
-                                                <button className="p-2 hover:bg-white rounded-xl shadow-sm text-gray-400 active:scale-90"><PencilIcon className="w-5 h-5" /></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </Card>
+                <InvoicesTab formatCurrency={formatCurrency} />
              </motion.div>
           )}
 
@@ -1367,80 +1394,7 @@ const FinancialManagementPage: React.FC = () => {
             </motion.div>
           )}
 
-          {activeTab === 'reports' && (
-            <motion.div 
-              key="reports"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-            >
-                {[
-                    { title: 'تقرير الأرباح والخسائر الربع سنوي', category: 'التقارير الرئيسية', icon: PresentationChartLineIcon, color: 'text-indigo-600' },
-                    { title: 'كشف ميزان المراجعة التفصيلي', category: 'المحاسبة القانونية', icon: ChartBarIcon, color: 'text-emerald-600' },
-                    { title: 'كشف التدفقات النقدية (Cash Flow)', category: 'الإدارة التشغيلية', icon: ArrowPathIcon, color: 'text-blue-600' },
-                    { title: 'تحليل المصاريف التشغيلية للمكتب', category: 'الكفاءة الإنفاقية', icon: BanknotesIcon, color: 'text-rose-600' },
-                    { title: 'تقرير أمانات الموكلين المعلقة', category: 'الالتزامات القانونية', icon: ShieldCheckIcon, color: 'text-amber-600' },
-                    { title: 'تقرير ضريبة القيمة المضافة المتوقع', category: 'الامتثال الضريبي', icon: DocumentTextIcon, color: 'text-violet-600' },
-                ].map((report, i) => (
-                    <Card key={i} className="p-10 rounded-[3rem] border-none shadow-xl bg-white dark:bg-dm-card group hover:shadow-2xl transition-all cursor-pointer relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-gray-50 dark:bg-dm-background rounded-full -translate-y-1/2 translate-x-1/2 group-hover:scale-150 transition-transform duration-700 opacity-50" />
-                        <div className={`p-5 rounded-2xl bg-gray-50 dark:bg-dm-background w-fit mb-8 ${report.color} group-hover:scale-110 transition-transform relative z-10`}>
-                            <report.icon className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-2xl font-black text-gray-900 dark:text-dm-text mb-2 tracking-tighter leading-tight relative z-10">{report.title}</h4>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest relative z-10">{report.category}</p>
-                        <div className="mt-10 pt-6 border-t border-gray-50 dark:border-gray-800 flex justify-between items-center relative z-10">
-                            <span className="text-xs font-black text-primary flex items-center gap-2">عرض وتصدير <ArrowUpRightIcon className="w-3 h-3" /></span>
-                            <PrinterIcon className="w-5 h-5 text-gray-300 hover:text-primary transition-colors" />
-                        </div>
-                    </Card>
-                ))}
-            </motion.div>
-          )}
 
-          {activeTab === 'documents' && (
-            <motion.div 
-              key="documents"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-8"
-            >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="md:col-span-1 p-8 rounded-[2.5rem] bg-indigo-600 text-white shadow-2xl shadow-indigo-500/20 flex flex-col justify-between min-h-[300px]">
-                        <div>
-                            <div className="p-4 bg-white/20 rounded-2xl w-fit mb-6"><DocumentTextIcon className="w-8 h-8" /></div>
-                            <h3 className="text-2xl font-black mb-2 tracking-tight">الأرشيف المالي</h3>
-                            <p className="text-indigo-100/70 text-xs font-medium leading-relaxed uppercase tracking-widest">Digital Financial Vault</p>
-                        </div>
-                        <Button className="bg-white text-indigo-600 rounded-2xl h-14 font-black shadow-xl">رفع مستند جديد</Button>
-                    </Card>
-
-                    <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[
-                            { name: 'فاتورة توريد حواسيب مركزية', date: '2024/05/10', size: '1.2MB' },
-                            { name: 'إيصال سداد رسوم قضائية #991', date: '2024/04/28', size: '0.4MB' },
-                            { name: 'عقد استشارات - شركة نفط الكويت', date: '2024/03/15', size: '4.8MB' },
-                            { name: 'كشف حساب بوبيان - الربع الأول', date: '2024/04/01', size: '2.1MB' },
-                            { name: 'مخالصة نهائية - مكتب العقارات', date: '2024/02/10', size: '0.9MB' },
-                            { name: 'قسيمة رواتب شهر مايو 2024', date: '2024/05/01', size: '3.5MB' },
-                        ].map((doc, idx) => (
-                            <Card key={idx} className="p-6 rounded-3xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-dm-card group hover:border-primary/30 hover:shadow-xl transition-all cursor-pointer">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div className="p-3 bg-gray-50 dark:bg-dm-background rounded-xl text-gray-400 group-hover:text-primary transition-colors">
-                                        <DocumentTextIcon className="w-6 h-6" />
-                                    </div>
-                                    <Badge variant="info" size="sm" text={doc.size} />
-                                </div>
-                                <h5 className="font-black text-gray-900 dark:text-dm-text text-sm truncate mb-1">{doc.name}</h5>
-                                <p className="text-[10px] text-gray-400 font-bold">{doc.date}</p>
-                            </Card>
-                        ))}
-                    </div>
-                </div>
-            </motion.div>
-          )}
 
           {activeTab === 'ai' && (
             <motion.div 

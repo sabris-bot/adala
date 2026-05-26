@@ -4,7 +4,8 @@ import {
     PropertyType, PropertyUnitStatus, LeaseAgreementStatus, RentPaymentFrequency, RentPaymentStatus,
     PropertyCategoryKuwait, PropertyUnitTypeKuwait, LeaseTermType, PaymentMethod,
     EvictionNoticeRecord, MaintenanceRequest, PropertyDocument,
-    MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PropertyDocumentType
+    MaintenanceCategory, MaintenancePriority, MaintenanceStatus, PropertyDocumentType,
+    Landlord, Broker, Complaint, PropertyExpense
 } from '../types';
 
 export const mockTenants: Tenant[] = [
@@ -325,5 +326,127 @@ export const mockPropertyDocuments: PropertyDocument[] = [
         uploadedAt: '2024-03-05',
         tags: ['تأمين', 'مجمع النور'],
         relatedCaseIds: ['1'], // Link to "مطالبة بتعويضات عن إخلال تعاقدي"
+    }
+];
+
+export const mockLandlords: Landlord[] = [
+    {
+        id: 'lnd1',
+        fullNameAr: 'الشيخ فهد الأحمد الصباح',
+        civilId: '275080912345',
+        phone: '99001122',
+        email: 'fahad@sabah.gov.kw',
+        bankName: 'بنك الكويت الوطني (NBK)',
+        bankAccountNumber: 'KW89NBK0000001234567890',
+        notes: 'مالك المحفظة الاستثمارية العقارية الكبرى بالسالمية وحولي.',
+        propertyIds: ['prop1', 'prop3'],
+        createdAt: '2023-01-10'
+    },
+    {
+        id: 'lnd2',
+        fullNameAr: 'شركة دار الاستثمار العقاري الكويتية',
+        civilId: '101234567',
+        phone: '22409000',
+        email: 'info@investdar.com.kw',
+        bankName: 'بيت التمويل الكويتي (KFH)',
+        bankAccountNumber: 'KW45KFH0000009876543210',
+        notes: 'الشريك المطور والمفوض الرسمي لإدارة مجمعات الفحيحيل والشويخ.',
+        propertyIds: ['prop2', 'prop4'],
+        createdAt: '2023-03-15'
+    }
+];
+
+export const mockBrokers: Broker[] = [
+    {
+        id: 'brk1',
+        fullNameAr: 'حمد جاسر العتيبي (مكتب ركاز العقاري)',
+        licenseNumber: 'BRK-2022-44',
+        phone: '66551100',
+        email: 'hamad@rekaz.com',
+        commissionRate: 1.5,
+        notes: 'الوسيط المعتمد للتسويق المكتبي لعقارات حولي والعاصمة.',
+        createdAt: '2023-05-20'
+    },
+    {
+        id: 'brk2',
+        fullNameAr: 'مستشار وساطة الغانم للعقارات المتميزة',
+        licenseNumber: 'BRK-2024-118',
+        phone: '55443322',
+        email: 'brokerage@alghanim.com',
+        commissionRate: 2.0,
+        notes: 'الوسيط العقاري الرسمي لشاليهات السرة وعقارات السكن الفاخر.',
+        createdAt: '2024-01-05'
+    }
+];
+
+export const mockComplaints: Complaint[] = [
+    {
+        id: 'cmp1',
+        tenantId: 't4',
+        tenantName: 'عبداللطيف حسن الجارالله',
+        propertyId: 'prop1',
+        propertyName: 'بناية النخيل السكنية',
+        unitId: 'u1c',
+        unitNumber: '3',
+        type: 'noise',
+        priority: 'medium',
+        description: 'شكوى من أعمال ترميم مفرطة وإزعاج صاخب بعد منتصف الليل من المستأجر المقابل في الطابق الثاني.',
+        status: 'in_progress',
+        createdAt: '2024-05-18'
+    },
+    {
+        id: 'cmp2',
+        tenantId: 't1',
+        tenantName: 'أحمد عبدالله محمد',
+        propertyId: 'prop1',
+        propertyName: 'بناية النخيل السكنية',
+        unitId: 'u1a',
+        unitNumber: '1',
+        type: 'maintenance_delay',
+        priority: 'high',
+        description: 'تأخر متكرر من الفني المعتمد في إصلاح تسريب مطبخ الشقة، مما تسبب في تلف طفيف بالديكور السفلي للجدار.',
+        status: 'resolved',
+        createdAt: '2024-04-20',
+        resolutionDate: '2024-04-24',
+        resolutionNotes: 'تم إيفاد شركة الصيانة السريعة وإصلاح التسريب وعزل الجدار بنجاح تام.'
+    }
+];
+
+export const mockPropertyExpenses: PropertyExpense[] = [
+    {
+        id: 'exp1',
+        propertyId: 'prop1',
+        propertyName: 'بناية النخيل السكنية',
+        expenseType: 'elevator',
+        amount: 350.000,
+        paymentDate: '2024-01-15',
+        recipientName: 'شركة مصاعد الخليج وميتسوبيشي',
+        paymentMethod: PaymentMethod.BANK_TRANSFER,
+        notes: 'رسوم عقد الصيانة ربع السنوي الشامل لقطع الغيار والمكابح الأساسية.',
+        createdAt: '2024-01-15'
+    },
+    {
+        id: 'exp2',
+        propertyId: 'prop3',
+        propertyName: 'مجمع النور التجاري',
+        expenseType: 'commission',
+        amount: 800.000,
+        paymentDate: '2024-03-10',
+        recipientName: 'مكتب ركاز العقاري (حمد جاسر العتيبي)',
+        paymentMethod: PaymentMethod.CHEQUE,
+        notes: 'عمولة وسيط عن تسويق وإبرام عقد تأجير المكاتب التجارية الكبرى.',
+        createdAt: '2024-03-10'
+    },
+    {
+        id: 'exp3',
+        propertyId: 'prop1',
+        propertyName: 'بناية النخيل السكنية',
+        expenseType: 'maintenance',
+        amount: 150.000,
+        paymentDate: '2024-04-18',
+        recipientName: 'شركة الصيانة السريعة للمقاولات العامة',
+        paymentMethod: PaymentMethod.CASH,
+        notes: 'أعمال عزل طارئة ومعالجة رطوبة بأسطح بناية النخيل.',
+        createdAt: '2024-04-18'
     }
 ];

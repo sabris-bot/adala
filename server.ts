@@ -17,7 +17,7 @@ async function startServer() {
   // --- Gemini Setup ---
   const API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
   const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-  const GEMINI_MODEL = "gemini-1.5-flash";
+  const GEMINI_MODEL = "gemini-3.5-flash";
 
   if (!ai) {
     console.warn("WARNING: GEMINI_API_KEY is not set. AI features will be disabled.");

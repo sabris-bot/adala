@@ -12,8 +12,24 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Card: React.FC<CardProps> = ({ title, icon, children, className = '', titleClassName = '', headerClassName = '', actions, ...props }) => {
+  // Filter out custom properties to prevent non-boolean/non-standard HTML DOM warnings
+  const domProps = Object.keys(props).reduce((acc, key) => {
+    if (
+      key === 'id' || 
+      key === 'style' || 
+      key === 'dir' || 
+      key.startsWith('onClick') || 
+      key.startsWith('onMouse') || 
+      key.startsWith('aria-') || 
+      key.startsWith('data-')
+    ) {
+      (acc as any)[key] = (props as any)[key];
+    }
+    return acc;
+  }, {} as React.HTMLAttributes<HTMLDivElement>);
+
   return (
-    <div className={`bg-neutral-card dark:bg-dm-card shadow-card hover:shadow-card-hover rounded-lg overflow-hidden transition-shadow duration-300 ${className}`} {...props}>
+    <div className={`bg-neutral-card dark:bg-dm-card shadow-card hover:shadow-card-hover rounded-lg overflow-hidden transition-shadow duration-300 ${className}`} {...domProps}>
       {(title || actions || icon) && (
         <div className={`p-4 sm:p-5 border-b border-gray-200 dark:border-secondary-dark/50 flex justify-between items-center ${headerClassName}`}>
           <div className="flex items-center gap-3">

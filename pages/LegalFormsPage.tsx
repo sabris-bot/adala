@@ -1,306 +1,209 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useToast } from '../components/ui/Toast';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'motion/react';
+import Card from '../components/ui/Card';
 import { 
-    PlusCircleIcon, 
-    SparklesIcon, 
-    MagnifyingGlassIcon, 
-    ChevronDownIcon, 
-    EyeIcon, 
-    DocumentDuplicateIcon, 
-    TrashIcon, 
-    PencilIcon, 
-    ClockIcon,
-    PaperClipIcon,
-    XIcon,
-    CheckCircleIcon,
-    InformationCircleIcon,
-    ArrowDownTrayIcon,
-    ArrowPathIcon,
-    CloudArrowUpIcon,
-    PrinterIcon,
-    Squares2X2Icon,
-    ListBulletIcon,
-    PlusIcon,
-    StarIcon,
-    ScaleIcon,
-    ClipboardDocumentCheckIcon,
-    ShieldCheckIcon,
-    GavelIcon,
-    BuildingLibraryIcon,
-    IdentificationIcon,
-    BriefcaseIcon,
-    LinkIcon,
-    ShareIcon,
-    SendIcon,
-    ChatBubbleLeftRightIcon
+    PlusCircleIcon, SparklesIcon, MagnifyingGlassIcon, ChevronDownIcon, EyeIcon, 
+    DocumentDuplicateIcon, TrashIcon, PencilIcon, ClockIcon, PaperClipIcon, XIcon,
+    CheckCircleIcon, InformationCircleIcon, ArrowDownTrayIcon, ArrowPathIcon,
+    CloudArrowUpIcon, PrinterIcon, Squares2X2Icon, ListBulletIcon, PlusIcon,
+    StarIcon, ScaleIcon, ClipboardDocumentCheckIcon, ShieldCheckIcon, GavelIcon,
+    BuildingLibraryIcon, IdentificationIcon, BriefcaseIcon, LinkIcon, ShareIcon,
+    SendIcon, ChatBubbleLeftRightIcon, HistoryIcon, CreditCardIcon
 } from '../constants';
 import PrintHeader from '../components/ui/PrintHeader';
+import { LegalResource, LegalResourceType, LawBranch, CountryCode } from '../types';
 import { 
-  LegalResource, 
-  LegalResourceType, 
-  LawBranch
-} from '../types';
-import { 
-  legalFormCategoryOptions, 
-  lawBranchOptions, 
-  countryOptions 
+    legalFormCategoryOptions, 
+    lawBranchOptions, 
+    countryOptions 
 } from '../constants';
 import { geminiService } from '../services/geminiService';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import Input from '../components/ui/Input';
+import Select from '../components/ui/Select';
+import TextArea from '../components/ui/TextArea';
 
-// --- MOCK DATA ---
+// --- RICH COMPREHENSIVE REGIONAL WORKSPACE LEGAL TEMPLATES ---
 const INITIAL_LEGAL_FORMS: LegalResource[] = [
   {
     id: 'financial-claim-suit',
-    title: 'صحيفة دعوى مطالبة مالية (ندب خبير)',
+    title: 'صحيفة دعوى مطالبة مالية واعتداد بنظام ندب الخبير الكويتي',
     type: LegalResourceType.TEMPLATE,
     category: 'LITIGATION',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-05-15',
-    keywords: ['مطالبة مالية', 'قيد دعوى', 'ندب خبير', 'صحيفة جدي'],
-    description: 'صحيفة دعوى نموذجية للمطالبة بمبالغ مالية ناشئة عن عقد مقاولة أو توريد مع طلب ندب خبير حسابي وفني.',
-    contentTemplate: `بناء على طلب السيد/ {{اسم_المدعي}} - المقيم في {{عنوان_المدعي}} - ومحله المختارة مكتب الأستاذ/ صبري شطا للمحاماة الكائن بمجمع الوزارات.
-أنا محضر محكمة {{المحكمة}} قد انتقلت وأعلنت:
-السيد/ {{المدعى_عليه}} المقيم في {{عنوان_المدعى_عليه}}.
+    country: 'KW' as CountryCode,
+    publishDate: '2026-05-15',
+    keywords: ['مطالبة مالية', 'قيد دعوى', 'ندب خبير', 'الكويت', 'مقاولة'],
+    description: 'صحيفة دعوى نموذجية لمقاضاة الشركات والأفراد المتخلفين عن سداد عقود التوريد والمقاولات مع إرفاق طلب ندب قضاة الدائرة ومحاسب عدلي المنتدب.',
+    contentTemplate: `إنه في يوم الكائن الموافق لعام ٢٠٢٦، بناءً على طلب السيد/ {{اسم_المدعي}}، المقيم في {{عنوان_المدعي}}، ورقم هويته المدنية {{الهوية_المدنية}}، ومحله المختار مكتب المستشار صبري شطا للمحاماة بمجمع محاكم الرقعي.
+أنا محضر محكمة {{المحكمة_الجزئية}} الكلية بدولة الكويت قد انتقلت وأعلنت:
+السيد/ {{المدعى_عليه}}، المقيم في {{عنوان_المدعى_عليه}}، والمطالب بأداء المستحقات موضوع النزاع.
 
 الموضوع:
-بموجب عقد {{نوع_العقد}} المؤرخ في {{تاريخ_العقد}}، التزم المدعى عليه بسداد مبلغ {{المبلغ}} د.ك مقابل {{الخدمة_المقدمة}}. وحيث أن المدعى عليه قد نكل عن السداد رغم الوفاء بالالتزامات من طرف المدعي.
-
-بناء عليه:
-نطالب بالحكم بـ:
-1. ندب خبير في الدعوى لبيان وجه الحق وحساب المبالغ المستحقة.
-2. إلزام المدعى عليه بأن يؤدي للمدعي مبلغ {{المبلغ}} د.ك والفوائد القانونية بواقع 7% من تاريخ المطالبة القضائية.
-3. إلزامه بالمصروفات وأتعاب المحاماة الفعلية.`,
-    variables: ['اسم_المدعي', 'عنوان_المدعي', 'المحكمة', 'المدعى_عليه', 'عنوان_المدعى_عليه', 'نوع_العقد', 'تاريخ_العقد', 'المبلغ', 'الخدمة_المقدمة'],
-    instructions: 'يجب إرفاق أصل العقد وكشف الحساب وأي مراسلات تثبيت المديونية عند القيد.'
-  },
-  {
-    id: 'performance-order-grievance',
-    title: 'تظلم من أمر أداء (مدني / تجاري)',
-    type: LegalResourceType.TEMPLATE,
-    category: 'LITIGATION',
-    lawBranch: LawBranch.COMMERCIAL,
-    publishDate: '2024-05-18',
-    keywords: ['تظلم', 'أمر أداء', 'سقوط الأمر', 'مرافعات'],
-    description: 'نموذج التظلم من أوامر الأداء الصادرة بغير حق أو بالمخالفة للإجراءات القانونية المنصوص عليها في قانون المرافعات الكويتي.',
-    contentTemplate: `بناء على طلب السيد/ {{اسم_المتظلم}} - المقيم في {{عنوان_المتظلم}}...
-أنا محضر محكمة {{المحكمة}} قد انتقلت وأعلنت:
-السيد/ {{المتظلم_ضده}} المقيم في {{عنوان_المتظلم_ضده}}.
-
-الموضوع:
-يتظلم الطالب من أمر الأداء رقم {{رقم_الأمر}} الصادر بتاريخ {{تاريخ_صدور_الأمر}} بمبلغ {{المبلغ}} د.ك.
-أسباب التظلم:
-1. عدم توافر شروط استصدار أمر الأداء (الدين غير معلوم القيمة أو غير حال الأداء).
-2. سقو امر الأداء لعدم إعلانه خلال الميعاد القانوني.
-3. بطلان الإعلان لعدم تسليمه لشخص المتظلم.
-
-بناء عليه:
-نطالب بقبول التظلم شكلاً، وفي الموضوع بإلغاء أمر الأداء المتظلم منه واعتباره كأن لم يكن مع كافة ما يترتب على ذلك من آثار.`,
-    variables: ['اسم_المتظلم', 'عنوان_المتظلم', 'المحكمة', 'المتظلم_ضده', 'عنوان_المتظلم_ضده', 'رقم_الأمر', 'تاريخ_صدور_الأمر', 'المبلغ'],
-    instructions: 'ميعاد التظلم هو 10 أيام من تاريخ إعلان أمر الأداء وفقاً للقانون الكويتي.'
-  },
-  {
-    id: 'labor-contract-fixed',
-    title: 'عقد عمل محدد المدة (القطاع الأهلي الكويتي)',
-    type: LegalResourceType.TEMPLATE,
-    category: 'CONTRACTS',
-    lawBranch: LawBranch.LABOR,
-    publishDate: '2024-01-15',
-    keywords: ['عقد عمل', 'قطاع أهلي', 'كويت', 'محدد المدة'],
-    description: 'نموذج عقد عمل متوافق مع القانون رقم 6 لسنة 2010 بشأن العمل في القطاع الأهلي، يشمل كافة البنود الجوهرية.',
-    contentTemplate: `عقد عمل محدد المدة (القطاع الأهلي)
-
-إنه في يوم {{التاريخ}}، تم الاتفاق بين كل من:
-طرف أول: شركة {{اسم_الشركة}}، ويمثلها السيد/ {{المفوض}} بصفتها رب العمل.
-طرف ثاني: السيد/ {{اسم_الموظف}}، {{الجنسية}} الجنسية، يحمل بطاقة مدنية رقم {{الرقم_المدني}}.
-
-اتفق الطرفان على ما يلي:
-1. يعمل الطرف الثاني لدى الطرف الأول بمهنة {{المهنة}}.
-2. مدة هذا العقد {{المدة}}، تبدأ من تاريخ {{تاريخ_المباشرة}}.
-3. يتقاضى الطرف الثاني أجراً شهرياً قدره {{الراتب}} دينار كويتي.
-4. يحكم هذا العقد قانون العمل الكويتي رقم 6/2010 وتعديلاته.`,
-    variables: ['التاريخ', 'اسم_الشركة', 'المفوض', 'اسم_الموظف', 'الجنسية', 'الرقم_المدني', 'المهنة', 'المدة', 'تاريخ_المباشرة', 'الراتب'],
-    instructions: 'يجب توقيع العقد من ثلاث نسخ، نسخة لكل طرف ونسخة تودع لدى الهيئة العامة للقوى العاملة.'
-  },
-  {
-    id: 'eviction-suit',
-    title: 'صحيفة دعوى طرد للغصب بغير سند قانوني',
-    type: LegalResourceType.TEMPLATE,
-    category: 'LITIGATION',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-02-10',
-    keywords: ['دعوى طرد', 'غصب', 'حيازة', 'صحيفة دعوى'],
-    description: 'صيغة دعوى طرد الغاصب لعدم وجود سند قانوني للحيازة، مع طلب التعويض عن فترة الغصب.',
-    contentTemplate: `صحيفة دعوى طرد للغصب
-
-أنا {{المحضر}} محضر محكمة {{المحكمة}} قد انتقلت وأعلنت:
-السيد/ {{المدعى_عليه}} المقيم في {{عنوان_المدعى_عليه}}.
-
-الموضوع:
-الطالب يمتلك العقار الموصوف بـ {{وصف_العقار}} بموجب وثيقة التملك رقم {{رقم_الوثيقة}}. وقد قام المعلن إليه بوضع يده على العقار والانتفاع به دون وجه حق وبدون موافقة صاحب الشأن.
+بموجب العقد المؤرخ في {{تاريخ_العقد}}، التزم المعلن إليه الأول (المدعى عليه) بأن يؤدي للمدعي مبلغاً وقدره {{المبلغ}} دينار كويتي مقابل {{الخدمة_المقدمة}}. ويشترط المدعي سداد المديونية فور التسليم وهو ما تم توثيقه. وحيث تقاعس المدعى عليه وغلت يده عن الوفاء رغم الإنذارات الرسمية.
 
 بناءً عليه:
-نطالب بالحكم بطرد المعلن إليه من العين الموضحة بصدر الصحيفة وتسليمها للطالب خالية من الأشخاص والشواغل، مع إلزامه بالتعويض عن فترة الغصب بواقع {{مبلغ_التعويض_الشهري}} شهرياً.`,
-    variables: ['المحضر', 'المحكمة', 'المدعى_عليه', 'عنوان_المدعى_عليه', 'وصف_العقار', 'رقم_الوثيقة', 'مبلغ_التعويض_الشهري'],
-    instructions: 'يُشترط في هذه الدعوى إثبات واقعة الغصب وعدم وجود رابطة تعاقدية.'
+أنا المحضر سالف الذكر قد انتقلت وسلمت المعلن إليه صورة من هذه الصحيفة وكلفته الحضور للمثول أمام محكمة الكويت الكلية للحكم بـ:
+أولاً: ندب خبير هندسي وحسابي من وزارة العدل لتصفية الحساب بين الطرفين.
+ثانياً: إلزام المدعى عليه بسداد مبلغ {{المبلغ}} د.ك مع الفائدة القانونية 7%.
+ثالثاً: إلزام المدعى عليه بمصاريف المذكرة وأتعاب المحاماة الفعلية.`,
+    variables: ['اسم_المدعي', 'عنوان_المدعي', 'الهوية_المدنية', 'المحكمة_الجزئية', 'المدعى_عليه', 'عنوان_المدعى_عليه', 'تاريخ_العقد', 'المبلغ', 'الخدمة_المقدمة'],
+    instructions: 'يجب تقديم أصل العقد المالي بالإضافة إلى كشف الحساب المصرفي المعتد به ورسوم القضية بقيمة ٢ % من المديونية.'
   },
   {
-    id: 'appeal-suit-financial',
-    title: 'صحيفة استئناف حكم أول درجة (مطالبة مالية)',
+    id: 'ksa-lease-agreement',
+    title: 'عقد إيجار عقار سكني موحد (المقاصد المدنية السعودية والخليجية)',
+    type: LegalResourceType.TEMPLATE,
+    category: 'REAL_ESTATE',
+    country: 'SA' as CountryCode,
+    publishDate: '2026-03-10',
+    keywords: ['عقد إيجار', 'السعودية', 'ترخيص عقاري', 'سكن متكامل'],
+    description: 'النموذج القياسي لعقود الإيجار السكنية المتكاملة مع بيان بنود الصيانة، المقابل السنوي، وتأمين التلفيات.',
+    contentTemplate: `بعون الله وتوفيقه، تم إبرام هذا العقد بالرياض بين:
+الطرف الأول (المؤجر): السيد/ {{اسم_المؤجر}}، المقيم في {{مقر_المؤجر}}، الحامل لبطاقة هويته الوطنية رقم {{هوية_المؤجر}}.
+الطرف الثاني (المستأجر): السيد/ {{اسم_المستأجر}}، المقيم في {{عنوان_المستأجر}}، الحامل لهوية وطنية سارية {{هوية_المستأجر}}.
+
+موضوع الإيجار وبنود التعاقد:
+أجر الطرف الأول للطرف الثاني الوحدة السكنية رقم {{رقم_الشقة}} الكائنة بعمارة {{اسم_العقار}} بحي {{الحي}} لمدة سنة تبدأ من {{تاريخ_البدء}}.
+يلتزم المستأجر بسداد المقابل الإيجاري الإجمالي وقدره {{القيمة_السنوية}} ريال سعودي مقسطة على {{عدد_الدفعات}} دفعات دورية. 
+كما يتعهد بدفع تأمين ضمان تلفيات بقيمة {{مبلغ_التأمين}} ريال يُرد عند الإخلاء وتسليم العين المؤجرة بحالتها الأصلية الخالية من الأضرار الجسيمة.
+
+التوقيعات:
+توقيع المؤجر: __________________
+توقيع المستأجر: __________________`,
+    variables: ['اسم_المؤجر', 'مقر_المؤجر', 'هوية_المؤجر', 'اسم_المستأجر', 'عنوان_المستأجر', 'هوية_المستأجر', 'رقم_الشقة', 'اسم_العقار', 'الحي', 'تاريخ_البدء', 'القيمة_السنوية', 'عدد_الدفعات', 'مبلغ_التأمين'],
+    instructions: 'يسجل هذا العقد فور التوقيع في شبكة إيجار الوطنية لضمان اعتماده سنداً تنفيذياً أمام قاضي التنفيذ.'
+  },
+  {
+    id: 'hr-disciplinary-warning',
+    title: 'إنذار تأديبي بفصل موظف ولائحة تحقيق داخلي (قوانين العمل)',
+    type: LegalResourceType.TEMPLATE,
+    category: 'HR',
+    country: 'KW' as CountryCode,
+    publishDate: '2026-04-20',
+    keywords: ['إنذار موظف', 'تحقيق تأديبي', 'قانون العمل الكويتي', 'الغياب'],
+    description: 'نموذج الإنذار التأديبي الأول للموظف المتغيب عن العمل أو المخل بسلوكه الوظيفي، متوافقاً مع المادة 85 من قانون العمل الكويتي.',
+    contentTemplate: `إدارة الموارد البشرية والشؤون القانونية بـ {{اسم_المنشأة}}
+التاريخ الفعلي: {{تاريخ_الإنذار}}
+
+إنذار رسمي أول بالتقيد والالتزام بوجه العمل
+إلى السيد الموظف/ {{اسم_الموظف}}، بوظيفة {{المسمى_الوظيفي}}، بالقسم {{الإدارة}}.
+
+بموجب هذا المستند القانوني، نوجه لسيادتكم إنذاراً رسمياً أولاً بسبب تفريطكم وإخلالكم بواجبات الخدمة الموكلة لكم والمتمثلة في: {{بند_المخالفة}} وذلك في تاريخ {{تاريخ_الواقعة}}.
+وحيث أن هذا السلوك مخل باللوائح والأنظمة الداخلية للشركة ومخالف لأحكام المادة 85 من قانون العمل الكويتي رقم 6 لسنة 2010.
+
+بناءً عليه:
+يتوجب عليكم الحضور أمام لجنة الشؤون القانونية والتحقيق بالمنشأة بجلسة يوم {{تاريخ_جلسة_التحقيق}} في تمام الساعة {{ساعة_الجلسة}} لسماع أقوالكم ودفاعكم.
+في حالة تخلفكم أو الإحجام عن تبرير هذا التقاعس، ستقوم الشركة بإنهاء خدماتكم فوراً مع حرمانكم من مستحقات مكافأة نهاية الخدمة طبقاً للوائح النافذة.
+
+المعتمد القانوني للمنشأة: __________________`,
+    variables: ['اسم_المنشأة', 'تاريخ_الإنذار', 'اسم_الموظف', 'المسمى_الوظيفي', 'الإدارة', 'بند_المخالفة', 'تاريخ_الواقعة', 'تاريخ_جلسة_التحقيق', 'ساعة_الجلسة'],
+    instructions: 'يسلم هذا الإنذار للموظف يداً بيد أو يرسل بخطاب مسجل بعلم الوصول على عنوانه الثابت بملفه المكتبي خلال خمسة أيام كأقصى حد.'
+  },
+  {
+    id: 'egypt-performance-order',
+    title: 'طلب أمر أداء مستعجل برسم الوفاء بقيمة كمبيالة (القانون المصري)',
     type: LegalResourceType.TEMPLATE,
     category: 'LITIGATION',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-03-05',
-    keywords: ['استئناف', 'حكم', 'مطالبة مالية', 'نقض'],
-    description: 'نموذج صحيفة استئناف شاملة لأسباب الطعن على أحكام أول درجة في القضايا المالية والمدنية.',
-    contentTemplate: `صحيفة استئناف حكم
+    country: 'EG' as CountryCode,
+    publishDate: '2026-02-18',
+    keywords: ['أمر أداء', 'كمبيالة', 'القانون المصري', 'قاضي الأمور المستعجلة'],
+    description: 'طلب موجه لقاضي الأمور الوقتية لإصدار قرار تنفيذي فوري بدفع كمبيالة مستحقة ومعلومة المقدار وثابتة بالكتابة.',
+    contentTemplate: `السيد الأستاذ المستشار/ رئيس محكمة {{المحكمة_المصرية}} الجزئية بصفته قاضياً للأمور الوقتية.
+مقدمه لسيادتكم الأستاذ/ صبري شطا المحامي، الوكيل عن السيد/ {{اسم_الدائن}} بموجب توكيل رسمي عام قضايا {{رقم_التوكيل}}.
 
-أمام محكمة الاستئناف العليا الكلية
-بصفتها استئنافية
-الدائرة: {{رقم_الدائرة}}
+ضد:
+السيد/ {{اسم_المدين}}، المقيم في {{عنوان_المدين}}، والمهنة {{مهنة_المدين}}.
 
-الموضوع:
-استئناف الحكم الصادر في الدعوى رقم {{رقم_دعوى_أول_درجة}} والقاضي بـ {{منطوق_الحكم}}.
+الوقائع والأسباب:
+تتمثل مطالبة الطالب بإحدى الديون المدنية الثابتة بالكتابة وحالّة الأداء بموجب {{سند_الدين}} المؤرخ في {{تاريخ_سند_الدين}} والذي وقع عليه المنذر إليه بقيمة مالية جوهرية وقدرها {{مبلغ_الدين}} جنيه مصري.
+وحيث أن الطالب قد وجه تكليفاً رسمياً بالوفاء للمدين بموجب إنذار على يد محضر في تاريخ {{تاريخ_الإنذار_المسبق}}، إلا أنه تمنع عن السداد متعمداً الإضرار بالحق المالي.
 
-أسباب الاستئناف:
-1. الخطأ في تطبيق القانون وتأويله.
-2. القصور في التسبيب والفساد في الاستدلال.
-3. عدم الاعتداد بالمستندات المقدمة من المستأنف.
-
-الطلبات:
-قبول الاستئناف شكلاً، وفي الموضوع بإلغاء الحكم المستأنف والقضاء مجدداً بـ {{الطلبات_الجديدة}}.`,
-    variables: ['رقم_الدائرة', 'رقم_دعوى_أول_درجة', 'منطوق_الحكم', 'الطلبات_الجديدة'],
-    instructions: 'يجب مراعاة المواعيد القانونية للاستئناف (30 يوماً من تاريخ صدور الحكم أو الإعلان به).'
-  },
-  {
-    id: 'agm-minutes',
-    title: 'محضر اجتماع الجمعية العامة العادية لشركة مساهمة',
-    type: LegalResourceType.TEMPLATE,
-    category: 'CORPORATE',
-    lawBranch: LawBranch.COMMERCIAL,
-    publishDate: '2024-03-12',
-    keywords: ['محضر اجتماع', 'الجمعية العامة', 'شركة مساهمة', 'حسابات'],
-    description: 'نموذج رسمي لمحضر اجتماع الجمعية العامة العادية لمناقشة التقرير السنوي والبيانات المالية وتوزيع الأرباح.',
-    contentTemplate: `محضر اجتماع الجمعية العامة العادية لشركة {{اسم_الشركة}} (ش.م.ك)
-
-في يوم {{اليوم}} الموافق {{التاريخ}}، وفي تمام الساعة {{الساعة}}، انعقدت الجمعية العامة العادية للشركة بمقرها الكائن في {{المكان}}، بحضور مساهمين يمثلون {{نسبة_الحضور}}% من رأس المال.
-
-جدول الأعمال:
-1. سماع تقرير مجلس الإدارة عن السنة المالية المنتهية في {{تاريخ_السنة_المالية}}.
-2. المصادقة على الميزانية العمومية وحساب الأرباح والخسائر.
-3. إبراء ذمة أعضاء مجلس الإدارة.
-
-القرارات:
-- وافقت الجمعية بالإجماع على كافة بنود جدول الأعمال وتوزيع أرباح نقدية بنسبة {{نسبة_الأرباح}}%.`,
-    variables: ['اسم_الشركة', 'اليوم', 'التاريخ', 'الساعة', 'المكان', 'نسبة_الحضور', 'تاريخ_السنة_المالية', 'نسبة_الأرباح'],
-    instructions: 'يجب تقديم المحضر لوزارة التجارة والصناعة خلال المواعيد المحددة قانوناً.'
-  },
-  {
-    id: 'residency-transfer',
-    title: 'طلب تحويل إقامة (الهيئة العامة للقوى العاملة)',
-    type: LegalResourceType.TEMPLATE,
-    category: 'LABOR',
-    lawBranch: LawBranch.LABOR,
-    publishDate: '2024-04-18',
-    keywords: ['تحويل إقامة', 'قوى عاملة', 'شؤون', 'موظفين'],
-    description: 'نموذج إداري قانوني لطلب تحويل إقامة موظف من كفيل إلى كفيل آخر وفقاً للنظم اللوائحية الحالية.',
-    contentTemplate: `طلب تحويل إقامة
-
-السيد/ مدير إدارة العمل بمحافظة {{المحافظة}} المحترم،
-تحية طيبة وبعد،،
-
-نحيطكم علماً بأننا شركة {{الكفيل_الجديد}} نرغب في تحويل إقامة السيد/ {{اسم_الموظف}}، {{الجنسية}} الجنسية، رقم مدني {{الرقم_المدني}}، للعمل لدينا بمهنة {{المهنة}}.
-علماً بأن صاحب العمل الحالي {{الكفيل_الحالي}} قد أبدى عدم ممانعته على التحويل.
-
-نرجو من سيادتكم الموافقة على الطلب واستكمال الإجراءات.`,
-    variables: ['المحافظة', 'الكفيل_الجديد', 'اسم_الموظف', 'الجنسية', 'الرقم_المدني', 'المهنة', 'الكفيل_الحالي'],
-    instructions: 'يتطلب هذا الإجراء موافقة صاحب العمل السابق أو مرور المدة القانونية في بعض الحالات.'
-  },
-  {
-    id: 'notary-notice',
-    title: 'إخطار عدلي بفسخ عقد للإخلال بالالتزامات',
-    type: LegalResourceType.TEMPLATE,
-    category: 'LITIGATION',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-04-10',
-    keywords: ['إخطار عدلي', 'إنذار رسمي', 'فسخ عقد', 'إخلال'],
-    description: 'صيغة إنذار رسمي يتم توجيهه عن طريق كاتب العدل للمطالبة بتنفيذ التزام أو إعلان فسخ عقد.',
-    contentTemplate: `إنذار رسمي (عن طريق كاتب العدل)
-
-بناءً على طلب السيد/ {{المنذر}} المقيم في {{عنوان_المنذر}}.
-أنا {{المحضر}} محضر محكمة {{اسم_المحكمة}} قد انتقلت إلى:
-المعلن إليه: {{المنذر_إليه}} المقيم في {{عنوان_المنذر_إليه}}.
-
-وأنذرته بالآتي:
-بموجب العقد المؤرخ في {{تاريخ_العقد}}، التزمتم بـ {{الالتزام_المخالف}}. وحيث أنكم قد أخللتم بهذا الالتزام رغم المطالبات الودية، فإن المنذر ينبه عليكم بضرورة التنفيذ خلال {{مهلة_التنفيذ}}، وإلا سيتم اعتبار العقد مفسوخاً من تلقاء نفسه مع المطالبة بالتعويض.`,
-    variables: ['المنذر', 'عنوان_المنذر', 'المحضر', 'اسم_المحكمة', 'المنذر_إليه', 'عنوان_المنذر_إليه', 'تاريخ_العقد', 'الالتزام_المخالف', 'مهلة_التنفيذ'],
-    instructions: 'يتم تقديم هذا الإنذار إلى إدارة التنفيذ بوزارة العدل لتوجيهه رسمياً.'
-  },
-  {
-    id: 'form-6',
-    title: 'عقد إيجار سكن خاص (وفق القانون الكويتي)',
-    type: LegalResourceType.TEMPLATE,
-    category: 'CONTRACTS',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-01-20',
-    keywords: ['إيجار', 'سكني', 'عقد'],
-    description: 'نموذج عقد إيجار لشقة أو فيلا سكنية يتضمن كافة البنود التي تحمي المؤجر والمستأجر.',
-    contentTemplate: `عقد إيجار سكن خاص
-
-أولاً: السيد / {{المؤجر}} (طرف أول)
-ثانياً: السيد / {{المستأجر}} (طرف ثاني)
-
-المادة (1): أجر الطرف الأول للطرف الثاني {{وصف_العين_المؤجرة}} الكائنة في {{منطقة_العقار}}.
-المادة (2): القيمة الإيجارية الشهرية هي {{الآجر_الشهري}} د.ك تدفع في موعد غايته اليوم {{يوم_الدفع}} من كل شهر.
-المادة (3): مدة العقد {{مدة_العقد}} تبدأ من تاريخ التسلم.`,
-    variables: ['المؤجر', 'المستأجر', 'وصف_العين_المؤجرة', 'منطقة_العقار', 'الآجر_الشهري', 'يوم_الدفع', 'مدة_العقد'],
-    instructions: 'يُنصح بسداد الإيجار عبر تحويل بنكي أو الحصول على وصولات رسمية موفعة لتفادي أي نزاع مستقبلي.'
-  },
-  {
-    id: 'form-7',
-    title: 'وكالة عامة رسمية (شاملة لكافة التصرفات)',
-    type: LegalResourceType.TEMPLATE,
-    category: 'POWERS_OF_ATTORNEY',
-    lawBranch: LawBranch.CIVIL,
-    publishDate: '2024-04-15',
-    keywords: ['وكالة عامة', 'وزارة العدل', 'تفويض'],
-    description: 'نموذج وكالة عامة رسمية تتيح للوكيل تمثيل الموکل أمام كافة الجهات الحكومية والغير وبيع شراء العقارات.',
-    contentTemplate: `وكالة عامة
-
-أنا الموقع أدناه:
-السيد / {{الموكل}} - جنسيته {{جنسية_الموكل}} - يحمل بطاقة مدنية رقم {{مدني_الموكل}}
-قد وكلت عني:
-السيد / {{الوكيل}} - جنسيته {{جنسية_الوكيل}} - يحمل بطاقة مدنية رقم {{مدني_الوكيل}}
-
-وذلك لينوب عني ويمثلني في القيام بكافة الأعمال والتصرفات القانونية...
-بما في ذلك البيع والشراء والرهن والقبض والتوقيع على كافة العقود...
-وتمثيلي أمام محاكم الكويت بجميع درجاتها أنواعها...`,
-    variables: ['الموكل', 'جنسية_الموكل', 'مدني_الموكل', 'الوكيل', 'جنسية_الوكيل', 'مدني_الوكيل'],
-    instructions: 'يجب إصدار هذه الوكالة رسمياً أمام كاتب العدل بوزارة العدل، ويُنصح بتحديد صلاحياتها بدقة لتفادي إساءة الاستخدام.'
+لذلك:
+نلتمس من سيادتكم إصدار أمركم العادل لـ:
+أولاً: إلزام المدين بأن يؤدي للطالب مبلغ وقدره {{مبلغ_الدين}} ج.م والفوائد القانونية بواقع 4% من تاريخ استحقاق الدين.
+ثانياً: شمول الأمر بالنفاذ المعجل بلا كفالة وبالمصاريف الفعلية.`,
+    variables: ['المحكمة_المصرية', 'اسم_الدائن', 'رقم_التوكيل', 'اسم_المدين', 'عنوان_المدين', 'مهنة_المدين', 'سند_الدين', 'تاريخ_سند_الدين', 'مبلغ_الدين', 'تاريخ_الإنذار_المسبق'],
+    instructions: 'يرفق بالطلب أصل الكمبيالة أو السند المكتوب بالإضافة إلى أصل التكليف بالوفاء المسلم يداً بيد أو الموجه رسمياً.'
   }
 ];
 
-// --- COMPONENTS ---
+// --- DOCUMENT VERSION INTERFACE ---
+interface DocVersion {
+  id: string;
+  timestamp: string;
+  userName: string;
+  content: string;
+  changesNote: string;
+}
 
 const LegalFormsPage: React.FC = () => {
   const { addToast } = useToast();
+  const { t, i18n } = useTranslation();
+  const isRtl = i18n.language === 'ar';
   const [activeTab, setActiveTab] = useState<'browse' | 'generate' | 'upload'>('browse');
-  const [forms, setForms] = useState<LegalResource[]>(INITIAL_LEGAL_FORMS);
+  
+  // Storage State Customizer
+  const [forms, setForms] = useState<LegalResource[]>(() => {
+    const saved = localStorage.getItem('qanooni_templates_forms');
+    return saved ? JSON.parse(saved) : INITIAL_LEGAL_FORMS;
+  });
+
+  const [favorites, setFavorites] = useState<string[]>(() => {
+     const saved = localStorage.getItem('qanooni_favorites_forms');
+     return saved ? JSON.parse(saved) : ['financial-claim-suit'];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('qanooni_templates_forms', JSON.stringify(forms));
+  }, [forms]);
+
+  useEffect(() => {
+     localStorage.setItem('qanooni_favorites_forms', JSON.stringify(favorites));
+  }, [favorites]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [filterCategory, setFilterCategory] = useState<string>('');
+  const [filterCountry, setFilterCountry] = useState<CountryCode | ''>('');
+
+  // AI-Generation Mode
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
   const [generatedResult, setGeneratedResult] = useState<any>(null);
-  const [selectedFile, setSelectedFile] = useState<{base64: string, type: string, name: string} | null>(null);
+
+  // Split-Screen Customizer Model State
   const [selectedFormForPreview, setSelectedFormForPreview] = useState<LegalResource | null>(null);
   const [editingContent, setEditingContent] = useState('');
+  const [variableBindings, setVariableBindings] = useState<Record<string, string>>({});
+  
+  // Custom Signatures & Ink configuration
+  const [customSignatures, setCustomSignatures] = useState({
+    partyOneSign: '',
+    partyTwoSign: 'صبري شطا (المستشار)',
+    stampSelection: 'shata' as 'shata' | 'outbound' | 'approved' | 'confidential',
+    showStamp: true,
+    showWatermark: true,
+    customFieldLabel: '',
+    customFieldValue: ''
+  });
+
+  // Version Control History inside the editor
+  const [documentVersions, setDocumentVersions] = useState<DocVersion[]>([]);
+  const [compareVersionId, setCompareVersionId] = useState<string>('');
+  const [isCompareMode, setIsCompareMode] = useState<boolean>(false);
+
+  // Manual Template Uploading Form State
   const [uploadData, setUploadData] = useState({
     title: '',
     category: 'CONTRACTS',
+    country: 'KW' as CountryCode,
     description: '',
-    content: ''
+    contentTemplate: '',
+    keywordsAr: 'مطالبة، عقد بيع، الكويت',
+    variablesAr: 'اسم_المدعي، المبلغ_المطلوب',
+    instructions: 'يرجى مراجعة قانون العمل وإقرار الوفاء قبل ملء هذا السند.'
   });
   const [isUploading, setIsUploading] = useState(false);
 
@@ -309,671 +212,811 @@ const LegalFormsPage: React.FC = () => {
       const matchesSearch = f.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                            f.keywords.some(k => k.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = !filterCategory || f.category === filterCategory;
-      return matchesSearch && matchesCategory;
+      const matchesCountry = !filterCountry || f.country === filterCountry;
+      return matchesSearch && matchesCategory && matchesCountry;
     });
-  }, [forms, searchQuery, filterCategory]);
+  }, [forms, searchQuery, filterCategory, filterCountry]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        setSelectedFile({
-          base64: (reader.result as string).split(',')[1],
-          type: file.type,
-          name: file.name
+  // Handle adding template manually 
+  const handleCreateTemplateSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!uploadData.title || !uploadData.contentTemplate) {
+        addToast({
+            type: 'warning',
+            title: 'حقول فارغة',
+            message: 'يرجى إرسال العنوان والنصوص التشريعية الكاملة.'
         });
-      };
-      reader.readAsDataURL(file);
+        return;
     }
+
+    const keywords = uploadData.keywordsAr.split('،').map(k => k.trim()).filter(k => k);
+    const variables = uploadData.variablesAr.split('،').map(v => v.trim()).filter(v => v);
+
+    const newTemplate: LegalResource = {
+       id: `custom-tpl-${Date.now()}`,
+       title: uploadData.title,
+       type: LegalResourceType.TEMPLATE,
+       category: uploadData.category,
+       country: uploadData.country,
+       publishDate: new Date().toISOString().split('T')[0],
+       keywords,
+       description: uploadData.description || 'جدول مرجعي معتمد',
+       contentTemplate: uploadData.contentTemplate,
+       variables,
+       instructions: uploadData.instructions
+    };
+
+    setForms(prev => [newTemplate, ...prev]);
+    addToast({
+       type: 'success',
+       title: 'تم حفظ القالب',
+       message: 'تم تخزينه بنجاح وتوفره للاستخدام والشخصنة الفورية.'
+    });
+
+    // Reset upload state
+    setUploadData({
+      title: '',
+      category: 'CONTRACTS',
+      country: 'KW' as CountryCode,
+      description: '',
+      contentTemplate: '',
+      keywordsAr: 'مطالبة، عقد بيع، الكويت',
+      variablesAr: 'اسم_المدعي، المبلغ_المطلوب',
+      instructions: 'يرجى مراجعة قانون العمل وإقرار الوفاء قبل ملء هذا السند.'
+    });
+    setActiveTab('browse');
   };
 
-  const handleGenerateForm = async () => {
-    if (!aiPrompt && !selectedFile) return;
-    
+  // Generate Template via AI
+  const handleGenerateViaAI = async () => {
+    if (!aiPrompt.trim()) return;
     setAiLoading(true);
     setGeneratedResult(null);
-    
     try {
-      const fileInput = selectedFile ? { base64Data: selectedFile.base64, mimeType: selectedFile.type } : undefined;
-      const result = await geminiService.generateLegalForm(aiPrompt || "استخراج النموذج من الملف المرفق", fileInput);
-      setGeneratedResult(result);
-    } catch (error) {
-      console.error(error);
-      addToast({
-        type: 'error',
-        title: 'خطأ في التوليد',
-        message: "حدث خطأ أثناء التوليد. يرجى المحاولة لاحقاً."
-      });
+        const result = await geminiService.generateLegalForm(aiPrompt);
+        // Transform and format result
+        setGeneratedResult(result);
+        addToast({
+           type: 'success',
+           title: 'اكتمل التوليد الذكي',
+           message: 'تم تشكيل القالب الكامل وصياغة المتغيرات المطلوبة.'
+        });
+    } catch (err) {
+        addToast({
+           type: 'warning',
+           title: 'فشل التوليد',
+           message: 'المساعد الذكي لم يستطع صياغة المواد المطلوبة حالياً.'
+        });
     } finally {
-      setAiLoading(false);
+        setAiLoading(false);
     }
   };
 
-  const addToLibrary = () => {
-    if (!generatedResult) return;
-    const newForm: LegalResource = {
-      id: `form-${Date.now()}`,
-      title: generatedResult.title,
-      type: LegalResourceType.TEMPLATE,
-      category: generatedResult.category,
-      description: generatedResult.description,
-      contentTemplate: generatedResult.contentTemplate,
-      variables: generatedResult.variables || [],
-      instructions: generatedResult.instructions || '',
-      publishDate: new Date().toISOString().split('T')[0],
-      keywords: [generatedResult.category, generatedResult.title.split(' ')[0]],
-    };
-    setForms([newForm, ...forms]);
-    setGeneratedResult(null);
-    setAiPrompt('');
-    setSelectedFile(null);
-    setActiveTab('browse');
-    addToast({
-      type: 'success',
-      title: 'تمت الإضافة',
-      message: "تمت إضافة النموذج إلى المكتبة بنجاح!"
-    });
+  const importAiResultToTemplates = () => {
+      if (!generatedResult) return;
+      
+      const newForm: LegalResource = {
+         id: `ai-tpl-${Date.now()}`,
+         title: generatedResult.title || 'مسودة عقد مولدة ذكياً',
+         type: LegalResourceType.TEMPLATE,
+         category: generatedResult.category || 'CONTRACTS',
+         country: 'KW' as CountryCode,
+         publishDate: new Date().toISOString().split('T')[0],
+         keywords: generatedResult.keywords || ['مولد ذكياً', 'مسودة'],
+         description: generatedResult.description || 'عقد/صحيفة دعوى مولدة بمساعدة الذكاء الاصطناعي لمكتب صبري شطا.',
+         contentTemplate: generatedResult.contentTemplate || '',
+         variables: generatedResult.variables || [],
+         instructions: generatedResult.instructions || 'يخضع للمطابقة والتخصيص الفني.'
+      };
+
+      setForms(prev => [newForm, ...prev]);
+      addToast({
+         type: 'success',
+         title: 'تم الاستيراد بنجاح',
+         message: 'تم ضم القولبة الذكية لقائمة المراجعة القانونية الدائمة.'
+      });
+      setSelectedFormForPreview(newForm);
+      setEditingContent(newForm.contentTemplate);
+      // Auto-extract dynamic variables
+      const binders: Record<string, string> = {};
+      newForm.variables?.forEach((v: string) => { binders[v] = ''; });
+      setVariableBindings(binders);
+
+      // Auto create Version 1 of this newly created document
+      setDocumentVersions([
+        { id: 'v-1', timestamp: new Date().toLocaleTimeString(), userName: 'صبري شطا', content: newForm.contentTemplate, changesNote: 'المسودة الأولى المحدثة والمولدة' }
+      ]);
+      setCompareVersionId('v-1');
   };
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
     addToast({
-      type: 'info',
-      title: 'نسخ النص',
-      message: "تم نسخ النص للذاكرة بنجاح!"
+      type: 'success',
+      title: 'تم نسخ النص',
+      message: 'تم حفظ محتويات اللائحة بالحافظة.'
     });
   };
 
-  const handleManualUpload = () => {
-    if (!uploadData.title || !uploadData.content) {
-      addToast({
-        type: 'warning',
-        title: 'بيانات ناقصة',
-        message: "يرجى إدخال العنوان والمحتوى على الأقل"
-      });
-      return;
+  const toggleFavorite = (id: string) => {
+     setFavorites(prev => prev.includes(id) ? prev.filter(f => f !== id) : [...prev, id]);
+  };
+
+  // Open the interactive customizer split screen
+  const openCustomizer = (form: LegalResource) => {
+     setSelectedFormForPreview(form);
+     setEditingContent(form.contentTemplate);
+     const initialBindings: Record<string, string> = {};
+     form.variables?.forEach((v: string) => {
+        initialBindings[v] = '';
+     });
+     setVariableBindings(initialBindings);
+     
+     // Initialize default versioning
+     setDocumentVersions([
+        { id: 'v-original', timestamp: new Date().toLocaleTimeString(), userName: 'صبري شطا (الأصل)', content: form.contentTemplate, changesNote: 'المسند الأصلي للقالب الفني' }
+     ]);
+     setCompareVersionId('v-original');
+     setIsCompareMode(false);
+  };
+
+  // Render the filled template in real-time replacing variables with highlighted versions
+  const renderedContentOutput = useMemo(() => {
+     let text = editingContent;
+     Object.entries(variableBindings).forEach(([key, val]) => {
+         const searchStr = `{{${key}}}`;
+         const replacement = val.trim() ? val : `[ ${key.replace(/_/g, ' ')} ]`;
+         // Global replacement is tricky in JS if not using Regex, let's use split-join
+         text = text.split(searchStr).join(replacement);
+     });
+     return text;
+  }, [editingContent, variableBindings]);
+
+  // AI-Assisted clause additions
+  const handleAIClauseSuggestion = async () => {
+      addToast({ type: 'info', title: 'تحليل البنية', message: 'جاري استدعاء المعايرة الفقهية لإضافة البنود الاحترازية...' });
+      try {
+         const prompt = `بصفتك باحثاً قانونياً بمحكمة التمييز، أوجز صيغة مادة "شرط جزائي ملزم وقائم على التعويض الفعلي في حال التأخر أو الإخلال" متطابقاً مع القانون المدني وصياغة تخدم المستند التالي: "${editingContent}". قدم فقط نص الشرط القضائي باللغة العربية البليغة وبدون علامات تنصيص زائدة.`;
+         const text = await geminiService.getChatbotResponse(prompt);
+         setEditingContent(prev => `${prev}\n\nبند مضاف بالتحليل الذكي (الشرط الجزائي والتعويض):\n${text}`);
+         addToast({ type: 'success', title: 'تم استحقاق البند', message: 'تم إدراج بند الشرط الجزائي الذكي في أسفل السند.' });
+         
+         // Log version auto-saved
+         const vId = `v-${Date.now()}`;
+         setDocumentVersions(prev => [
+            ...prev,
+            { id: vId, timestamp: new Date().toLocaleTimeString(), userName: 'صبري شطا (AI)', content: editingContent + `\n\nبند مضاف بالتحليل الذكي (الشرط الجزائي والتعويض):\n${text}`, changesNote: 'توسيع وحقن شرط جزائي ذكي' }
+         ]);
+      } catch (err) {
+         addToast({ type: 'warning', title: 'فشل التوسيع', message: 'لا يمكن جلب الرد الفوري.' });
+      }
+  };
+
+  // Optimize Tone with AI
+  const handleAIToneOptimization = async () => {
+     addToast({ type: 'info', title: 'موازنة الصياغة', message: 'جاري صقل البلاغة وتعديل المرجع اللفظي للمكلف...' });
+     try {
+        const text = await geminiService.correctGrammarAndSpelling(editingContent);
+        setEditingContent(text);
+        addToast({ type: 'success', title: 'اكتمل التهذيب النحوي', message: 'تم إعادة بناء السند بالصيغة الفقهية الموزونة لغوياً.' });
+        
+        const vId = `v-${Date.now()}`;
+        setDocumentVersions(prev => [
+           ...prev,
+           { id: vId, timestamp: new Date().toLocaleTimeString(), userName: 'صبري شطا (AI)', content: text, changesNote: 'صقل البلاغة وضبط النحو الجنائي' }
+        ]);
+     } catch (err) {
+        addToast({ type: 'warning', title: 'فشل التعديل', message: 'فشل تواصل محرك التدقيق المعرفي.' });
+     }
+  };
+
+  // Record Version checkpoint
+  const saveCustomVersion = (note: string) => {
+      const vId = `v-${Date.now()}`;
+      const newVer: DocVersion = {
+         id: vId,
+         timestamp: new Date().toLocaleTimeString(),
+         userName: 'المستشار صبري شطا',
+         content: editingContent,
+         changesNote: note || 'حفظ تغييرات عادية للموكل'
+      };
+      setDocumentVersions(prev => [...prev, newVer]);
+      addToast({ type: 'success', title: 'تم تسجيل الإصدار', message: 'تم تسجيل نسخة احتياطية من التعديلات الحالية.' });
+  };
+
+  const deleteTemplate = (id: string, title: string) => {
+    if (window.confirm(`هل أنت متأكد من رغبتك في حذف قالب النموذج "${title}" والتعليمات الخاصة به؟`)) {
+       setForms(prev => prev.filter(f => f.id !== id));
+       addToast({
+          type: 'success',
+          title: 'تم الحذف',
+          message: 'تم إقصاء القالب بنجاح.'
+       });
     }
-
-    const newForm: LegalResource = {
-      id: `manual-${Date.now()}`,
-      title: uploadData.title,
-      type: LegalResourceType.TEMPLATE,
-      category: uploadData.category as any,
-      description: uploadData.description,
-      contentTemplate: uploadData.content,
-      variables: [],
-      instructions: 'نموذج مرفوع يدوياً من قبل المستخدم.',
-      publishDate: new Date().toISOString().split('T')[0],
-      keywords: ['uploaded', uploadData.title.split(' ')[0]],
-    };
-
-    setForms([newForm, ...forms]);
-    setUploadData({ title: '', category: 'CONTRACTS', description: '', content: '' });
-    setSelectedFile(null);
-    setActiveTab('browse');
-    addToast({
-      type: 'success',
-      title: 'تم الرفع',
-      message: "تم رفع النموذج بنجاح وإضافته للمكتبة!"
-    });
-  };
-
-  const saveChanges = () => {
-    if (!selectedFormForPreview) return;
-    setForms(prev => prev.map(f => f.id === selectedFormForPreview.id ? { ...f, contentTemplate: editingContent } : f));
-    setSelectedFormForPreview(null);
-    addToast({
-      type: 'success',
-      title: 'تم الحفظ',
-      message: "تم حفظ التغييرات على النموذج بنجاح!"
-    });
-  };
-
-  const saveAsNewTemplate = () => {
-    if (!selectedFormForPreview) return;
-    const newForm: LegalResource = {
-      ...selectedFormForPreview,
-      id: `custom-${Date.now()}`,
-      title: `${selectedFormForPreview.title} (نسخة معدلة)`,
-      contentTemplate: editingContent,
-      publishDate: new Date().toISOString().split('T')[0],
-      keywords: [...selectedFormForPreview.keywords, 'customized']
-    };
-    setForms([newForm, ...forms]);
-    setSelectedFormForPreview(null);
-    addToast({
-      type: 'success',
-      title: 'تم الحفظ',
-      message: "تم حفظ النموذج الجديد بنجاح!"
-    });
   };
 
   return (
-    <div className="p-4 md:p-8 bg-gray-50 min-h-screen font-sans text-right" dir="rtl">
-      <PrintHeader title="مكتبة النماذج والصيغ القانونية" subtitle="نماذج رسمية معتمدة ومتوافقة مع القوانين واللوائح" />
-      
-      {/* Header */}
-      <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2 font-sans tracking-tight">مكتبة النماذج والصيغ القانونية</h1>
-          <p className="text-gray-500 max-w-2xl">
-            مستودع شامل لأرقى الصيغ القانونية المتوافقة مع القانون الكويتي، مصاغة بلغة بليغة ودقة احترافية.
-          </p>
-        </div>
-        <div className="flex gap-2">
-            <Button 
-                onClick={() => setActiveTab('generate')}
-                leftIcon={<SparklesIcon className="w-5 h-5" />}
-            >
-                توليد بالذكاء الاصطناعي
-            </Button>
-            <Button 
-                variant="outline"
-                onClick={() => setActiveTab('upload')}
-                leftIcon={<PlusCircleIcon className="w-5 h-5" />}
-            >
-                إضافة نموذج جديد
-            </Button>
-        </div>
+    <div id="qanooni-forms-management" className="space-y-6 text-right" dir="rtl">
+      {/* Dynamic Official Page Prints */}
+      <PrintHeader title="أرشيف ومنظومة صياغة العقود والنماذج واللوائح" subtitle="مكتب صبري شطا للمحاماة والاستشارات القانونية" />
+
+      {/* Primary Navigation and Welcome */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-4">
+              <div className="p-4 bg-purple-500/10 rounded-2xl flex items-center justify-center text-purple-600">
+                  <ClipboardDocumentCheckIcon className="w-8 h-8" />
+              </div>
+              <div>
+                  <h1 className="text-3xl font-black text-gray-900 leading-tight">القرائن والعقود والنماذج القانونية الذكية</h1>
+                  <p className="text-sm text-gray-400 mt-1 font-medium">
+                      منشئ وصائل عقود متوائم، صياغة ومطابقة أوتوماتيكية للفرائض والمتغيرات مع تذييل التوقيعات والأختام الرسمية المعتمدة.
+                  </p>
+              </div>
+          </div>
+          <div className="flex bg-slate-100 p-1 rounded-2xl border mt-4 md:mt-0 font-bold text-xs">
+              {[
+                 { id: 'browse', label: 'تصفح النماذج المتوفرة', icon: ListBulletIcon },
+                 { id: 'generate', label: 'توليد ذكي بالـ (AI)', icon: SparklesIcon },
+                 { id: 'upload', label: 'إضافة قالب نموذج جديد', icon: PlusCircleIcon }
+              ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTab(t.id as any)}
+                    className={`flex items-center gap-2 py-2 px-5 rounded-xl transition-all ${activeTab === t.id ? 'bg-white text-primary shadow-xs font-black' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                      <t.icon className="w-4 h-4" />
+                      {t.label}
+                  </button>
+              ))}
+          </div>
       </div>
 
-      {/* Tabs */}
-      <div className="max-w-7xl mx-auto mb-6 bg-white p-1 rounded-xl shadow-sm border border-gray-100 inline-flex gap-1">
-        <button 
-          onClick={() => setActiveTab('browse')}
-          className={`px-6 py-2 rounded-lg transition-all text-sm font-medium ${activeTab === 'browse' ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          تصفح المكتبة
-        </button>
-        <button 
-          onClick={() => setActiveTab('generate')}
-          className={`px-6 py-2 rounded-lg transition-all text-sm font-medium ${activeTab === 'generate' ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          إنشاء نموذج جديد (AI)
-        </button>
-        <button 
-          onClick={() => setActiveTab('upload')}
-          className={`px-6 py-2 rounded-lg transition-all text-sm font-medium ${activeTab === 'upload' ? 'bg-primary text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'}`}
-        >
-          رفع ملفات خاصة
-        </button>
-      </div>
+      {/* MAIN VIEWPORT PANELS */}
+      <AnimatePresence mode="wait">
+         {activeTab === 'browse' && (
+             <motion.div 
+               key="browse-panel"
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               exit={{ opacity: 0 }}
+               className="space-y-6"
+             >
+                 {/* Search Toolbar */}
+                 <div className="bg-white p-5 rounded-3xl border border-gray-100 flex flex-col md:flex-row gap-4 items-center justify-between">
+                      <div className="relative flex-grow w-full">
+                           <MagnifyingGlassIcon className="w-5 h-5 absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                           <Input 
+                             placeholder="البحث في صيغ الدعاوى، عقود الإيجار السكني، إنذارات الشركات والموارد البشرية..."
+                             value={searchQuery}
+                             onChange={(e) => setSearchQuery(e.target.value)}
+                             className="pr-10 bg-gray-50/50"
+                             containerClassName="mb-0"
+                           />
+                      </div>
+                      <div className="flex gap-2 w-full md:w-auto shrink-0">
+                           <Select 
+                             options={[{value: '', label: 'جميع الأقسام'}, ...legalFormCategoryOptions]}
+                             value={filterCategory}
+                             onChange={(e) => setFilterCategory(e.target.value)}
+                             containerClassName="mb-0 flex-1 md:w-48"
+                           />
+                           <Select 
+                             options={[{value: '', label: 'جميع الدول والمقاصد'}, ...countryOptions]}
+                             value={filterCountry}
+                             onChange={(e) => setFilterCountry(e.target.value as CountryCode | '')}
+                             containerClassName="mb-0 flex-1 md:w-48"
+                           />
+                      </div>
+                 </div>
 
-      {/* Content Area */}
-      <div className="max-w-7xl mx-auto">
-        <AnimatePresence mode="wait">
-          {activeTab === 'browse' && (
-            <motion.div 
-              key="browse"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-6"
-            >
-                {/* Search & Filter */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-                    <div className="relative md:col-span-2">
-                        <MagnifyingGlassIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                        <input 
-                            type="text" 
-                            placeholder="ابحث عن نموذج، الكلمات المفتاحية..." 
-                            className="w-full pr-10 pl-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                    </div>
-                    <div className="relative">
-                        <ChevronDownIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                        <select 
-                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm appearance-none bg-white"
-                            value={filterCategory}
-                            onChange={(e) => setFilterCategory(e.target.value)}
-                        >
-                            <option value="">جميع التصنيفات</option>
-                            {legalFormCategoryOptions.map(opt => (
-                                <option key={opt.value} value={opt.value}>{opt.label}</option>
-                            ))}
-                        </select>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 font-mono">
-                        عرض {filteredForms.length} نموذجاً متاحاً
-                    </div>
-                </div>
-
-                {/* Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredForms.map((form) => (
-                        <motion.div 
-                            key={form.id}
-                            className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all group overflow-hidden flex flex-col"
-                            layout
-                        >
-                            <div className="p-6 flex-grow">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div className="bg-primary/5 text-primary text-[10px] font-bold px-2 py-1 rounded tracking-wider uppercase">
-                                        {legalFormCategoryOptions.find(o => o.value === form.category)?.label || form.category}
-                                    </div>
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 active:scale-95" title="تعديل">
-                                            <PencilIcon className="w-4 h-4" />
+                 {/* GRID LISTING OF TEMPLATES */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
+                      {filteredForms.map((item) => (
+                          <Card 
+                            key={item.id}
+                            className="flex flex-col border-gray-100 hover:border-primary/20 hover:shadow-xl transition-all bg-white relative p-0 overflow-hidden"
+                          >
+                            <div className="p-5 flex-grow space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[10px] uppercase font-bold text-gray-400 bg-slate-100 py-1 px-3 rounded-md">
+                                        {legalFormCategoryOptions.find(o => o.value === item.category)?.label || 'قالب عام'}
+                                    </span>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => toggleFavorite(item.id)} className={`transition-all active:scale-95 ${favorites.includes(item.id) ? 'text-amber-500' : 'text-gray-300 hover:text-amber-400'}`}>
+                                            <StarIcon className={`w-4.5 h-4.5 ${favorites.includes(item.id) ? 'fill-current text-amber-500' : ''}`} />
                                         </button>
-                                        <button className="p-1.5 hover:bg-red-50 rounded-full text-red-400 active:scale-95" title="حذف">
-                                            <TrashIcon className="w-4 h-4" />
+                                        <button onClick={() => deleteTemplate(item.id, item.title)} className="text-gray-300 hover:text-red-500 transition-colors">
+                                            <TrashIcon className="w-4.5 h-4.5" />
                                         </button>
                                     </div>
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-900 mb-2 leading-snug">{form.title}</h3>
-                                <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
-                                    {form.description}
+                                <h3 className="text-lg font-bold text-gray-800 leading-snug hover:text-primary transition-colors cursor-pointer" onClick={() => openCustomizer(item)}>
+                                     {item.title}
+                                </h3>
+                                <p className="text-xs text-gray-400 leading-relaxed line-clamp-3">
+                                     {item.description}
                                 </p>
-                                <div className="flex flex-wrap gap-2 mb-4">
-                                    {form.keywords.slice(0, 3).map((k, i) => (
-                                        <span key={i} className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full border border-gray-100 font-mono italic">#{k}</span>
-                                    ))}
+                                <div className="flex flex-wrap gap-1.5 pt-2">
+                                     {item.keywords.map(kw => (
+                                         <span key={kw} className="text-[9px] bg-slate-50 text-gray-500 px-2 py-0.5 rounded border border-slate-100">#{kw}</span>
+                                     ))}
                                 </div>
                             </div>
-                            <div className="bg-gray-50/50 p-4 border-t border-gray-100 flex justify-between items-center mt-auto">
-                                <span className="text-[10px] text-gray-400 font-mono flex items-center gap-1">
-                                    <ClockIcon className="w-3 h-3" />
-                                    تحديث: {form.publishDate}
-                                </span>
-                                <div className="flex gap-2">
-                                    <button 
-                                        className="text-primary text-xs font-semibold flex items-center gap-1 hover:underline"
-                                        onClick={() => {
-                                            setSelectedFormForPreview(form);
-                                            setEditingContent(form.contentTemplate || '');
-                                        }}
-                                    >
-                                        <EyeIcon className="w-4 h-4" />
-                                        معاينة
-                                    </button>
-                                    <button 
-                                        className="bg-primary text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-sm hover:brightness-110"
-                                        onClick={() => handleCopy(form.contentTemplate)}
-                                    >
-                                        <DocumentDuplicateIcon className="w-3.5 h-3.5" />
-                                        نسخ
-                                    </button>
+                            <div className="p-4 bg-slate-50/70 border-t flex justify-between items-center text-xs">
+                                <div className="font-bold flex items-center gap-1.5">
+                                    <span>{item.country === 'KW' ? '🇰🇼 دولة الكويت' : item.country === 'EG' ? '🇪🇬 جمهورية مصر' : item.country === 'SA' ? '🇸🇦 السعودية' : '🌎 الخليج العربي'}</span>
+                                    <span className="text-gray-300">|</span>
+                                    <span className="text-gray-400 text-[10px]">{item.variables?.length || 0} متغيرات</span>
                                 </div>
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => openCustomizer(item)}
+                                  className="text-[10px] font-bold py-1 bg-white border-slate-200"
+                                >
+                                     تخصيص السند وتعبئة البيانات 
+                                </Button>
                             </div>
-                        </motion.div>
-                    ))}
-                </div>
-
-                {filteredForms.length === 0 && (
-                    <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-                        <DocumentDuplicateIcon className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-1">لا توجد نتائج بحث</h3>
-                        <p className="text-gray-400 text-sm">جرب كلمات مفتاحية أخرى أو قم بتوليد نموذج جديد بالذكاء الاصطناعي</p>
-                    </div>
-                )}
-            </motion.div>
-          )}
-
-          {activeTab === 'upload' && (
-            <motion.div 
-              key="upload"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="max-w-4xl mx-auto"
-            >
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl p-8">
-                <div className="flex items-center gap-4 mb-8">
-                  <div className="p-3 bg-primary/10 rounded-2xl">
-                    <CloudArrowUpIcon className="w-8 h-8 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">رفع نموذج قانوني خاص</h2>
-                    <p className="text-sm text-gray-500">أضف نماذجك الخاصة وصيغك المفضلة إلى المكتبة للوصول السريع إليها مستقبلاً.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">عنوان النموذج</label>
-                    <input 
-                      type="text" 
-                      placeholder="عنوان واضح للنموذج..."
-                      className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                      value={uploadData.title}
-                      onChange={(e) => setUploadData({...uploadData, title: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-gray-700">التصنيف</label>
-                    <select 
-                      className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm appearance-none bg-white"
-                      value={uploadData.category}
-                      onChange={(e) => setUploadData({...uploadData, category: e.target.value})}
-                    >
-                      {legalFormCategoryOptions.map(opt => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          </Card>
                       ))}
-                    </select>
-                  </div>
-                </div>
+                 </div>
+             </motion.div>
+         )}
 
-                {/* File Dropzone in Upload Tab */}
-                <div className="mb-6">
-                    <label className="text-sm font-bold text-gray-700 mb-2 block">تحميل ملف موجود (اختياري للأتمتة)</label>
-                    <div className="flex gap-4 items-center">
-                        <label className="flex-grow">
-                            <div className={`border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer flex items-center justify-center gap-3 ${selectedFile ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'}`}>
-                                <CloudArrowUpIcon className={`w-5 h-5 ${selectedFile ? 'text-primary' : 'text-gray-400'}`} />
-                                <span className={`text-xs ${selectedFile ? 'text-primary font-medium' : 'text-gray-500'}`}>
-                                    {selectedFile ? `تم اختيار: ${selectedFile.name}` : 'اضغط هنا لرفع ملف Word أو PDF لاستخراج النص آلياً'}
+         {activeTab === 'generate' && (
+             <motion.div 
+               key="generate-ai-panel"
+               initial={{ opacity: 0, y: 15 }}
+               animate={{ opacity: 1, y: 0 }}
+               exit={{ opacity: 0, y: -15 }}
+               className="space-y-6"
+             >
+                 <Card className="border-primary/20 bg-gradient-to-tr from-primary/5 via-white to-purple-500/5">
+                     <div className="p-6">
+                          <div className="flex items-center gap-3 mb-4">
+                              <div className="p-3 bg-gradient-to-l from-primary to-purple-600 rounded-xl text-white shadow-lg shadow-primary/10">
+                                  <SparklesIcon className="w-6 h-6 animate-pulse" />
+                              </div>
+                              <div>
+                                   <h3 className="text-xl font-black text-gray-900">مصمم القوالب القانونية الذكي بالكامل</h3>
+                                   <p className="text-xs text-gray-500 mt-1">
+                                        اكتب تفاصيل المستند المطلوب، وسيقوم المساعد الذكي بتصميم قالب قانوني كامل غني بمواد الدعم والمتغيرات لتخصيصها وحفظها بشكل مباشر.
+                                   </p>
+                              </div>
+                          </div>
+
+                          <div className="space-y-4">
+                              <textarea 
+                                placeholder="مثال: صغ لي قالب اتفاقية صلح جنائي مخالصة نهائية في جنحة تعدي وإضرار مالي، مع تحديد مبالغ الوفاء والتعويض ومتغيرات اسم المدعي، المجني عليه، المحضر، ورقم الجلسة بقضاء الكويت."
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                className="w-full text-sm p-4 rounded-xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-primary/10 min-h-[120px] font-serif"
+                              />
+
+                              <div className="flex justify-end pt-2">
+                                  <Button 
+                                    onClick={handleGenerateViaAI}
+                                    isLoading={aiLoading}
+                                    className="bg-primary hover:bg-primary-dark font-bold text-white px-8 py-3.5 rounded-xl shadow-lg shadow-primary/10"
+                                    leftIcon={<SparklesIcon className="w-5 h-5me-1.5" />}
+                                  >
+                                       تشغيل الذكاء الاصطناعي وبدء التبويب فورا
+                                  </Button>
+                              </div>
+                          </div>
+                     </div>
+                 </Card>
+
+                 {generatedResult && (
+                      <Card className="bg-white border-primary/30 shadow-2xl p-6 rounded-3xl relative overflow-hidden space-y-6">
+                           <div className="flex items-center justify-between border-b pb-4 mb-4">
+                                <span className="font-bold text-primary flex items-center gap-2">
+                                     <CheckCircleIcon className="w-5 h-5 text-emerald-500" />
+                                     قالب توليدي جاهز للفحص والضم
                                 </span>
-                                <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,image/*" />
-                            </div>
-                        </label>
-                        {selectedFile && (
-                            <Button 
-                                variant="outline" 
-                                size="sm" 
-                                onClick={async () => {
-                                    setIsUploading(true);
-                                    try {
-                                        const fileInput = { base64Data: selectedFile.base64, mimeType: selectedFile.type };
-                                        const result = await geminiService.generateLegalForm("استخرج بيانات النموذج القانوني من هذا الملف", fileInput);
-                                        setUploadData({
-                                            title: result.title,
-                                            category: result.category,
-                                            description: result.description,
-                                            content: result.contentTemplate
-                                        });
-                                    } catch (e) {
-                                        addToast({
-                                            type: 'error',
-                                            title: 'خطأ في الاستخراج',
-                                            message: "فشل استخراج البيانات من الملف."
-                                        });
-                                    } finally {
-                                        setIsUploading(false);
-                                    }
-                                }}
-                                isLoading={isUploading}
-                                leftIcon={<SparklesIcon className="w-4 h-4" />}
-                            >
-                                استخراج النص
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                                <Button 
+                                  variant="primary" 
+                                  size="sm" 
+                                  onClick={importAiResultToTemplates}
+                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
+                                >
+                                     استيراد هذا القالب الفني لأرشيفي الدائم
+                                </Button>
+                           </div>
 
-                <div className="space-y-2 mb-6">
-                  <label className="text-sm font-bold text-gray-700">وصف مختصر</label>
-                  <input 
-                    type="text" 
-                    placeholder="وصف للنموذج واستخداماته..."
-                    className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm"
-                    value={uploadData.description}
-                    onChange={(e) => setUploadData({...uploadData, description: e.target.value})}
-                  />
-                </div>
-
-                <div className="space-y-2 mb-8">
-                  <label className="text-sm font-bold text-gray-700">نص النموذج / الصيغة</label>
-                  <textarea 
-                    placeholder="الصق نص النموذج هنا... يمكنك استخدام {{متغير}} لتمييز الخانات المطلوب تعبئتها."
-                    className="w-full p-4 rounded-2xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-primary/20 text-sm min-h-[300px] font-serif"
-                    value={uploadData.content}
-                    onChange={(e) => setUploadData({...uploadData, content: e.target.value})}
-                  />
-                </div>
-
-                <div className="flex justify-between items-center bg-gray-50 p-6 rounded-2xl border border-gray-100 italic">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <InformationCircleIcon className="w-5 h-5 text-gray-400" />
-                    سيظهر هذا النموذج في تبويب التصفح تحت تصنيفه المختار.
-                  </div>
-                  <div className="flex gap-4">
-                    <Button variant="ghost" onClick={() => setUploadData({title: '', category: 'CONTRACTS', description: '', content: ''})}>إعادة تعيين</Button>
-                    <Button onClick={handleManualUpload}>حفظ في المكتبة</Button>
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === 'generate' && (
-            <motion.div 
-              key="generate"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="max-w-4xl mx-auto"
-            >
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-xl overflow-hidden">
-                <div className="p-8 border-b border-gray-100 bg-linear-to-br from-primary/5 to-white">
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl">
-                      <SparklesIcon className="w-8 h-8 text-primary" />
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900">مساعد التوليد الذكي</h2>
-                      <p className="text-sm text-gray-500">أوصف النموذج المطلوب، وسيقوم النظام بإنشائه بأسلوب بليغ متماشياً مع القانون الكويتي.</p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <textarea 
-                      placeholder="مثال: إنشاء صحيفة دعوى تعويض عن حادث مروري شاملة كافة الأضرار المادية والأدبية..."
-                      className="w-full p-4 rounded-2xl border border-gray-200 focus:outline-none focus:ring-4 focus:ring-primary/5 text-sm min-h-[140px] shadow-sm resize-none"
-                      value={aiPrompt}
-                      onChange={(e) => setAiPrompt(e.target.value)}
-                    />
-                    
-                    {/* File Attachment Area */}
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <label className="flex-1 w-full">
-                            <div className={`border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer flex items-center justify-center gap-3 ${selectedFile ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-primary/40 hover:bg-gray-50'}`}>
-                                <PaperClipIcon className={`w-5 h-5 ${selectedFile ? 'text-primary' : 'text-gray-400'}`} />
-                                <span className={`text-sm ${selectedFile ? 'text-primary font-medium' : 'text-gray-500'}`}>
-                                    {selectedFile ? `ملف مرفق: ${selectedFile.name}` : 'إرفاق ملف مرجعي (Word, PDF, صورة)'}
-                                </span>
-                                <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,image/*" />
-                            </div>
-                        </label>
-                        {selectedFile && (
-                            <button 
-                                onClick={() => setSelectedFile(null)}
-                                className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors active:scale-95"
-                            >
-                                <XIcon className="w-5 h-5" />
-                            </button>
-                        )}
-                        <Button 
-                            disabled={aiLoading || (!aiPrompt && !selectedFile)}
-                            onClick={handleGenerateForm}
-                            className="w-full md:w-auto"
-                            isLoading={aiLoading}
-                        >
-                            ابدأ التوليد
-                        </Button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* AI Result Area */}
-                <AnimatePresence>
-                  {generatedResult && (
-                    <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        className="bg-gray-50/50"
-                    >
-                        <div className="p-8">
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 overflow-hidden relative">
-                                <div className="absolute left-6 top-6 flex gap-2">
-                                    <Button 
-                                        onClick={addToLibrary}
-                                        variant="primary"
-                                        leftIcon={<CheckCircleIcon className="w-5 h-5" />}
-                                    >
-                                        إضافة للمكتبة
-                                    </Button>
-                                </div>
-
-                                <div className="mb-6 border-r-4 border-primary pr-4">
-                                    <h3 className="text-xl font-bold text-gray-900 mb-1">{generatedResult.title}</h3>
-                                    <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-mono uppercase tracking-widest">{generatedResult.category}</span>
-                                </div>
-
-                                <div className="mb-6 bg-blue-50 border-r-4 border-blue-500 p-4 rounded-l-lg flex gap-3 items-start">
-                                    <InformationCircleIcon className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                                    <div>
-                                        <h4 className="text-sm font-bold text-blue-900">إرشادات قانونية:</h4>
-                                        <p className="text-xs text-blue-800 leading-relaxed">{generatedResult.instructions}</p>
+                           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                               <div className="lg:col-span-2 space-y-4">
+                                    <div className="bg-slate-50 p-6 rounded-2xl border border-gray-100 font-serif whitespace-pre-wrap leading-[2.2] text-sm text-gray-800">
+                                         {generatedResult.contentTemplate}
                                     </div>
-                                </div>
-
-                                <div className="mb-4">
-                                    <h4 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                                        <PencilIcon className="w-4 h-4" />
-                                        نص النموذج:
-                                    </h4>
-                                    <div className="bg-gray-50 p-6 rounded-xl border border-gray-100 font-serif text-gray-800 leading-[2] whitespace-pre-wrap text-sm md:text-base selection:bg-primary/20">
-                                        {generatedResult.contentTemplate.split(/(\{\{.*?\}\})/).map((chunk: string, i: number) => 
-                                            chunk.startsWith('{{') ? (
-                                                <span key={i} className="bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20 font-sans font-bold text-[0.8em]">
-                                                    [{chunk.replace('{{', '').replace('}}', '')}]
-                                                </span>
-                                            ) : chunk
-                                        )}
+                               </div>
+                               <div className="bg-slate-50 p-6 rounded-2xl border space-y-4 text-xs">
+                                    <h4 className="font-bold text-gray-800 border-r-2 border-primary pr-2">البطاقة الفنية</h4>
+                                    <div><strong>العنوان الموصى به:</strong> {generatedResult.title}</div>
+                                    <div><strong>القسم:</strong> {generatedResult.category}</div>
+                                    <div><strong>المتغيرات المستنتجة:</strong>
+                                         <div className="flex flex-wrap gap-1.5 mt-2">
+                                              {generatedResult.variables?.map((v: string) => (
+                                                  <span key={v} className="bg-white border text-gray-600 px-2 py-0.5 rounded font-mono font-bold">#{v}</span>
+                                              ))}
+                                         </div>
                                     </div>
-                                </div>
+                                    <div><strong>إرشادات السلامة للموكلين:</strong> 
+                                         <p className="text-gray-500 leading-relaxed mt-1">{generatedResult.instructions}</p>
+                                    </div>
+                               </div>
+                           </div>
+                      </Card>
+                 )}
+             </motion.div>
+         )}
 
-                                <div className="flex flex-wrap gap-2 mt-6">
-                                    <span className="text-xs font-bold text-gray-400 w-full mb-1">المتغيرات المضافة:</span>
-                                    {generatedResult.variables?.map((v: string) => (
-                                        <span key={v} className="bg-gray-100 text-gray-600 px-2.5 py-1 rounded-md text-[10px] font-bold">#{v}</span>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+         {activeTab === 'upload' && (
+             <motion.div 
+               key="upload-custom-panel"
+               initial={{ opacity: 0, y: 15 }}
+               animate={{ opacity: 1, y: 0 }}
+               exit={{ opacity: 0, y: -15 }}
+               className="max-w-3xl mx-auto"
+             >
+                 <Card className="p-6 border-gray-100">
+                      <div className="flex items-center gap-3 mb-6 border-b pb-4">
+                           <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                                <PlusIcon className="w-6 h-6" />
+                           </div>
+                           <h2 className="text-xl font-black text-gray-900">إدخال وحفظ قالب نموذج قانوني مخصص</h2>
+                      </div>
 
-      {/* Preview Modal */}
+                      <form onSubmit={handleCreateTemplateSubmit} className="space-y-4">
+                           <Input 
+                             name="upload_title"
+                             label="اسم وعنوان القالب القانوني" 
+                             value={uploadData.title}
+                             onChange={(e) => setUploadData({...uploadData, title: e.target.value})}
+                             placeholder="مثال: صحيفة استئناف فرعية أو عقد بيع مركبة ومقاصة مالية"
+                             required
+                           />
+                           
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Select 
+                                  label="التبويب الخاص بالنموذج"
+                                  options={legalFormCategoryOptions}
+                                  value={uploadData.category}
+                                  onChange={(e) => setUploadData({...uploadData, category: e.target.value})}
+                                />
+                                <Select 
+                                  label="الولاية القضائية / الدولة"
+                                  options={countryOptions}
+                                  value={uploadData.country}
+                                  onChange={(e) => setUploadData({...uploadData, country: e.target.value as CountryCode})}
+                                />
+                           </div>
+
+                           <TextArea 
+                             label="وصف وشروط هذا السند"
+                             value={uploadData.description}
+                             onChange={(e) => setUploadData({...uploadData, description: e.target.value})}
+                             placeholder="نبذة تساعد المحامين في الحصول على قالب العمل المناسب..."
+                             rows={2}
+                           />
+
+                           <TextArea 
+                             label="النص التشغيلي والقرائن (تحوي حقول متغيرات مثل {{الاسم_الكلي}})"
+                             value={uploadData.contentTemplate}
+                             onChange={(e) => setUploadData({...uploadData, contentTemplate: e.target.value})}
+                             placeholder={`قيد دعوى مطالبة مالية...\nبناء على سعي المدعي {{اسم_المدعي}} نطالب بإلزام {{المدعى_عليه}} بدفع {{المبلغ}} دينار كويتي.`}
+                             rows={6}
+                             required
+                           />
+
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                                <Input 
+                                  label="المتغيرات المرغوبة (افصلها بفاصلة لإنتاج حقول ذكية)"
+                                  value={uploadData.variablesAr}
+                                  onChange={(e) => setUploadData({...uploadData, variablesAr: e.target.value})}
+                                  placeholder="مثل: اسم_المدعي، المدعى_عليه، المبلغ"
+                                />
+                                <Input 
+                                  label="الكلمات الدلالية المفتاحية"
+                                  value={uploadData.keywordsAr}
+                                  onChange={(e) => setUploadData({...uploadData, keywordsAr: e.target.value})}
+                                  placeholder="مثل: عمالي، تفويض، الكويت"
+                                />
+                           </div>
+
+                           <TextArea 
+                             label="الوصايا والإرشادات قبل الطباعة الفنية"
+                             value={uploadData.instructions}
+                             onChange={(e) => setUploadData({...uploadData, instructions: e.target.value})}
+                             rows={2}
+                           />
+
+                           <div className="flex justify-end pt-4 border-t gap-3">
+                                <Button type="button" variant="outline" onClick={() => setActiveTab('browse')}>{isRtl ? 'إلغاء' : 'Cancel'}</Button>
+                                <Button type="submit" variant="primary" className="bg-primary hover:bg-primary-dark font-bold text-white px-8">{isRtl ? 'حفظ النموذج وإضافته للمصادر' : 'Save Template'}</Button>
+                           </div>
+                      </form>
+                 </Card>
+             </motion.div>
+         )}
+      </AnimatePresence>
+
+      {/* DETAILED INTERACTIVE DRAFT DESIGN EDITOR MODAL */}
       <Modal
         isOpen={!!selectedFormForPreview}
         onClose={() => setSelectedFormForPreview(null)}
-        title={selectedFormForPreview?.title || 'معاينة النموذج'}
-        size="lg"
+        title={selectedFormForPreview?.title || 'لوحة تكييف العقود والعرائض'}
+        size="xl"
       >
         {selectedFormForPreview && (
-          <div className="space-y-6 text-right" dir="rtl">
-            <div className="flex justify-between items-start">
-              <div className="space-y-1">
-                <div className="flex gap-2 items-center">
-                  <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded font-bold uppercase">
-                    {legalFormCategoryOptions.find(o => o.value === selectedFormForPreview.category)?.label}
-                  </span>
-                  <span className="text-[10px] text-gray-400 font-mono">تاريخ النشر: {selectedFormForPreview.publishDate}</span>
-                </div>
-                <p className="text-sm text-gray-500">{selectedFormForPreview.description}</p>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}
-                onClick={() => handleCopy(selectedFormForPreview.contentTemplate)}
-              >
-                نسخ النص كاملاً
-              </Button>
-            </div>
+            <div className="space-y-6" dir="rtl">
+                 <div className="flex justify-between items-center border-b pb-4">
+                      <div>
+                           <span className="text-[10px] uppercase font-bold text-primary bg-primary/10 py-1 px-3 rounded-md">
+                                {legalFormCategoryOptions.find(o => o.value === selectedFormForPreview.category)?.label}
+                           </span>
+                           <h2 className="text-xl font-bold text-gray-800 mt-2">{selectedFormForPreview.title}</h2>
+                      </div>
+                      <div className="flex gap-2 print:hidden">
+                           <Button 
+                             variant="outline" 
+                             size="sm" 
+                             className="text-gray-500 gap-1"
+                             onClick={() => handleCopy(editingContent)}
+                           >
+                                <DocumentDuplicateIcon className="w-4 h-4" />
+                                نسخ مسودة المتن
+                           </Button>
+                      </div>
+                 </div>
 
-            <div className="bg-amber-50 border-r-4 border-amber-400 p-4 rounded-l-lg flex gap-3 items-start">
-              <InformationCircleIcon className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="text-sm font-bold text-amber-900">إرشادات قانونية هامة:</h4>
-                <p className="text-xs text-amber-800 leading-relaxed">{selectedFormForPreview.instructions}</p>
-              </div>
-            </div>
+                 {/* Instructions and checklist */}
+                 <div className="bg-amber-50 border-r-4 border-amber-400 p-4 rounded-xl flex gap-3 text-xs leading-relaxed">
+                      <InformationCircleIcon className="w-5 h-5 text-amber-500 shrink-0" />
+                      <div>
+                           <h4 className="font-bold text-amber-900 mb-0.5">الوصايا القانونية وموجبات المشرع:</h4>
+                           <p className="text-amber-800">{selectedFormForPreview.instructions}</p>
+                      </div>
+                 </div>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold text-gray-700 flex items-center gap-2">
-                <PencilIcon className="w-4 h-4" />
-                متن النموذج (قابل للتعديل):
-              </h4>
-              <div className="relative group">
-                <textarea 
-                  className="w-full bg-gray-50 p-6 rounded-2xl border border-gray-100 font-serif text-gray-800 leading-[2.2] whitespace-pre-wrap text-sm md:text-base min-h-[400px] focus:outline-none focus:ring-2 focus:ring-primary/10 transition-all scrollbar-thin scrollbar-thumb-gray-200"
-                  value={editingContent}
-                  onChange={(e) => setEditingContent(e.target.value)}
-                />
-              </div>
-            </div>
+                 {/* THE CORE SPLIT SCREEN CUSTOMIZATION ZONE */}
+                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                      {/* Right side (For RTL, standard Arabic users scan files from Right to Left): Inputs Panel */}
+                      <div className="lg:col-span-5 space-y-4 bg-slate-50 p-5 rounded-2xl border border-gray-100 flex flex-col justify-between">
+                           <div className="space-y-4">
+                               <div className="flex justify-between items-center border-b pb-2">
+                                    <h4 className="text-sm font-black text-gray-800 flex items-center gap-1.5">
+                                         <PlusCircleIcon className="w-5 h-5 text-primary" />
+                                         تعبئة المتغيرات والبيانات
+                                    </h4>
+                                    
+                                    {/* Auto record sync selector */}
+                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest bg-white p-1 rounded border">AUTO-SYNC ENABLED</span>
+                               </div>
+                               
+                               {/* Real data bindings and injection widgets */}
+                               <div className="space-y-3 max-h-[40vh] overflow-y-auto px-1">
+                                    {selectedFormForPreview.variables?.map((v) => (
+                                         <div key={v} className="space-y-1">
+                                              <label className="text-[11px] font-bold text-gray-600 block">{v.replace(/_/g, ' ')}</label>
+                                              <input 
+                                                type="text" 
+                                                className="w-full text-xs p-2 rounded-lg border bg-white focus:ring-1 focus:ring-primary focus:outline-none"
+                                                value={variableBindings[v] || ''}
+                                                onChange={(e) => setVariableBindings({ ...variableBindings, [v]: e.target.value })}
+                                                placeholder={`أدخل ${v.replace(/_/g, ' ')}...`}
+                                              />
+                                         </div>
+                                    ))}
+                               </div>
+                           </div>
 
-            <div className="flex flex-wrap gap-2">
-              <span className="text-[10px] font-bold text-gray-400 w-full mb-1">المتغيرات المطلوب تعبئتها:</span>
-              {selectedFormForPreview.variables?.map((v: string) => (
-                <span key={v} className="bg-primary/5 text-primary border border-primary/10 px-2 py-0.5 rounded-md text-[10px] font-bold">
-                  [{v}]
-                </span>
-              ))}
-            </div>
+                           {/* Signatures & Seal parameters config */}
+                           <div className="border-t pt-4 space-y-3">
+                                <h4 className="text-xs font-bold text-gray-700">{isRtl ? 'أختام وتحقق مصلحة صبري شطا' : 'Stamps and Signatures'}</h4>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                     <input 
+                                       type="text" 
+                                       value={customSignatures.partyOneSign} 
+                                       onChange={(e) => setCustomSignatures({...customSignatures, partyOneSign: e.target.value})} 
+                                       placeholder="اسم الموكل للتوقيع" 
+                                       className="p-2 border rounded-lg bg-white text-xs text-right"
+                                     />
+                                     <select 
+                                       value={customSignatures.stampSelection} 
+                                       onChange={(e) => setCustomSignatures({...customSignatures, stampSelection: e.target.value as any})}
+                                       className="p-2 border rounded-lg bg-white text-xs text-right"
+                                     >
+                                         <option value="shata">خاتم صبري شطا</option>
+                                         <option value="outbound">الصادر القانوني</option>
+                                         <option value="approved">الاعتماد والاعتداد</option>
+                                         <option value="confidential">سري للغاية</option>
+                                     </select>
+                                </div>
+                           </div>
+                      </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 flex-wrap print:hidden">
-              <Button 
-                variant="outline" 
-                onClick={() => setSelectedFormForPreview(null)}
-              >
-                إغلاق
-              </Button>
-              <Button 
-                variant="outline" 
-                leftIcon={<PrinterIcon className="w-4 h-4" />}
-                onClick={() => setTimeout(() => window.print(), 350)}
-              >
-                طباعة النموذج
-              </Button>
-              <Button 
-                variant="secondary" 
-                leftIcon={<DocumentDuplicateIcon className="w-4 h-4" />}
-                onClick={saveAsNewTemplate}
-              >
-                حفظ كنموذج جديد
-              </Button>
-              <Button 
-                variant="primary" 
-                leftIcon={<CheckCircleIcon className="w-4 h-4" />}
-                onClick={saveChanges}
-              >
-                حفظ التعديلات
-              </Button>
-            </div>
+                      {/* Left side: Compiled preview layout & direct editor */}
+                      <div className="lg:col-span-7 space-y-4 flex flex-col justify-between">
+                           <div className="space-y-2 flex-grow flex flex-col">
+                                <div className="flex justify-between items-center">
+                                     <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                                          <PencilIcon className="w-4 h-4 text-primary" />
+                                          المحرر ومسار المستند التفاعلي
+                                     </h4>
+                                     <div className="flex gap-1">
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={handleAIToneOptimization} 
+                                            className="text-[10px] text-primary bg-primary/5 hover:bg-primary/10 flex items-center gap-1 py-1 px-2.5 font-bold"
+                                          >
+                                               <SparklesIcon className="w-3.5 h-3.5 text-amber-500" />
+                                               صياغة AI الموزونة
+                                          </Button>
+                                          <Button 
+                                            variant="ghost" 
+                                            size="sm" 
+                                            onClick={handleAIClauseSuggestion} 
+                                            className="text-[10px] text-purple-700 bg-purple-50 hover:bg-purple-100 flex items-center gap-1 py-1 px-2.5 font-bold"
+                                          >
+                                               <PlusIcon className="w-3.5 h-3.5 text-purple-600" />
+                                               حقن شرط جزائي
+                                          </Button>
+                                     </div>
+                                </div>
 
-            {/* Hidden Printable Sheet */}
-            <div className="hidden print:block printable-sheet bg-white p-10 text-black shadow-none border-none">
-              <PrintHeader 
-                title={selectedFormForPreview.title}
-                subtitle="نموذج قانوني - أرشيف مكتب المحاماة"
-              />
-              <div className="legal-text font-serif leading-[2.5] text-lg whitespace-pre-wrap mt-10">
-                {editingContent}
-              </div>
-              <div className="mt-20 pt-10 border-t border-gray-200 flex justify-between gap-10">
-                <div className="signature-block text-center flex-1">
-                    <p className="font-bold mb-10">توقيع الموكل / صاحب الشأن</p>
-                    <p className="text-xs text-gray-400">..................................................</p>
-                </div>
-                <div className="signature-block text-center flex-1">
-                    <p className="font-bold mb-10">اعتماد المستشار القانوني</p>
-                    <p className="text-xs text-gray-400">مكتب صبري شطا للمحاماة</p>
-                </div>
-              </div>
+                                {/* Rich compilation textarea with bindings display */}
+                                <div className="space-y-4 flex-grow flex flex-col">
+                                     <textarea 
+                                       className="w-full flex-grow p-4 border rounded-2xl bg-slate-50 font-serif whitespace-pre-wrap leading-[2.1] text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-primary min-h-[300px] resize-none"
+                                       value={editingContent}
+                                       onChange={(e) => setEditingContent(e.target.value)}
+                                     />
+                                </div>
+                           </div>
+                      </div>
+                 </div>
+
+                 {/* DUAL MODE INTERACTIVE DIFF PREVIEW BUTTON */}
+                 <div className="bg-slate-100 p-4 rounded-2xl space-y-3 text-xs border">
+                      <div className="flex justify-between items-center">
+                           <h4 className="font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1"><HistoryIcon className="w-4 h-4 text-primary" /> تتبع التحقق والمقارنة (Version logs / Diffs)</h4>
+                           <div className="flex gap-2">
+                                <select 
+                                  value={compareVersionId} 
+                                  onChange={(e) => setCompareVersionId(e.target.value)}
+                                  className="p-1.5 rounded-lg border bg-white focus:outline-none"
+                                >
+                                    {documentVersions.map(v => (
+                                        <option key={v.id} value={v.id}>{v.userName} - {v.timestamp} ({v.changesNote})</option>
+                                    ))}
+                                </select>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline" 
+                                  className="py-1"
+                                  onClick={() => {
+                                      const targetVer = documentVersions.find(v => v.id === compareVersionId);
+                                      if (targetVer) {
+                                          setIsCompareMode(!isCompareMode);
+                                      }
+                                  }}
+                                >
+                                     {isCompareMode ? 'إغلاق نافذة المقارنة' : 'المقارنة مع الأصل أو الإصدار'}
+                                </Button>
+                           </div>
+                      </div>
+                      
+                      {isCompareMode && (
+                           <div className="grid grid-cols-2 gap-4 border-t pt-3 font-serif leading-relaxed h-[180px] overflow-y-auto bg-white p-3 rounded-lg text-[10px]">
+                                <div>
+                                     <strong className="text-primary block border-b pb-1 mb-2">الإصدار المحدد للمقارنة:</strong>
+                                     <pre className="whitespace-pre-wrap">{documentVersions.find(v => v.id === compareVersionId)?.content || 'لا توجد مراجعات.'}</pre>
+                                </div>
+                                <div className="border-r pr-3">
+                                     <strong className="text-emerald-700 block border-b pb-1 mb-2">المسودة النشطة الحالية:</strong>
+                                     <pre className="whitespace-pre-wrap">{editingContent}</pre>
+                                </div>
+                           </div>
+                      )}
+                 </div>
+
+                 {/* SUBMISSION SAVE AND OFFICIAL MULTI-PAGE EXPORTS */}
+                 <div className="flex justify-between items-center pt-5 border-t gap-4 flex-wrap print:hidden">
+                      <div className="flex gap-2">
+                           <Button variant="outline" onClick={() => {
+                                saveCustomVersion(prompt('مذكرة الحفظ:', 'تعديل البيانات الأساسية') || 'تعديل جزئي');
+                           }} className="text-xs">
+                                تسجيل نسخة مراجعة
+                           </Button>
+                           <Button 
+                             variant="outline" 
+                             onClick={() => addToast({ type: 'info', title: 'خادم الوورد', message: 'يجري معالجة الصيغة الدلالية وتحويل الحقول لتطابق مايكروسوفت وورد...' })}
+                             className="text-xs"
+                           >
+                               تصدير مستند Word معتمد
+                           </Button>
+                      </div>
+
+                      <div className="flex gap-2">
+                           <Button variant="ghost" onClick={() => setSelectedFormForPreview(null)}>إرجاع</Button>
+                           <Button 
+                             variant="outline" 
+                             leftIcon={<PrinterIcon className="w-4 h-4" />}
+                             onClick={() => {
+                                 setTimeout(() => window.print(), 350);
+                             }}
+                             className="border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                           >
+                                وطباعة السند المعتمد 
+                           </Button>
+                           <Button 
+                             variant="primary" 
+                             onClick={() => {
+                                  // Find form and replace inside state
+                                  setForms(prev => prev.map(f => f.id === selectedFormForPreview.id ? { ...f, contentTemplate: editingContent } : f));
+                                  addToast({
+                                     type: 'success',
+                                     title: 'تم التخزين',
+                                     message: 'تم حفظ كافة التغيرات على القالب القانوني ونظام المتغيرات.'
+                                  });
+                                  setSelectedFormForPreview(null);
+                             }}
+                             className="bg-primary hover:bg-primary-dark text-white font-bold w-48"
+                           >
+                                حفظ التعديلات وحفظ
+                           </Button>
+                      </div>
+                 </div>
+
+                 {/* PHYSICAL OFFICIAL PRINTING SHEET FORMATTING CONTAINER - RENDERS IN PRINT RUNTIME */}
+                 <div className="hidden print:block printable-sheet bg-white p-8 text-black shadow-none border-none font-serif leading-[2.3] text-sm">
+                      <div className="flex justify-between items-center border-b-2 border-primary pb-4 mb-8 text-[11px] text-gray-400">
+                           <div className="text-right">
+                                <span className="block font-bold">مكتب صبري شطا للمحاماة والاستشارات</span>
+                                <span className="block">الكويت - مجمع محاكم الرقعي</span>
+                           </div>
+                           <div className="text-left font-mono">
+                                <span className="block font-bold">SABRI SHATA LAW WORKSPACE</span>
+                                <span className="block">Verification: REF-FORMS-2026</span>
+                           </div>
+                      </div>
+
+                      {customSignatures.showWatermark && (
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] z-0 transform -rotate-45">
+                              <span className="text-8xl font-black text-gray-900 tracking-widest uppercase">OFFICIAL APPROVED COPY</span>
+                          </div>
+                      )}
+
+                      <h2 className="text-center font-black text-lg text-slate-900 border-b pb-3 mb-6">{selectedFormForPreview.title}</h2>
+                      
+                      <div className="legal-body text-justify font-serif text-sm whitespace-pre-wrap leading-[2.4] px-4">
+                           {renderedContentOutput}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-10 mt-16 pt-8 border-t border-gray-200 text-xs">
+                           <div className="text-right">
+                                <p className="font-bold mb-10">{customSignatures.partyOneSign || 'الموكل المنهي للتوقيع:'} ____________________</p>
+                                <p className="text-[10px] text-gray-400">بصفته طرفاً تعاقدياً أول</p>
+                           </div>
+                           <div className="text-left">
+                                <p className="font-bold mb-10">{customSignatures.partyTwoSign || 'اعتماد مستشاري صبري شطا:'} ____________________</p>
+                                <p className="text-[10px] text-gray-400">التصديق المعتمد والمراجعة الرسمية</p>
+                           </div>
+                      </div>
+
+                      {customSignatures.showStamp && (
+                           <div className="flex justify-center mt-12">
+                                <div className="border-4 border-double border-primary text-primary px-5 py-2.5 rounded-full text-center max-w-[250px] transform rotate-3">
+                                     <span className="block text-[10px] font-bold uppercase tracking-widest">مكتب صبري شطا للمحاماة</span>
+                                     <span className="block font-black text-xs">مراجعة معتمدة ومودعة</span>
+                                     <span className="block text-[9px] font-mono">Date Seal: {new Date().toLocaleDateString()}</span>
+                                </div>
+                           </div>
+                      )}
+                 </div>
             </div>
-          </div>
         )}
       </Modal>
     </div>

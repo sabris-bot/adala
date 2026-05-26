@@ -144,11 +144,18 @@ export const CompliancePriorityBadge: React.FC<{ priority: CompliancePriority, s
 export const LoanStatusBadge: React.FC<{ status: LoanStatus, size?: 'xs' | 'sm' }> = ({ status, size }) => {
   let color: BadgeColor = 'gray';
   switch(status) {
+    case LoanStatus.DRAFT: color = 'purple'; break;
     case LoanStatus.PENDING_APPROVAL: color = 'yellow'; break;
-    case LoanStatus.APPROVED: case LoanStatus.ACTIVE: color = 'blue'; break;
+    case LoanStatus.UNDER_FINANCIAL_REVIEW: color = 'orange'; break;
+    case LoanStatus.AWAITING_HR_APPROVAL: color = 'cyan'; break;
+    case LoanStatus.APPROVED: color = 'indigo'; break;
+    case LoanStatus.ACTIVE: color = 'blue'; break;
+    case LoanStatus.PARTIALLY_PAID: color = 'orange'; break;
     case LoanStatus.PAID_IN_FULL: color = 'green'; break;
-    case LoanStatus.REJECTED: case LoanStatus.CANCELLED: color = 'gray'; break;
+    case LoanStatus.REJECTED: color = 'red'; break;
+    case LoanStatus.CANCELLED: color = 'gray'; break;
     case LoanStatus.DEFAULTED: color = 'red'; break;
+    case LoanStatus.ARCHIVED: color = 'gray'; break;
   }
   return <Badge text={status} color={color} size={size} />;
 };
