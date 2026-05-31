@@ -335,16 +335,16 @@ export const LocalizationSettings: React.FC = () => {
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">اللغة الحالية بالمتصفح</label>
               <div className="flex items-center gap-2">
                 <Button 
-                  size="xs" 
-                  variant={i18n.language === 'ar' ? 'indigo' : 'white'}
+                  size="sm" 
+                  variant={i18n.language === 'ar' ? 'primary' : 'outline'}
                   className="rounded-xl px-4 py-1.5 font-black text-xs"
                   onClick={() => handleSaveDefaultLang('ar')}
                 >
                   العربية (RTL)
                 </Button>
                 <Button 
-                  size="xs" 
-                  variant={i18n.language === 'en' ? 'indigo' : 'white'}
+                  size="sm" 
+                  variant={i18n.language === 'en' ? 'primary' : 'outline'}
                   className="rounded-xl px-4 py-1.5 font-black text-xs"
                   onClick={() => handleSaveDefaultLang('en')}
                 >
@@ -435,7 +435,7 @@ export const LocalizationSettings: React.FC = () => {
                 />
 
                 <Button 
-                  variant="indigo"
+                  variant="primary"
                   leftIcon={<Plus className="w-4 h-4" />}
                   className="rounded-2xl text-xs font-black shadow-lg shadow-indigo-600/15"
                   onClick={() => {
@@ -447,7 +447,7 @@ export const LocalizationSettings: React.FC = () => {
                 </Button>
 
                 <Button
-                  variant="white"
+                  variant="outline"
                   className="rounded-2xl text-xs"
                   onClick={loadData}
                   leftIcon={<RefreshCw className="w-3.5 h-3.5" />}
@@ -487,8 +487,8 @@ export const LocalizationSettings: React.FC = () => {
 
                     <div className="flex gap-1">
                       <Button
-                        size="xs"
-                        variant="white"
+                        size="sm"
+                        variant="outline"
                         className="rounded-lg p-1.5"
                         onClick={() => handleOpenEdit(item)}
                         title="تعديل الترجمة"
@@ -497,8 +497,8 @@ export const LocalizationSettings: React.FC = () => {
                       </Button>
                       {item.isCustom && (
                         <Button
-                          size="xs"
-                          variant="white"
+                          size="sm"
+                          variant="outline"
                           className="rounded-lg p-1.5 text-rose-500 hover:bg-rose-50"
                           onClick={() => handleDeleteOverride(item.key)}
                           title="استعادة الترجمة الافتراضية"
@@ -623,10 +623,10 @@ export const LocalizationSettings: React.FC = () => {
                         </span>
                       </div>
                       <Button
-                        size="xs"
-                        variant="indigo"
+                        size="sm"
+                        variant="primary"
                         onClick={() => {
-                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: '', en: '' };
+                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: '', en: '', isCustom: false, isMissing: true, isArCustom: false, isEnCustom: false };
                           handleOpenEdit(originalItem);
                         }}
                       >
@@ -666,10 +666,10 @@ export const LocalizationSettings: React.FC = () => {
                         </span>
                       </div>
                       <Button
-                        size="xs"
-                        variant="indigo"
+                        size="sm"
+                        variant="primary"
                         onClick={() => {
-                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: item.arValue, en: item.enValue };
+                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: item.arValue, en: item.enValue, isCustom: true, isMissing: false, isArCustom: true, isEnCustom: true };
                           handleOpenEdit(originalItem);
                         }}
                       >
@@ -709,10 +709,10 @@ export const LocalizationSettings: React.FC = () => {
                         </span>
                       </div>
                       <Button
-                        size="xs"
-                        variant="indigo"
+                        size="sm"
+                        variant="primary"
                         onClick={() => {
-                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: item.arValue, en: item.enValue };
+                          const originalItem = translationsTable.find(t => t.key === item.key) || { key: item.key, ar: item.arValue, en: item.enValue, isCustom: true, isMissing: false, isArCustom: true, isEnCustom: true };
                           handleOpenEdit(originalItem);
                         }}
                       >
@@ -753,7 +753,7 @@ export const LocalizationSettings: React.FC = () => {
                   </div>
                   <Button
                     size="sm"
-                    variant="indigo"
+                    variant="primary"
                     onClick={() => handleExportJSON('ar')}
                   >
                     تصدير الحزمة
@@ -767,7 +767,7 @@ export const LocalizationSettings: React.FC = () => {
                   </div>
                   <Button
                     size="sm"
-                    variant="indigo"
+                    variant="primary"
                     onClick={() => handleExportJSON('en')}
                   >
                     Export Package
@@ -793,16 +793,16 @@ export const LocalizationSettings: React.FC = () => {
                   <label className="block text-xs font-black text-slate-600 dark:text-slate-400 mb-2">اسم الحزمة المستهدفة بالمدخلات</label>
                   <div className="flex items-center gap-2">
                     <Button
-                      size="xs"
-                      variant={selectedLanguage === 'ar' ? 'indigo' : 'white'}
+                      size="sm"
+                      variant={selectedLanguage === 'ar' ? 'primary' : 'outline'}
                       className="rounded-xl px-4 py-1.5 text-xs font-bold"
                       onClick={() => setSelectedLanguage('ar')}
                     >
                       دمج بالقاموس العربي (ar.json)
                     </Button>
                     <Button
-                      size="xs"
-                      variant={selectedLanguage === 'en' ? 'indigo' : 'white'}
+                      size="sm"
+                      variant={selectedLanguage === 'en' ? 'primary' : 'outline'}
                       className="rounded-xl px-4 py-1.5 text-xs font-bold"
                       onClick={() => setSelectedLanguage('en')}
                     >
@@ -873,7 +873,7 @@ export const LocalizationSettings: React.FC = () => {
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-gray-850">
                   <Button
                     type="button"
-                    variant="white"
+                    variant="outline"
                     className="rounded-xl px-5 text-xs"
                     onClick={() => setIsEditModalOpen(false)}
                   >
@@ -881,7 +881,7 @@ export const LocalizationSettings: React.FC = () => {
                   </Button>
                   <Button
                     type="submit"
-                    variant="indigo"
+                    variant="primary"
                     className="rounded-xl px-6 text-xs font-black"
                   >
                     حفظ الترجمة الحالية
@@ -949,7 +949,7 @@ export const LocalizationSettings: React.FC = () => {
                 <div className="flex justify-end gap-2 pt-4 border-t border-slate-100 dark:border-gray-850">
                   <Button
                     type="button"
-                    variant="white"
+                    variant="outline"
                     className="rounded-xl px-5 text-xs"
                     onClick={() => setIsAddModalOpen(false)}
                   >
@@ -957,7 +957,7 @@ export const LocalizationSettings: React.FC = () => {
                   </Button>
                   <Button
                     type="submit"
-                    variant="indigo"
+                    variant="primary"
                     className="rounded-xl px-6 text-xs font-black"
                   >
                     رصف وإضافة المصطلح

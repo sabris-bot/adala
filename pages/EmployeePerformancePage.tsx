@@ -1,1856 +1,1892 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { 
-    Activity, Plus, UserCircle, ChevronRight, Search, Filter, Star, RefreshCw, 
-    BarChart3, Printer, Eye, Trash, Edit, ArrowDown, CheckCircle2, AlertTriangle, 
-    Clock, TrendingUp, FileText, ChevronLeft, ShieldAlert, Award, FileSpreadsheet,
-    Building2, ClipboardList, HelpCircle, ArrowRightLeft, MessageSquare, Copy
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Plus, Search, Filter, Printer, Trash, Copy, Edit3, Award, FileText,
+  AlertTriangle, Users, BookOpen, Clock, Shield, Archive, RefreshCw, Check, CheckCircle2,
+  Lock, ArrowRight, ExternalLink, QrCode, FileSpreadsheet, Fingerprint, Coins, Eye, Star, Map, HelpingHand
 } from 'lucide-react';
-import Card from '../components/ui/Card';
-import Button from '../components/ui/Button';
-import { Badge } from '../components/ui/Badge';
-import Modal from '../components/ui/Modal';
-import { useJurisdiction } from '../components/JurisdictionContext';
-import { 
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell
-} from 'recharts';
 
-// --- ENUMS & INTERFACES ---
-export enum RoleLevel {
-    EXECUTIVE = 'Executive', // تنفيذي / قيادي
-    MANAGERIAL = 'Managerial', // إداري / إشرافي
-    OPERATIONAL = 'Operational', // تشغيلي / تنفيذي
-    TECHNICAL = 'Technical', // فني / تخصصي
-}
+// Modular Sub-components and types
+import {
+  LocalEmployee,
+  LocalAppraisal,
+  PerformanceTier,
+  PerformanceAppraisalStatus
+} from './PerformanceAppraisalTypes';
 
-export type PerformanceAppraisalStatus = 'Draft' | 'Pending Line Manager' | 'Under HR Review' | 'Under Financial Review' | 'Signed & Completed';
+import {
+  mockEmployeesList,
+  initialAppraisalsSeed,
+  translations
+} from './PerformanceAppraisalData';
 
-export interface PerformanceCriterion {
-    name: string;
-    score: number;
-    weight: number;
-    notes?: string;
-}
+import { PrePrintEditorModal } from './PrePrintEditorModal';
+import { PerformanceReportsSuite } from './PerformanceReportsSuite';
 
-export interface PerformanceAppraisal {
-    id: string;
-    employeeId: string;
-    employeeName: string;
-    employeeJobTitle: string;
-    employeeDepartment: string;
-    managerName: string;
-    appraisalPeriod: string;
-    appraisalDate: string;
-    status: PerformanceAppraisalStatus;
-    roleLevel: RoleLevel;
-    
-    // Auto-retrieved compliance flags
-    attendanceAbsences: number;
-    attendanceDelays: number;
-    warningsCount: number;
-    activeGoalsCount: number;
-    basicSalary: number;
-    allowancesAmount: number;
-    civilId: string;
-    joiningDate: string;
-    nationality: string;
+// Custom Toast System
+const Toast: React.FC<{ message: string; sub: string; type: 'success' | 'warn'; onClose: () => void }> = ({
+  message,
+  sub,
+  type,
+  onClose
+}) => (
+  <motion.div
+    initial={{ y: 50, opacity: 0 }}
+    animate={{ y: 0, opacity: 1 }}
+    exit={{ y: 50, opacity: 0 }}
+    className="fixed bottom-6 left-6 z-[9999] p-4.5 bg-slate-900 border border-slate-850 rounded-2xl shadow-2xl flex items-start gap-3 w-80 text-right leading-relaxed"
+    dir="rtl"
+  >
+    <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+      type === 'success' ? 'bg-[#E0F2F1] text-[#00796B]' : 'bg-rose-100 text-rose-600'
+    }`}>
+      {type === 'success' ? <Check className="w-4 h-4" /> : <AlertTriangle className="w-4 h-4" />}
+    </div>
+    <div className="flex-1">
+      <p className="font-black text-xs text-white">{message}</p>
+      <p className="text-[10.5px] text-slate-400 font-semibold mt-0.5">{sub}</p>
+    </div>
+  </motion.div>
+);
 
-    // Evaluation Scores
-    criteria: {
-        // Quantitative (الكمية)
-        efficiency: PerformanceCriterion;        // كفاءة الإنجاز
-        outputAmount: PerformanceCriterion;      // كمية المخرجات
-        attendance: PerformanceCriterion;        // الانضباط والدوام
-        policyCompliance: PerformanceCriterion;  // الالتزام باللوائح والتعليمات
-
-        // Qualitative (النوعية)
-        leadership: PerformanceCriterion;        // القيادة والتمكين
-        integrity: PerformanceCriterion;         // النزاهة وأخلاقيات العمل
-        clientCoordination: PerformanceCriterion;// التنسيق والتعامل مع العملاء
-        nationalAlignment: PerformanceCriterion; // التوطين والتوجه الوطني
-    };
-    
-    overallScore: number; 
-    overallGrade: 'Excellent' | 'Very Good' | 'Good' | 'Satisfactory' | 'Weak'; 
-    generalNotes?: string;
-    correctiveActionPlan?: string;
-
-    // Recommendations
-    recommendations: {
-        promotion: boolean;
-        salaryIncrease: boolean;
-        salaryIncreasePct: number;
-        bonus: boolean;
-        bonusAmount: number;
-        warning: boolean;
-        disciplinaryAction?: string;
-        trainingNeeded?: string;
-    };
-
-    // Audit and signatures
-    referenceNumber: string;
-    qrCodeData: string;
-    signatures: {
-        manager?: { name: string; signedAt?: string };
-        hr?: { name: string; signedAt?: string };
-        employee?: { name: string; signedAt?: string };
-        auditor?: { name: string; signedAt?: string };
-    };
-    
-    // Workflows / History
-    isGrievanceSubmitted?: boolean;
-    grievanceNote?: string;
-    grievanceResponse?: string;
-    isTransferSubmitted?: boolean;
-    transferTargetDept?: string;
-}
-
-// --- MOCK EMPLOYEES ---
-const mockEmployeesList = [
-    { id: 'emp-1', employeeId: 'EMP001', fullNameAr: 'أحمد محمود العبدالله', jobTitle: 'محاسب رئيسي', department: 'المالية', joiningDate: '2018-05-10', basicSalary: 1500, allowancesAmount: 300, civilId: '290010100123', nationality: 'كويتي', warningsCount: 0, attendanceAbsences: 0, attendanceDelays: 1 },
-    { id: 'emp-2', employeeId: 'EMP002', fullNameAr: 'سحر جاسم الفيلي', jobTitle: 'مساعد عمليات', department: 'العمليات', joiningDate: '2022-09-12', basicSalary: 750, allowancesAmount: 100, civilId: '295050500456', nationality: 'كويتية', warningsCount: 3, attendanceAbsences: 12, attendanceDelays: 14 },
-    { id: 'emp-3', employeeId: 'EMP003', fullNameAr: 'خالد عبدالمحسن الصايغ', jobTitle: 'منسق عمليات', department: 'العمليات', joiningDate: '2021-03-05', basicSalary: 1100, allowancesAmount: 150, civilId: '291030300789', nationality: 'كويتي', warningsCount: 0, attendanceAbsences: 2, attendanceDelays: 4 },
-    { id: 'emp-4', employeeId: 'EMP004', fullNameAr: 'بدر فهد المطيري', jobTitle: 'باحث قانوني', department: 'الشؤون القانونية', joiningDate: '2020-07-15', basicSalary: 1250, allowancesAmount: 200, civilId: '293040400321', nationality: 'كويتي', warningsCount: 1, attendanceAbsences: 1, attendanceDelays: 3 },
-    { id: 'emp-5', employeeId: 'EMP005', fullNameAr: 'سارة خالد الصباح', jobTitle: 'مستشار قانوني', department: 'الشركات', joiningDate: '2020-02-15', basicSalary: 1800, allowancesAmount: 400, civilId: '295090900111', nationality: 'كويتية', warningsCount: 0, attendanceAbsences: 0, attendanceDelays: 0 },
+const APPRAISAL_TYPES = [
+  { id: 'probation', ar: 'تقييم فترة التجربة والتحقق عمالياً', en: 'Probation Period Statutory Evaluation' },
+  { id: 'monthly', ar: 'التقييم الشهري المنتظم للأداء بالبصمة', en: 'Regular Monthly Performance Appraisal' },
+  { id: 'quarterly', ar: 'التقييم الربع سنوي للمطابقة والإنتاجية', en: 'Quarterly Productivity & Compliance Audit' },
+  { id: 'semi_annual', ar: 'التقييم نصف السنوي المبرم للكفاءة', en: 'Semi-annual Performance Ledger Review' },
+  { id: 'annual', ar: 'التقييم السنوي الشامل والنهائي لقانون العمل', en: 'Annual Statutory Performance Appraisal' },
+  { id: 'promotion', ar: 'تقييم الترقية والزيادة والاستحقاق المالي', en: 'Promotion & Payroll Increment Assessment' },
+  { id: 'professional_competency', ar: 'تقييم الكفاءة المهنية وصياغة اللوائح والمذكرات', en: 'Professional Legal Drafting & Counsel Competency' },
+  { id: 'behavior_discipline', ar: 'تقييم الانضباط الوظيفي والالتزام بالدوام والتحقيق', en: 'Job Discipline, Leave Tracking & Attendance Evaluation' },
+  { id: 'skills_behavior', ar: 'تقييم المهارات والسلوك والأخلاقيات وشرف المهنة', en: 'Skills, Professional Behavior & Client Ethics Review' }
 ];
 
-// --- SEED CONTEXT DEPOS (4 INTERACTIVE LIVE DEMOS) ---
-const initialAppraisalsSeed: PerformanceAppraisal[] = [
-    {
-        id: 'app-seed-1',
-        employeeId: 'emp-1',
-        employeeName: 'أحمد محمود العبدالله',
-        employeeJobTitle: 'محاسب رئيسي',
-        employeeDepartment: 'المالية',
-        managerName: 'يوسف العثمان',
-        appraisalPeriod: '2024 / 2025',
-        appraisalDate: '2025-12-15',
-        status: 'Signed & Completed',
-        roleLevel: RoleLevel.MANAGERIAL,
-        attendanceAbsences: 0,
-        attendanceDelays: 1,
-        warningsCount: 0,
-        activeGoalsCount: 3,
-        basicSalary: 1500,
-        allowancesAmount: 300,
-        civilId: '290010100123',
-        joiningDate: '2018-05-10',
-        nationality: 'كويتي',
-        criteria: {
-            efficiency: { name: 'كفاءة الإنجاز والتوقيت', score: 5, weight: 15 },
-            outputAmount: { name: 'حجم مخرجات العمل', score: 5, weight: 15 },
-            attendance: { name: 'الانضباط والالتزام بالدوام', score: 5, weight: 10 },
-            policyCompliance: { name: 'الالتزام باللوائح والسياسات', score: 5, weight: 10 },
-            leadership: { name: 'التوجيه والقيادة والمبادرة', score: 4.5, weight: 15 },
-            integrity: { name: 'النزاهة وأخلاقيات المهنة', score: 5, weight: 15 },
-            clientCoordination: { name: 'التواصل ورضا العملاء', score: 4.5, weight: 10 },
-            nationalAlignment: { name: 'التوطين ومواءمة التوجه الوطني', score: 4.8, weight: 10 },
-        },
-        overallScore: 4.86,
-        overallGrade: 'Excellent',
-        generalNotes: 'موظف قيادي واستباقي. يظهر كفاءة استثنائية في إعداد وإغلاق الميزانيات الربعية والسنوية بنسبة التزام وتدقيق كاملة 100% دون أي ملاحظات من المدقق المالي الخارجي.',
-        recommendations: {
-            promotion: true,
-            salaryIncrease: true,
-            salaryIncreasePct: 15,
-            bonus: true,
-            bonusAmount: 500,
-            warning: false,
-            trainingNeeded: 'برنامج دبلوم الإدارة والقيادة المتقدم بالتنسيق مع معهد الدراسات المصرفية',
-        },
-        referenceNumber: 'QA-PERF-2025-001',
-        qrCodeData: 'https://ais-adala/verify/perf/QA-PERF-2025-001',
-        signatures: {
-            manager: { name: 'يوسف العثمان', signedAt: '2025-12-16' },
-            hr: { name: 'ناصر السبيعي', signedAt: '2025-12-18' },
-            employee: { name: 'أحمد محمود العبدالله', signedAt: '2025-12-20' },
-            auditor: { name: 'صبري شطا', signedAt: '2025-12-18' }
-        }
-    },
-    {
-        id: 'app-seed-2',
-        employeeId: 'emp-2',
-        employeeName: 'سحر جاسم الفيلي',
-        employeeJobTitle: 'مساعد عمليات',
-        employeeDepartment: 'العمليات',
-        managerName: 'منيرة الصباح',
-        appraisalPeriod: '2025 / 2026',
-        appraisalDate: '2026-05-15',
-        status: 'Under HR Review',
-        roleLevel: RoleLevel.OPERATIONAL,
-        attendanceAbsences: 12,
-        attendanceDelays: 14,
-        warningsCount: 3,
-        activeGoalsCount: 1,
-        basicSalary: 750,
-        allowancesAmount: 100,
-        civilId: '295050500456',
-        joiningDate: '2022-09-12',
-        nationality: 'كويتية',
-        criteria: {
-            efficiency: { name: 'كفاءة الإنجاز والتوقيت', score: 2.0, weight: 15 },
-            outputAmount: { name: 'حجم مخرجات العمل', score: 1.5, weight: 15 },
-            attendance: { name: 'الانضباط والالتزام بالدوام', score: 1.0, weight: 10 },
-            policyCompliance: { name: 'الالتزام باللوائح والسياسات', score: 2.0, weight: 10 },
-            leadership: { name: 'التوجيه والقيادة والمبادرة', score: 1.0, weight: 15 },
-            integrity: { name: 'النزاهة وأخلاقيات المهنة', score: 3.5, weight: 15 },
-            clientCoordination: { name: 'التواصل ورضا العملاء', score: 1.8, weight: 10 },
-            nationalAlignment: { name: 'التوطين ومواءمة التوجه الوطني', score: 2.5, weight: 10 },
-        },
-        overallScore: 1.83,
-        overallGrade: 'Weak',
-        generalNotes: 'الموظفة تعاني من تراجع ملحوظ في الأداء وتكرار الغيابات دون عذر طبي مقبول أو إجازة مسبقة. تم توجيه إنذارات سابقة شفهية وكتابية دون تحسن ملموس. هناك قصور حاد في معالجة طلبات العملاء.',
-        correctiveActionPlan: 'وضع الموظفة تحت خطة تقويم ومراقبة أداء مشددة لمدة 90 يوماً من تاريخ التقييم مع ضرورة تقديم تقارير إنجاز أسبوعية وإلحاقها بتدريب أساسي.',
-        recommendations: {
-            promotion: false,
-            salaryIncrease: false,
-            salaryIncreasePct: 0,
-            bonus: false,
-            bonusAmount: 0,
-            warning: true,
-            disciplinaryAction: 'إصدار كتاب إنذار نهائي مسجل وإيقاع خصم من الراتب لمخالفتها لوائح الحضور والانصراف وفقاً للفصل السادس من قانون العمل الكويتي',
-            trainingNeeded: 'تمويل دورة تدريبية علاجية لخدمة العملاء والالتزام الوظيفي.',
-        },
-        referenceNumber: 'QA-PERF-2026-002',
-        qrCodeData: 'https://ais-adala/verify/perf/QA-PERF-2026-002',
-        signatures: {
-            manager: { name: 'منيرة الصباح', signedAt: '2026-05-16' },
-        }
-    },
-    {
-        id: 'app-seed-3',
-        employeeId: 'emp-3',
-        employeeName: 'خالد عبدالمحسن الصايغ',
-        employeeJobTitle: 'منسق عمليات',
-        employeeDepartment: 'العمليات',
-        managerName: 'منيرة الصباح',
-        appraisalPeriod: '2025 / 2026',
-        appraisalDate: '2026-05-18',
-        status: 'Under Financial Review',
-        roleLevel: RoleLevel.TECHNICAL,
-        attendanceAbsences: 2,
-        attendanceDelays: 4,
-        warningsCount: 0,
-        activeGoalsCount: 2,
-        basicSalary: 1100,
-        allowancesAmount: 150,
-        civilId: '291030300789',
-        joiningDate: '2021-03-05',
-        nationality: 'كويتي',
-        criteria: {
-            efficiency: { name: 'كفاءة الإنجاز والتوقيت', score: 4.5, weight: 15 },
-            outputAmount: { name: 'حجم مخرجات العمل', score: 4.2, weight: 15 },
-            attendance: { name: 'الانضباط والالتزام بالدوام', score: 4.5, weight: 10 },
-            policyCompliance: { name: 'الالتزام باللوائح والسياسات', score: 4.5, weight: 10 },
-            leadership: { name: 'التوجيه والقيادة والمبادرة', score: 3.8, weight: 15 },
-            integrity: { name: 'النزاهة وأخلاقيات المهنة', score: 4.2, weight: 15 },
-            clientCoordination: { name: 'التواصل ورضا العملاء', score: 4.5, weight: 10 },
-            nationalAlignment: { name: 'التوطين ومواءمة التوجه الوطني', score: 4.0, weight: 10 },
-        },
-        overallScore: 4.24,
-        overallGrade: 'Very Good',
-        generalNotes: 'طلب الموظف النقل من إدارة العمليات إلى إدارة التدقيق القانوني بالشركة، نظراً لحصوله مؤخراً على شهادة تخصصية في القانون المالي ومراجعة الحسابات الإدارية. التقييم يدعم هذا المسار الوظيفي الداخلي.',
-        isTransferSubmitted: true,
-        transferTargetDept: 'إدارة التدقيق القانوني',
-        recommendations: {
-            promotion: false,
-            salaryIncrease: true,
-            salaryIncreasePct: 5,
-            bonus: false,
-            bonusAmount: 0,
-            warning: false,
-            disciplinaryAction: 'الموافقة المبدئية والرفع للمدير المالي لاعتماد هيكلة وبدلات إدارة التدقيق القانوني الجديدة.',
-        },
-        referenceNumber: 'QA-PERF-2026-003',
-        qrCodeData: 'https://ais-adala/verify/perf/QA-PERF-2026-003',
-        signatures: {
-            manager: { name: 'منيرة الصباح', signedAt: '2026-05-18' },
-            hr: { name: 'ناصر السبيعي', signedAt: '2026-05-19' }
-        }
-    },
-    {
-        id: 'app-seed-4',
-        employeeId: 'emp-4',
-        employeeName: 'بدر فهد المطيري',
-        employeeJobTitle: 'باحث قانوني',
-        employeeDepartment: 'الشؤون القانونية',
-        managerName: 'أبو الوفا الدسوقي',
-        appraisalPeriod: '2025 / 2026',
-        appraisalDate: '2026-05-20',
-        status: 'Under HR Review',
-        roleLevel: RoleLevel.TECHNICAL,
-        attendanceAbsences: 1,
-        attendanceDelays: 3,
-        warningsCount: 1,
-        activeGoalsCount: 2,
-        basicSalary: 1250,
-        allowancesAmount: 200,
-        civilId: '293040400321',
-        joiningDate: '2020-07-15',
-        nationality: 'كويتي',
-        criteria: {
-            efficiency: { name: 'كفاءة الإنجاز والتوقيت', score: 3.5, weight: 15 },
-            outputAmount: { name: 'حجم مخرجات العمل', score: 3.0, weight: 15 },
-            attendance: { name: 'الانضباط والالتزام بالدوام', score: 3.5, weight: 10 },
-            policyCompliance: { name: 'الالتزام باللوائح والسياسات', score: 3.0, weight: 10 },
-            leadership: { name: 'التوجيه والقيادة والمبادرة', score: 2.5, weight: 15 },
-            integrity: { name: 'النزاهة وأخلاقيات المهنة', score: 4.0, weight: 15 },
-            clientCoordination: { name: 'التواصل ورضا العملاء', score: 3.0, weight: 10 },
-            nationalAlignment: { name: 'التوطين ومواءمة التوجه الوطني', score: 3.5, weight: 10 },
-        },
-        overallScore: 3.20,
-        overallGrade: 'Good',
-        generalNotes: 'تقدّم الموظف بتظلم رسمي إداري ضد تقييمه الصادر من رئيس القسم المباشر (بدرجة جيد)، بحجة تواجد تحيز شخصي ضده وطالب بإعادة مراجعة التقييم استناداً لملف مذكرات الرد على القضايا الكلية المنجزة وعددها 14 قضية.',
-        isGrievanceSubmitted: true,
-        grievanceNote: 'التقييم لا يعكس الجهد المبذول في صياغة مذكرات قضايا الشركات الكبرى. قمت بصياغة 14 مذكرة دفاع في المحكمة الكلية وتم قبول الدفوع بالكامل وتحقيق مكاسب تتجاوز 400 ألف د.ك لصالح عملاء الشركة.',
-        grievanceResponse: 'قيد الدراسة من لجنة الموارد البشرية والتدقيق القانوني لإعادة مراجعة ملف القضايا والتحقق من التظلم الإداري.',
-        recommendations: {
-            promotion: false,
-            salaryIncrease: false,
-            salaryIncreasePct: 0,
-            bonus: false,
-            bonusAmount: 0,
-            warning: false,
-        },
-        referenceNumber: 'QA-PERF-2026-004',
-        qrCodeData: 'https://ais-adala/verify/perf/QA-PERF-2026-004',
-        signatures: {
-            manager: { name: 'أبو الوفا الدسوقي', signedAt: '2026-05-20' }
-        }
+export const EmployeePerformancePage: React.FC = () => {
+  // --- Languages & General States ---
+  const [language, setLanguage] = useState<'ar' | 'en'>(() => {
+    return (localStorage.getItem('alwagayan_lang') as 'ar' | 'en') || 'ar';
+  });
+  const isAr = language === 'ar';
+
+  const translate = (ar: string, en: string) => isAr ? ar : en;
+  const t = translations[language];
+
+  // --- Dynamic System State Databases Loaded Instantly ---
+  
+  // 1. Employee Profile Register (Synchronized across ERP)
+  const [employees, setEmployees] = useState<any[]>(() => {
+    const stored = localStorage.getItem('alwagayan_employees');
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (parsed.length > 0) return parsed;
+      } catch (e) {
+        console.error('Failed parsing alwagayan_employees', e);
+      }
     }
-];
+    // Set fallback seed
+    localStorage.setItem('alwagayan_employees', JSON.stringify(mockEmployeesList));
+    return mockEmployeesList;
+  });
 
-const EmployeePerformancePage: React.FC = () => {
-    const { t } = useTranslation();
-    const { selectedJurisdiction } = useJurisdiction();
+  // 2. Performance Appraisals Dossier
+  const [appraisals, setAppraisals] = useState<any[]>(() => {
+    const saved = localStorage.getItem('adala_perf_appraisals_v3');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return initialAppraisalsSeed;
+  });
 
-    // --- STATES ---
-    const [appraisals, setAppraisals] = useState<PerformanceAppraisal[]>(initialAppraisalsSeed);
-    const [employees, setEmployees] = useState(mockEmployeesList);
-    const [activeTab, setActiveTab] = useState<'kpi' | 'evaluations' | 'newForm'>('kpi');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [deptFilter, setDeptFilter] = useState('All');
-    const [levelFilter, setLevelFilter] = useState('All');
+  // 3. Goals Database
+  const [goals, setGoals] = useState<any[]>(() => {
+    const saved = localStorage.getItem('adala_perf_goals_v3');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return [
+      { id: 'goal-1', employeeId: 'emp-1', titleAr: 'تحسين سرعة إنجاز عقود الاستملاك والتجارة بنسبة 20%', titleEn: 'Optimize acquisitions contract speeds by 20%', targetDate: '2026-08-31', statusAr: 'قيد التنفيذ' },
+      { id: 'goal-2', employeeId: 'emp-2', titleAr: 'حضور دورتين تخصصيتين في صياغة دفوع التلبس الجنائي', titleEn: 'Attend two crime defense pleading courses', targetDate: '2026-07-15', statusAr: 'قيد التنفيذ' },
+      { id: 'goal-3', employeeId: 'emp-3', titleAr: 'اعتماد ٣ مساحات تحكيم مالي جديدة مع جمعية المحامين', titleEn: 'Accredit 3 commercial arbitration frameworks', targetDate: '2026-12-01', statusAr: 'قيد التنفيذ' }
+    ];
+  });
 
-    // Details / Print Modal States
-    const [selectedAppraisal, setSelectedAppraisal] = useState<PerformanceAppraisal | null>(null);
-    const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-    const [printDocType, setPrintDocType] = useState<'appraisal' | 'warning' | 'promotion' | 'transfer' | 'grievance'>('appraisal');
+  // 4. Development Plans Register (خطط التطوير والتحسين)
+  const [developmentPlans, setDevelopmentPlans] = useState<any[]>(() => {
+    const saved = localStorage.getItem('adala_perf_dev_v3');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return [
+      { id: 'dev-1', employeeId: 'emp-4', titleAr: 'خطة تقويم إجبارية في أصول صياغة اللائحة مع الأستاذ صبري شطا', titleEn: 'Remedial writing and pleading training with Saber Shatta', mentor: 'أ. صبري شطا', targetDate: '2026-06-30', progress: 40 },
+      { id: 'dev-2', employeeId: 'emp-2', titleAr: 'خطة تعميق دراسة أوراق قضايا الخبراء وتسليم التقارير بوزارة العدل', titleEn: 'Deeper audits workflow of expert folders with Ministry of Justice', mentor: 'د. يوسف شطا', targetDate: '2026-09-01', progress: 75 }
+    ];
+  });
 
-    // Add / Edit Form State
-    const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
-    const [editingId, setEditingId] = useState<string | null>(null);
-    
-    // Core Form Fields
-    const [formEmployeeId, setFormEmployeeId] = useState('');
-    const [formRoleLevel, setFormRoleLevel] = useState<RoleLevel>(RoleLevel.OPERATIONAL);
-    const [formAppraisalPeriod, setFormAppraisalPeriod] = useState('2025 / 2026');
-    const [formAppraisalDate, setFormAppraisalDate] = useState(new Date().toISOString().split('T')[0]);
-    const [formManagerName, setFormManagerName] = useState('صبري شطا');
-    const [formNotes, setFormNotes] = useState('');
-    const [formActionPlan, setFormActionPlan] = useState('');
-    
-    // Scores
-    const [scoreEfficiency, setScoreEfficiency] = useState(4);
-    const [scoreOutput, setScoreOutput] = useState(4);
-    const [scoreAttendance, setScoreAttendance] = useState(4);
-    const [scoreCompliance, setScoreCompliance] = useState(4);
-    const [scoreLeadership, setScoreLeadership] = useState(4);
-    const [scoreIntegrity, setScoreIntegrity] = useState(4);
-    const [scoreClient, setScoreClient] = useState(4);
-    const [scoreNational, setScoreNational] = useState(4);
+  // 5. Recommendations Ledger (التوصيات والقرارات الكادرية لعام 2026)
+  const [recommendations, setRecommendations] = useState<any[]>(() => {
+    const saved = localStorage.getItem('adala_perf_recs_v3');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.error(e); }
+    }
+    return [
+      { id: 'rec-1', employeeId: 'emp-1', typeAr: 'ترقية استشارية وعلاوة', typeEn: 'Promotion & Hike', recommendationTextAr: 'توصي لجنة الترقية للمستشار أحمد العبدالله نظراً لامتيازه اللائحي بكتابة مذكرات تجاوزت 5 ملايين د.ك.', recommendationTextEn: 'Recommend Ahmad Al-Abdullah for partnership promotion due to exceptional drafting exceeds 5M KWD.', decisionStatus: 'Approved', effectiveDate: '2026-06-15', refId: 'REC-2026-09' },
+      { id: 'rec-2', employeeId: 'emp-4', typeAr: 'صقل وتدريب مهني غليظ', typeEn: 'Remedial training', recommendationTextAr: 'إلزام الباحث بدر المطيري بـ ٤ ورش صياغة وتوجيه إنذار دوام بالبصمة قبل التثبيت.', recommendationTextEn: 'Bader Al-Mutairi requires mandatory biometric schedule compliance before permanent contract lock.', decisionStatus: 'Pending', effectiveDate: '2026-07-01', refId: 'REC-2026-10' }
+    ];
+  });
 
-    // Recs
-    const [recPromotion, setRecPromotion] = useState(false);
-    const [recSalaryInc, setRecSalaryInc] = useState(false);
-    const [recSalaryPct, setRecSalaryPct] = useState(5);
-    const [recBonus, setRecBonus] = useState(false);
-    const [recBonusAmt, setRecBonusAmt] = useState(0);
-    const [recWarning, setRecWarning] = useState(false);
-    const [recDisciplinary, setRecDisciplinary] = useState('');
-    const [recTraining, setRecTraining] = useState('');
+  // 6. Archived List
+  const [archivedAppraisalIds, setArchivedAppraisalIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('adala_perf_archived_v3');
+    return saved ? JSON.parse(saved) : [];
+  });
 
-    // Transfer integration
-    const [formIsTransfer, setFormIsTransfer] = useState(false);
-    const [formTransferDept, setFormTransferDept] = useState('');
+  // --- Dynamic ERP Linkages (CROSS MODULE LOADS) ---
+  const disciplinaryLogs = useMemo(() => {
+    const stored = localStorage.getItem('alwagayan_disciplinary');
+    return stored ? JSON.parse(stored) : [];
+  }, []);
 
-    // Grievance states
-    const [formIsGrievance, setFormIsGrievance] = useState(false);
-    const [formGrievanceNote, setFormGrievanceNote] = useState('');
-    const [formGrievanceResponse, setFormGrievanceResponse] = useState('');
+  const leaveRequests = useMemo(() => {
+    const stored = localStorage.getItem('alwagayan_leave_requests_detailed') || localStorage.getItem('alwagayan_leave_requests');
+    return stored ? JSON.parse(stored) : [];
+  }, []);
 
-    // Auto-retrieved metrics of selected employee
-    const selectedEmployeeMeta = useMemo(() => {
-        return employees.find(emp => emp.id === formEmployeeId);
-    }, [formEmployeeId, employees]);
+  const payrollLedger = useMemo(() => {
+    const stored = localStorage.getItem('alwagayan_employee_payroll');
+    return stored ? JSON.parse(stored) : [];
+  }, []);
 
-    // Set initial employee when going to adding form
-    useEffect(() => {
-        if (!formEmployeeId && employees.length > 0) {
-            setFormEmployeeId(employees[0].id);
-        }
-    }, [employees, formEmployeeId]);
+  const eosCases = useMemo(() => {
+    const stored = localStorage.getItem('adalah_eos_cases_cache_v3');
+    return stored ? JSON.parse(stored) : [];
+  }, []);
 
-    // Apply auto-retrieved metrics to form when employee is selected
-    useEffect(() => {
-        if (selectedEmployeeMeta && formMode === 'create') {
-            // Automatically select default role levels based on Job Title
-            if (selectedEmployeeMeta.jobTitle.includes('رئيسي') || selectedEmployeeMeta.jobTitle.includes('أول') || selectedEmployeeMeta.jobTitle.includes('مدير')) {
-                setFormRoleLevel(RoleLevel.MANAGERIAL);
-            } else if (selectedEmployeeMeta.jobTitle.includes('مستشار')) {
-                setFormRoleLevel(RoleLevel.EXECUTIVE);
-            } else if (selectedEmployeeMeta.jobTitle.includes('باحث') || selectedEmployeeMeta.jobTitle.includes('فني')) {
-                setFormRoleLevel(RoleLevel.TECHNICAL);
-            } else {
-                setFormRoleLevel(RoleLevel.OPERATIONAL);
-            }
+  // --- Effects for Storage Persistence ---
+  useEffect(() => {
+    localStorage.setItem('adala_perf_appraisals_v3', JSON.stringify(appraisals));
+  }, [appraisals]);
 
-            // Sync warning or default behaviors
-            if (selectedEmployeeMeta.warningsCount > 2) {
-                setRecWarning(true);
-                setRecDisciplinary('إنذار كتابي رسمي بتقصير الأداء الوظيفي والغيابات المتكررة');
-            } else {
-                setRecWarning(false);
-                setRecDisciplinary('');
-            }
-        }
-    }, [selectedEmployeeMeta, formMode]);
+  useEffect(() => {
+    localStorage.setItem('adala_perf_archived_v3', JSON.stringify(archivedAppraisalIds));
+  }, [archivedAppraisalIds]);
 
-    // Computed real-time Rating and Grade for current form scores
-    const calculatedOverallStats = useMemo(() => {
-        const scores = [
-            scoreEfficiency, scoreOutput, scoreAttendance, scoreCompliance,
-            scoreLeadership, scoreIntegrity, scoreClient, scoreNational
-        ];
-        const sum = scores.reduce((acc, current) => acc + current, 0);
-        const avg = parseFloat((sum / 8).toFixed(2));
-        
-        let grade: 'Excellent' | 'Very Good' | 'Good' | 'Satisfactory' | 'Weak' = 'Good';
-        if (avg >= 4.5) grade = 'Excellent';
-        else if (avg >= 4.0) grade = 'Very Good';
-        else if (avg >= 3.0) grade = 'Good';
-        else if (avg >= 2.0) grade = 'Satisfactory';
-        else grade = 'Weak';
+  useEffect(() => {
+    localStorage.setItem('adala_perf_goals_v3', JSON.stringify(goals));
+  }, [goals]);
 
-        return { avg, grade };
-    }, [
-        scoreEfficiency, scoreOutput, scoreAttendance, scoreCompliance,
-        scoreLeadership, scoreIntegrity, scoreClient, scoreNational
-    ]);
+  useEffect(() => {
+    localStorage.setItem('adala_perf_dev_v3', JSON.stringify(developmentPlans));
+  }, [developmentPlans]);
 
-    // Smart warning flag checking
-    const showPromotionRestrictionAlert = useMemo(() => {
-        // True if trying to promote or raise salary above 10% when avg grade from form is NOT Excellent
-        return (recPromotion || (recSalaryInc && recSalaryPct > 10)) && calculatedOverallStats.grade !== 'Excellent';
-    }, [recPromotion, recSalaryInc, recSalaryPct, calculatedOverallStats]);
+  useEffect(() => {
+    localStorage.setItem('adala_perf_recs_v3', JSON.stringify(recommendations));
+  }, [recommendations]);
 
-    const showLowPerformanceWarningAlert = useMemo(() => {
-        return calculatedOverallStats.avg < 3.0; // Satisfactory or Weak
-    }, [calculatedOverallStats]);
+  // --- Dynamic Dashboard & Filter values states ---
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'appraisals_list' | 'kpis_track' | 'development_plans' | 'recommendations' | 'reports_analytics'>('dashboard');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deptFilter, setDeptFilter] = useState('All');
+  const [tierFilter, setTierFilter] = useState('All');
+  const [statusFilter, setStatusFilter] = useState('All');
 
-    // --- STATS & COUNTS FOR DASHBOARD ---
-    const dashboardStats = useMemo(() => {
-        const total = appraisals.length;
-        const signedCount = appraisals.filter(a => a.status === 'Signed & Completed').length;
-        const hrCount = appraisals.filter(a => a.status === 'Under HR Review').length;
-        const financialCount = appraisals.filter(a => a.status === 'Under Financial Review').length;
-        const lineCount = appraisals.filter(a => a.status === 'Pending Line Manager').length;
+  // --- Toast Trigger State ---
+  const [toast, setToast] = useState<{ message: string; sub: string; type: 'success' | 'warn' } | null>(null);
+  const triggerToast = (msg: string, subText: string, tType: 'success' | 'warn' = 'success') => {
+    setToast({ message: msg, sub: subText, type: tType });
+    setTimeout(() => setToast(null), 4000);
+  };
 
-        const weakCount = appraisals.filter(a => a.overallGrade === 'Weak' || a.overallGrade === 'Satisfactory').length;
-        const excellentCount = appraisals.filter(a => a.overallGrade === 'Excellent').length;
-        const avgCompanyRating = total > 0 ? (appraisals.reduce((sum, a) => sum + a.overallScore, 0) / total).toFixed(2) : '0';
-        
-        const grievanceCount = appraisals.filter(a => a.isGrievanceSubmitted).length;
-        const transferCount = appraisals.filter(a => a.isTransferSubmitted).length;
+  // --- Wizard intake forms states (Unified Creating/Editing Form engine) ---
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(1);
+  const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
+  const [editingAppraisalId, setEditingAppraisalId] = useState<string | null>(null);
 
-        // Warning Distributions (for demo)
-        const totalDisciplinaryCount = appraisals.reduce((sum, a) => sum + (a.recommendations.warning ? 1 : 0), 0) + 2;
+  // Form Fields State
+  const [wEmployeeId, setWEmployeeId] = useState('');
+  const [wPeriod, setWPeriod] = useState('Q1 2026');
+  const [wDate, setWDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [appraisalFormType, setAppraisalFormType] = useState('annual');
 
-        return {
-            total, signedCount, hrCount, financialCount, lineCount,
-            weakCount, excellentCount, avgCompanyRating, grievanceCount, transferCount, totalDisciplinaryCount
-        };
-    }, [appraisals]);
+  const [scoreDrafting, setScoreDrafting] = useState<number>(4.5);
+  const [scoreSuccess, setScoreSuccess] = useState<number>(4.2);
+  const [scoreClient, setScoreClient] = useState<number>(4.8);
+  const [scoreCompliance, setScoreCompliance] = useState<number>(4.5);
 
-    // --- SEARCH / FILTERING ---
-    const filteredAppraisalsList = useMemo(() => {
-        return appraisals.filter(a => {
-            const matchesSearch = a.employeeName.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                 a.employeeJobTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                                 a.referenceNumber.toLowerCase().includes(searchQuery.toLowerCase());
-            
-            const matchesDept = deptFilter === 'All' || a.employeeDepartment === deptFilter;
-            const matchesLevel = levelFilter === 'All' || a.roleLevel === levelFilter;
+  const [wStrengthsAr, setWStrengthsAr] = useState('');
+  const [wStrengthsEn, setWStrengthsEn] = useState('');
+  const [wImprovementsAr, setWImprovementsAr] = useState('');
+  const [wImprovementsEn, setWImprovementsEn] = useState('');
+  const [wTrainingAr, setWTrainingAr] = useState('');
+  const [wTrainingEn, setWTrainingEn] = useState('');
+  const [wSigneeAr, setWSigneeAr] = useState('');
+  const [wDigitalCode, setWDigitalCode] = useState('');
 
-            return matchesSearch && matchesDept && matchesLevel;
+  // Probation Specific outcome check
+  const [probationOutcome, setProbationOutcome] = useState('Confirm'); // Confirm, Extend, Dismiss
+
+  // Wage Hike Specific State
+  const [proposedHike, setProposedHike] = useState(50);
+
+  // --- Dynamic Autofill of selected employee (Loads payroll & warns in real-time) ---
+  const activeEmployeeMeta = useMemo(() => {
+    return employees.find(e => e.id === wEmployeeId);
+  }, [wEmployeeId, employees]);
+
+  useEffect(() => {
+    if (activeEmployeeMeta) {
+      // Find historical warnings
+      const warnings = disciplinaryLogs.filter((d: any) => d.employeeName === activeEmployeeMeta.fullName?.ar || d.employeeName === activeEmployeeMeta.fullNameAr);
+      // Auto adjust attendance compliance if multiple warnings exist
+      if (warnings.length > 0) {
+        setScoreCompliance(Math.max(1, parseFloat((4.5 - warnings.length * 0.5).toFixed(1))));
+      }
+
+      // Auto load signee defaults
+      setWSigneeAr(isAr ? 'أ. صبري شطا' : 'Sabri Shatta, Esq.');
+      setWPeriod('Q1 2026');
+      setWDigitalCode(`REF-S-CODE-${Math.floor(1000 + Math.random()*9000)}-SHA`);
+    }
+  }, [wEmployeeId, activeEmployeeMeta, disciplinaryLogs, isAr]);
+
+  // --- Dialog popup drawer details view ---
+  const [activeDossierDetail, setActiveDossierDetail] = useState<any | null>(null);
+
+  // --- Print Pre-Print Live Preview Studio Modal ---
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [selectedAppraisalForPrint, setSelectedAppraisalForPrint] = useState<any | null>(null);
+
+  // --- CRUD Modals for Goals or Dev Plans ---
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [newGoalData, setNewGoalData] = useState({ employeeId: '', titleAr: '', titleEn: '', targetDate: '', statusAr: 'قيد التنفيذ' });
+
+  const [isDevPlanModalOpen, setIsDevPlanModalOpen] = useState(false);
+  const [newDevData, setNewDevData] = useState({ employeeId: '', titleAr: '', titleEn: '', mentor: '', targetDate: '', progress: 10 });
+
+  const [isRecModalOpen, setIsRecModalOpen] = useState(false);
+  const [newRecData, setNewRecData] = useState({ employeeId: '', typeAr: 'زيادة راتب بملف المالية', typeEn: 'Increment proposal', recommendationTextAr: '', recommendationTextEn: '', effectiveDate: '', decisionStatus: 'Pending' });
+
+  // Load first employee in setup
+  useEffect(() => {
+    if (employees.length > 0 && !wEmployeeId) {
+      setWEmployeeId(employees[0].id);
+    }
+  }, [employees, wEmployeeId]);
+
+  // --- Helper state getters ---
+  const getEmployeeName = (emp: any) => {
+    if (!emp) return '';
+    if (typeof emp.fullName === 'object' && emp.fullName !== null) {
+      return isAr ? (emp.fullName.ar || emp.fullName.en) : (emp.fullName.en || emp.fullName.ar);
+    }
+    if (emp.fullNameAr) return emp.fullNameAr;
+    if (emp.fullName) return emp.fullName;
+    if (emp.name) return emp.name;
+    return '';
+  };
+
+  const getEmployeeJob = (emp: any) => {
+    if (!emp) return '';
+    if (typeof emp.jobTitle === 'object' && emp.jobTitle !== null) {
+      return isAr ? (emp.jobTitle.ar || emp.jobTitle.en) : (emp.jobTitle.en || emp.jobTitle.ar);
+    }
+    if (emp.jobTitle) return emp.jobTitle;
+    if (emp.position) return emp.position;
+    return '';
+  };
+
+  const getEmployeeDept = (emp: any) => {
+    if (!emp) return '';
+    if (typeof emp.department === 'object' && emp.department !== null) {
+      return isAr ? (emp.department.ar || emp.department.en) : (emp.department.en || emp.department.ar);
+    }
+    if (emp.department) return emp.department;
+    return '';
+  };
+
+  // --- Form calculation rating weights ---
+  const formOverallScore = useMemo(() => {
+    const avg = (scoreDrafting + scoreSuccess + scoreClient + scoreCompliance) / 4;
+    return parseFloat(avg.toFixed(2));
+  }, [scoreDrafting, scoreSuccess, scoreClient, scoreCompliance]);
+
+  // --- Actions & State mutations for appraisals ---
+  const resetWizard = (mode: 'create' | 'edit', app?: any) => {
+    setFormMode(mode);
+    setWizardStep(1);
+    if (mode === 'create') {
+      setEditingAppraisalId(null);
+      if (employees.length > 0) setWEmployeeId(employees[0].id);
+      setWPeriod('Q1 2026');
+      setAppraisalFormType('annual');
+      setScoreDrafting(4.5);
+      setScoreSuccess(4.2);
+      setScoreClient(4.8);
+      setScoreCompliance(4.5);
+      setWStrengthsAr('');
+      setWStrengthsEn('');
+      setWImprovementsAr('');
+      setWImprovementsEn('');
+      setWTrainingAr('');
+      setWTrainingEn('');
+      setWSigneeAr(isAr ? 'أ. صبري شطا' : 'Sabri Shatta, Esq.');
+      setWDigitalCode(`REF-${Math.floor(1000 + Math.random()*9000)}-SHA`);
+    } else if (mode === 'edit' && app) {
+      setEditingAppraisalId(app.id);
+      setWEmployeeId(app.employeeId);
+      setWPeriod(app.appraisalPeriod);
+      setWDate(app.appraisalDate);
+      setAppraisalFormType(app.formType || 'annual');
+      setScoreDrafting(app.scores?.drafting ?? 4.5);
+      setScoreSuccess(app.scores?.successRate ?? 4.2);
+      setScoreClient(app.scores?.clientRelations ?? 4.8);
+      setScoreCompliance(app.scores?.compliance ?? 4.5);
+      setWStrengthsAr(app.strengths?.ar || app.strengths || '');
+      setWStrengthsEn(app.strengths?.en || '');
+      setWImprovementsAr(app.improvements?.ar || app.improvements || '');
+      setWImprovementsEn(app.improvements?.en || '');
+      setWTrainingAr(app.training?.ar || app.training || '');
+      setWTrainingEn(app.training?.en || '');
+      setWSigneeAr(app.signeeName?.ar || app.signeeName || '');
+      setWDigitalCode(app.signatureCode || '');
+    }
+    setIsWizardOpen(true);
+  };
+
+  const handleWizardSubmit = (targetStatus: PerformanceAppraisalStatus) => {
+    const ratingTier = formOverallScore >= 4.5 ? PerformanceTier.EXCELLENT :
+                       formOverallScore >= 3.8 ? PerformanceTier.EXCEEDS_EXPECTATIONS :
+                       formOverallScore >= 3.0 ? PerformanceTier.MEETS_EXPECTATIONS :
+                       PerformanceTier.NEEDS_IMPROVEMENT;
+
+    const appraisalObject: any = {
+      id: formMode === 'create' ? `app-${Date.now()}` : editingAppraisalId!,
+      employeeId: wEmployeeId,
+      appraisalPeriod: wPeriod,
+      appraisalDate: wDate,
+      status: targetStatus,
+      formType: appraisalFormType,
+      probationAction: appraisalFormType === 'probation' ? probationOutcome : undefined,
+      proposedIncrement: appraisalFormType === 'promotion' ? proposedHike : undefined,
+      appraiserName: { ar: 'الموارد البشرية والمطابقة', en: 'HR & Audit Bureau' },
+      overallScore: formOverallScore,
+      scores: {
+        drafting: scoreDrafting,
+        successRate: scoreSuccess,
+        clientRelations: scoreClient,
+        compliance: scoreCompliance
+      },
+      strengths: { ar: wStrengthsAr || 'أداء قانوني متماسك', en: wStrengthsEn || 'Cohesive legal performance' },
+      improvements: { ar: wImprovementsAr || 'التوسع في الإلمام بالتجارة الدولية', en: wImprovementsEn || 'Expand international commercial scopes' },
+      training: { ar: wTrainingAr || 'برنامج التطوير الموازي', en: wTrainingEn || 'Remedial legal audit training' },
+      refId: formMode === 'create' ? `QA-PERF-2026-${Math.floor(100 + Math.random() * 900)}` : appraisals.find(a => a.id === editingAppraisalId)?.refId || `QA-PERF-2026-${Math.floor(100 + Math.random() * 900)}`,
+      signatureCode: wDigitalCode || `SHA-2026-${Math.floor(1000 + Math.random()*9000)}`,
+      signeeName: { ar: wSigneeAr || 'صبري شطا', en: wSigneeAr || 'Sabri Shatta' },
+      signedAt: new Date().toISOString().split('T')[0]
+    };
+
+    if (formMode === 'create') {
+      setAppraisals([appraisalObject, ...appraisals]);
+      triggerToast(t.successMsg, translate('تم صب المستند وتوثيقه وحفظه بالبصمة الرقمية.', 'Document issued & locked with SHA footprint keys.'));
+    } else {
+      setAppraisals(appraisals.map(a => a.id === editingAppraisalId ? appraisalObject : a));
+      triggerToast(translate('تم تحديث صك الأداء بالتغييرات', 'Performance dossier updated'), translate('تم حفظ نسخة التقرير المعدلة بنجاح بالموارد.', 'Modifications synced back to HR records.'));
+    }
+
+    // Dynamic promotion/hike processing
+    if (appraisalFormType === 'promotion' && targetStatus === 'Certified') {
+      handlePushSalaryHike(wEmployeeId, proposedHike);
+    }
+
+    setIsWizardOpen(false);
+  };
+
+  // --- Dynamic direct updates to other modules (Payroll Link) ---
+  const handlePushSalaryHike = (empId: string, hike: number) => {
+    const storedPayroll = localStorage.getItem('alwagayan_employee_payroll');
+    if (storedPayroll) {
+      try {
+        const payList = JSON.parse(storedPayroll);
+        const emp = employees.find(e => e.id === empId);
+        const empName = getEmployeeName(emp);
+
+        const updated = payList.map((p: any) => {
+          if (p.employeeId === empId || p.employeeName === empName) {
+            return {
+              ...p,
+              basicSalary: (p.basicSalary || 0) + hike,
+              history: [
+                ...(p.history || []),
+                { date: new Date().toISOString().split('T')[0], type: 'زيادة ترقية الكفاءة', value: hike, desc: 'زيادة تلقائية بناءً على تقييم ناتج ممتاز بمكتب صبري شطا' }
+              ]
+            };
+          }
+          return p;
         });
-    }, [appraisals, searchQuery, deptFilter, levelFilter]);
+        localStorage.setItem('alwagayan_employee_payroll', JSON.stringify(updated));
+        triggerToast(
+          translate('تم تمرير الزيادة إلى المحاسبة والرواتب', 'Payroll Incremented Dynamically'),
+          translate(`تم زيادة راتب ${empName} بمقدار ${hike} د.ك وتعديل دفتر الموازنة بنظام عدالة تلقائياً.`, `Basic wage raised by ${hike} KWD successfully.`)
+        );
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  };
 
+  const handleDelete = (id: string) => {
+    setAppraisals(appraisals.filter(a => a.id !== id));
+    triggerToast(t.deleteMsg, translate('تم مسح السجل نهائياً وتمريره لأرشيف الإتلاف المائي.', 'Dossier dismantled from direct database view.'), 'warn');
+  };
 
-    // --- HANDLERS ---
-    const handleSwitchToForm = (mode: 'create' | 'edit', app?: PerformanceAppraisal) => {
-        setFormMode(mode);
-        if (mode === 'create') {
-            setEditingId(null);
-            setFormEmployeeId(employees[0]?.id || '');
-            setFormRoleLevel(RoleLevel.OPERATIONAL);
-            setFormAppraisalPeriod('2025 / 2026');
-            setFormAppraisalDate(new Date().toISOString().split('T')[0]);
-            setFormManagerName('منيرة الصباح');
-            setFormNotes('');
-            setFormActionPlan('');
+  const handleDuplicate = (app: any) => {
+    const duplicatedApp: any = {
+      ...app,
+      id: `app-dup-${Date.now()}`,
+      refId: `QA-PERF-2026-DUP-${Math.floor(100 + Math.random() * 900)}`,
+      status: 'Draft',
+      signedAt: ''
+    };
+    setAppraisals([duplicatedApp, ...appraisals]);
+    triggerToast(t.duplicateMsg, translate('يمكنك صياغة أو تعديل الملف المكرر الآن مع الحفاظ على الأوزان.', 'Duplicated elements are editable in drafts.'));
+  };
 
-            setScoreEfficiency(4);
-            setScoreOutput(4);
-            setScoreAttendance(4);
-            setScoreCompliance(4);
-            setScoreLeadership(3);
-            setScoreIntegrity(4);
-            setScoreClient(4);
-            setScoreNational(4);
+  const handleToggleArchive = (id: string, name: string) => {
+    if (archivedAppraisalIds.includes(id)) {
+      setArchivedAppraisalIds(archivedAppraisalIds.filter(x => x !== id));
+      triggerToast(translate('تم فك ملف الأرشفة بنجاح', 'Dossier Unarchived'), `${name} - ${translate('السجل متاح حالياً للمطابقة اليومية والتدقيق.', 'Record resides back in direct audits.')}`);
+    } else {
+      setArchivedAppraisalIds([...archivedAppraisalIds, id]);
+      triggerToast(translate('تم أرشفة صك الأداء المغلق', 'Dossier Archived'), `${name} - ${translate('تم إرسال الملف لشبكة التخزين طويلة المدى.', 'Record sent to cloud archives storage.')}`);
+    }
+  };
 
-            setRecPromotion(false);
-            setRecSalaryInc(false);
-            setRecSalaryPct(5);
-            setRecBonus(false);
-            setRecBonusAmt(0);
-            setRecWarning(false);
-            setRecDisciplinary('');
-            setRecTraining('');
-            setFormIsTransfer(false);
-            setFormTransferDept('');
-            setFormIsGrievance(false);
-            setFormGrievanceNote('');
-            setFormGrievanceResponse('');
-        } else if (mode === 'edit' && app) {
-            setEditingId(app.id);
-            setFormEmployeeId(app.employeeId);
-            setFormRoleLevel(app.roleLevel);
-            setFormAppraisalPeriod(app.appraisalPeriod);
-            setFormAppraisalDate(app.appraisalDate);
-            setFormManagerName(app.managerName);
-            setFormNotes(app.generalNotes || '');
-            setFormActionPlan(app.correctiveActionPlan || '');
+  // --- CRUD goals helper ---
+  const handleAddGoal = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGoalData.employeeId || !newGoalData.titleAr) return;
+    const newG = {
+      id: `goal-${Date.now()}`,
+      employeeId: newGoalData.employeeId,
+      titleAr: newGoalData.titleAr,
+      titleEn: newGoalData.titleEn || newGoalData.titleAr,
+      targetDate: newGoalData.targetDate || new Date().toISOString().split('T')[0],
+      statusAr: newGoalData.statusAr
+    };
+    setGoals([...goals, newG]);
+    setIsGoalModalOpen(false);
+    triggerToast(translate('تم إدراج هدف سنوي جديد', 'New Target Goal Registered'), translate('تم قفل وحساب الأهداف في سجلات المتنافسين بنجاح.', 'Target goals index recalculated.'));
+  };
 
-            setScoreEfficiency(app.criteria.efficiency.score);
-            setScoreOutput(app.criteria.outputAmount.score);
-            setScoreAttendance(app.criteria.attendance.score);
-            setScoreCompliance(app.criteria.policyCompliance.score);
-            setScoreLeadership(app.criteria.leadership.score);
-            setScoreIntegrity(app.criteria.integrity.score);
-            setScoreClient(app.criteria.clientCoordination.score);
-            setScoreNational(app.criteria.nationalAlignment.score);
+  const handleDeleteGoal = (goalId: string) => {
+    setGoals(goals.filter(g => g.id !== goalId));
+    triggerToast(translate('تم إقصاء الهدف السنوي', 'Target Goal Removed'), translate('تم شطب الهدف من دفتر التقدم.', 'Deleted from track index.'), 'warn');
+  };
 
-            setRecPromotion(app.recommendations.promotion);
-            setRecSalaryInc(app.recommendations.salaryIncrease);
-            setRecSalaryPct(app.recommendations.salaryIncreasePct);
-            setRecBonus(app.recommendations.bonus);
-            setRecBonusAmt(app.recommendations.bonusAmount || 0);
-            setRecWarning(app.recommendations.warning);
-            setRecDisciplinary(app.recommendations.disciplinaryAction || '');
-            setRecTraining(app.recommendations.trainingNeeded || '');
-            
-            setFormIsTransfer(!!app.isTransferSubmitted);
-            setFormTransferDept(app.transferTargetDept || '');
-            setFormIsGrievance(!!app.isGrievanceSubmitted);
-            setFormGrievanceNote(app.grievanceNote || '');
-            setFormGrievanceResponse(app.grievanceResponse || '');
+  // --- CRUD Dev Plans sub ---
+  const handleAddDevPlan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDevData.employeeId || !newDevData.titleAr) return;
+    const newD = {
+      id: `dev-${Date.now()}`,
+      employeeId: newDevData.employeeId,
+      titleAr: newDevData.titleAr,
+      titleEn: newDevData.titleEn || newDevData.titleAr,
+      mentor: newDevData.mentor || 'أ. صبري شطا',
+      targetDate: newDevData.targetDate || new Date().toISOString().split('T')[0],
+      progress: newDevData.progress
+    };
+    setDevelopmentPlans([...developmentPlans, newD]);
+    setIsDevPlanModalOpen(false);
+    triggerToast(translate('تم إطلاق خطة تحسين', 'Improvement Plan Launched'), translate('تم إشراك الموظف والمسؤول في جدول التعلم.', 'Mentor & employee shared in calendar.'));
+  };
+
+  const handleDeleteDevPlan = (id: string) => {
+    setDevelopmentPlans(developmentPlans.filter(d => d.id !== id));
+    triggerToast(translate('تم حذف خطة التطوير', 'Improvement Plan Deleted'), translate('تم إلغاء متابعة البرنامج للموظف.', 'Plan stopped on HR databases.'), 'warn');
+  };
+
+  // --- CRUD Recommendations ---
+  const handleAddRec = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRecData.employeeId || !newRecData.recommendationTextAr) return;
+    const newR = {
+      id: `rec-${Date.now()}`,
+      employeeId: newRecData.employeeId,
+      typeAr: newRecData.typeAr,
+      typeEn: newRecData.typeEn,
+      recommendationTextAr: newRecData.recommendationTextAr,
+      recommendationTextEn: newRecData.recommendationTextEn || newRecData.recommendationTextAr,
+      effectiveDate: newRecData.effectiveDate || new Date().toISOString().split('T')[0],
+      decisionStatus: newRecData.decisionStatus,
+      refId: `REC-2026-${Math.floor(100 + Math.random() * 900)}`
+    };
+    setRecommendations([...recommendations, newR]);
+    setIsRecModalOpen(false);
+    triggerToast(translate('تم إدراج توصية كادرية جديدة', 'New Recommendation Logged'), translate('تم صب التوجيه وتوزيع الإشراك بالموارد البشرية.', 'Recommendation sent to HR board.'));
+  };
+
+  const handleDeleteRec = (id: string) => {
+    setRecommendations(recommendations.filter(r => r.id !== id));
+    triggerToast(translate('تم إقصاء التوصية الكادرية', 'Recommendation Revoked'), translate('تم إلغاء تتبع القرار الإداري.', 'Candidacy text removed.'), 'warn');
+  };
+
+  // Switch status of recommendations
+  const toggleRecStatus = (id: string, currentStatus: string) => {
+    const nextStatus = currentStatus === 'Pending' ? 'Approved' : currentStatus === 'Approved' ? 'Implemented' : 'Pending';
+    setRecommendations(recommendations.map(r => {
+      if (r.id === id) {
+        // Trigger wage hike if changed to Approved/Implemented for promotions
+        if (r.typeAr.includes('زيادة') || r.typeEn.toLowerCase().includes('increment') || r.typeEn.toLowerCase().includes('promotion')) {
+          if (nextStatus === 'Approved') {
+            handlePushSalaryHike(r.employeeId, 100);
+          }
         }
-        setActiveTab('newForm');
-    };
-
-    const handleDuplicate = (app: PerformanceAppraisal) => {
-        const newApp: PerformanceAppraisal = {
-            ...app,
-            id: `app-dup-${Date.now()}`,
-            referenceNumber: `QA-PERF-${new Date().getFullYear()}-${Math.floor(Math.random() * 900) + 100}`,
-            status: 'Draft',
-            appraisalDate: new Date().toISOString().split('T')[0],
-            employeeName: `${app.employeeName} (نسخة مسودة)`,
-            signatures: {},
-        };
-        setAppraisals(prev => [newApp, ...prev]);
-        setActiveTab('evaluations');
-    };
-
-    const handleDelete = (id: string) => {
-        if (confirm('هل أنت متأكد من حذف هذا التقييم الإداري نهائياً؟')) {
-            setAppraisals(prev => prev.filter(a => a.id !== id));
-        }
-    };
-
-    const handleSaveForm = (e: React.FormEvent) => {
-        e.preventDefault();
-        const activeEmp = employees.find(emp => emp.id === formEmployeeId);
-        if (!activeEmp) return;
-
-        const updatedModel: PerformanceAppraisal = {
-            id: formMode === 'create' ? `app-new-${Date.now()}` : (editingId || ''),
-            employeeId: activeEmp.id,
-            employeeName: activeEmp.fullNameAr,
-            employeeJobTitle: activeEmp.jobTitle,
-            employeeDepartment: activeEmp.department,
-            managerName: formManagerName,
-            appraisalPeriod: formAppraisalPeriod,
-            appraisalDate: formAppraisalDate,
-            status: formMode === 'create' ? 'Draft' : (appraisals.find(x => x.id === editingId)?.status || 'Under HR Review'),
-            roleLevel: formRoleLevel,
-            
-            attendanceAbsences: activeEmp.attendanceAbsences,
-            attendanceDelays: activeEmp.attendanceDelays,
-            warningsCount: activeEmp.warningsCount,
-            activeGoalsCount: 2,
-            basicSalary: activeEmp.basicSalary,
-            allowancesAmount: activeEmp.allowancesAmount,
-            civilId: activeEmp.civilId,
-            joiningDate: activeEmp.joiningDate,
-            nationality: activeEmp.nationality,
-
-            criteria: {
-                efficiency: { name: 'كفاءة الإنجاز والتوقيت', score: scoreEfficiency, weight: 15 },
-                outputAmount: { name: 'حجم مخرجات العمل', score: scoreOutput, weight: 15 },
-                attendance: { name: 'الانضباط والالتزام بالدوام', score: scoreAttendance, weight: 10 },
-                policyCompliance: { name: 'الالتزام باللوائح والسياسات', score: scoreCompliance, weight: 10 },
-                leadership: { name: 'التوجيه والقيادة والمبادرة', score: scoreLeadership, weight: 15 },
-                integrity: { name: 'النزاهة وأخلاقيات المهنة', score: scoreIntegrity, weight: 15 },
-                clientCoordination: { name: 'التواصل ورضا العملاء', score: scoreClient, weight: 10 },
-                nationalAlignment: { name: 'التوطين ومواءمة التوجه الوطني', score: scoreNational, weight: 10 },
-            },
-            
-            overallScore: calculatedOverallStats.avg,
-            overallGrade: calculatedOverallStats.grade,
-            generalNotes: formNotes,
-            correctiveActionPlan: formActionPlan,
-
-            recommendations: {
-                promotion: recPromotion,
-                salaryIncrease: recSalaryInc,
-                salaryIncreasePct: recSalaryInc ? recSalaryPct : 0,
-                bonus: recBonus,
-                bonusAmount: recBonus ? recBonusAmt : 0,
-                warning: recWarning,
-                disciplinaryAction: recDisciplinary,
-                trainingNeeded: recTraining,
-            },
-
-            isTransferSubmitted: formIsTransfer,
-            transferTargetDept: formIsTransfer ? formTransferDept : undefined,
-            isGrievanceSubmitted: formIsGrievance,
-            grievanceNote: formIsGrievance ? formGrievanceNote : undefined,
-            grievanceResponse: formIsGrievance ? formGrievanceResponse : undefined,
-
-            referenceNumber: formMode === 'create' ? `QA-PERF-2026-0${appraisals.length + 5}` : (appraisals.find(x => x.id === editingId)?.referenceNumber || `QA-PERF-2026-${Math.floor(Math.random() * 100)}`),
-            qrCodeData: `https://ais-adala/verify/perf/QA-PERF-2026-0${appraisals.length + 5}`,
-            signatures: {
-                manager: { name: formManagerName, signedAt: new Date().toISOString().split('T')[0] },
-                ...(formMode === 'edit' ? appraisals.find(x => x.id === editingId)?.signatures : {})
-            }
-        };
-
-        if (formMode === 'create') {
-            setAppraisals(prev => [updatedModel, ...prev]);
-        } else {
-            setAppraisals(prev => prev.map(a => a.id === editingId ? updatedModel : a));
-        }
-
-        // Return to evaluations tab
-        setActiveTab('evaluations');
-    };
-
-    const handleWorkflowChange = (requestId: string, newStatus: PerformanceAppraisalStatus) => {
-        setAppraisals(prev => prev.map(app => {
-            if (app.id === requestId) {
-                const currentSigs = { ...app.signatures };
-                
-                // Dynamically apply fake signatures based on workflow
-                if (newStatus === 'Signed & Completed') {
-                    currentSigs.employee = { name: app.employeeName, signedAt: new Date().toISOString().split('T')[0] };
-                    currentSigs.hr = { name: 'ناصر السبيعي', signedAt: new Date().toISOString().split('T')[0] };
-                    currentSigs.auditor = { name: 'صبري شطا', signedAt: new Date().toISOString().split('T')[0] };
-                } else if (newStatus === 'Under Financial Review') {
-                    currentSigs.hr = { name: 'ناصر السبيعي', signedAt: new Date().toISOString().split('T')[0] };
-                }
-
-                return {
-                    ...app,
-                    status: newStatus,
-                    signatures: currentSigs,
-                    updatedAt: new Date().toISOString().split('T')[0]
-                };
-            }
-            return app;
-        }));
-
-        // Refresh selected object in view modal
-        const fresh = appraisals.find(x => x.id === requestId);
-        if (fresh) {
-            setSelectedAppraisal(prev => prev && prev.id === requestId ? { ...prev, status: newStatus } : prev);
-        }
-    };
-
-    const openPrintFormDetails = (app: PerformanceAppraisal, docType: 'appraisal' | 'warning' | 'promotion' | 'transfer' | 'grievance') => {
-        setSelectedAppraisal(app);
-        setPrintDocType(docType);
-        setIsPrintModalOpen(true);
-    };
-
-    // --- CHART DATA GENERATION ---
-    const radarData = useMemo(() => {
-        if (!selectedAppraisal) return [];
-        return [
-            { subject: 'الكفاءة', score: selectedAppraisal.criteria.efficiency.score, fullMark: 5 },
-            { subject: 'المخرجات', score: selectedAppraisal.criteria.outputAmount.score, fullMark: 5 },
-            { subject: 'الانضباط', score: selectedAppraisal.criteria.attendance.score, fullMark: 5 },
-            { subject: 'اللوائح', score: selectedAppraisal.criteria.policyCompliance.score, fullMark: 5 },
-            { subject: 'القيادة', score: selectedAppraisal.criteria.leadership.score, fullMark: 5 },
-            { subject: 'التوطين', score: selectedAppraisal.criteria.nationalAlignment.score, fullMark: 5 },
-        ];
-    }, [selectedAppraisal]);
-
-    const pieChartDistribution = useMemo(() => {
-        const counts = { Excellent: 0, VeryGood: 0, Good: 0, Satisfactory: 0, Weak: 0 };
-        appraisals.forEach(a => {
-            if (a.overallGrade === 'Excellent') counts.Excellent++;
-            else if (a.overallGrade === 'Very Good') counts.VeryGood++;
-            else if (a.overallGrade === 'Good') counts.Good++;
-            else if (a.overallGrade === 'Satisfactory') counts.Satisfactory++;
-            else if (a.overallGrade === 'Weak') counts.Weak++;
-        });
-        return [
-            { name: 'ممتاز (Excellent)', value: counts.Excellent, color: '#10B981' },
-            { name: 'جيد جداً (Very Good)', value: counts.VeryGood, color: '#3B82F6' },
-            { name: 'جيد (Good)', value: counts.Good, color: '#6366F1' },
-            { name: 'مقبول (Satisfactory)', value: counts.Satisfactory, color: '#F59E0B' },
-            { name: 'ضعيف (Weak)', value: counts.Weak, color: '#EF4444' },
-        ];
-    }, [appraisals]);
-
-    return (
-        <div className="space-y-6 animate-in fade-in duration-700 pb-20">
-            {/* --- TOP HEADER NAVIGATION --- */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-4">
-                    <div className="p-4 bg-primary/10 rounded-2xl text-primary">
-                        <Activity className="w-8 h-8" />
-                    </div>
-                    <div>
-                        <div className="flex items-center gap-2 mb-1">
-                            <Link to="/employee-affairs" className="text-xs text-primary hover:underline font-bold">شؤون الموظفين</Link>
-                            <span className="text-xs text-slate-300">/</span>
-                            <span className="text-xs text-slate-400 font-bold">تقييم الأداء والقرارات الإدارية</span>
-                        </div>
-                        <h1 className="text-2xl font-black text-slate-800 dark:text-white">تقييم الكفاءة والطلبات الإدارية المعتمدة</h1>
-                        <p className="text-slate-400 text-xs font-bold mt-1">
-                            نظام رقابي ذكي متطابق مع قانون العمل الكويتي رقم 6 لسنة 2010 والقرارات الإدارية لبرنامج الهيكلة وقوى العاملة 2026
-                        </p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 w-full lg:w-auto">
-                    <Button variant="primary" onClick={() => handleSwitchToForm('create')} className="w-full lg:w-auto rounded-xl flex items-center justify-center gap-2">
-                        <Plus className="w-5 h-5" />
-                        إعداد نموذج تقييم ذكي
-                    </Button>
-                </div>
-            </div>
-
-            {/* --- METRIC STATS WORKSPACE --- */}
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black">إجمالي التقييمات</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-slate-800 dark:text-white">{dashboardStats.total}</span>
-                        <ClipboardList className="w-6 h-6 text-primary opacity-25" />
-                    </div>
-                </Card>
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black">المعقّمة والمكتملة</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-emerald-500">{dashboardStats.signedCount}</span>
-                        <CheckCircle2 className="w-6 h-6 text-emerald-500 opacity-25" />
-                    </div>
-                </Card>
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black">قيد مراجعة الموارد البشرية</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-blue-500">{dashboardStats.hrCount}</span>
-                        <Clock className="w-6 h-6 text-blue-500 opacity-25" />
-                    </div>
-                </Card>
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black">قيد المراجعة المالية</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-purple-500">{dashboardStats.financialCount}</span>
-                        <TrendingUp className="w-6 h-6 text-purple-500 opacity-25" />
-                    </div>
-                </Card>
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black">التظلمات والشكاوى الإدارية</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-amber-500">{dashboardStats.grievanceCount}</span>
-                        <ShieldAlert className="w-6 h-6 text-amber-500 opacity-25" />
-                    </div>
-                </Card>
-                <Card className="p-4 bg-white dark:bg-slate-900 border-none shadow-sm flex flex-col justify-between">
-                    <div className="text-slate-400 text-xs font-black font-sans">متوسط تقييم الشركة</div>
-                    <div className="flex items-baseline justify-between mt-2">
-                        <span className="text-3xl font-black text-primary font-mono">{dashboardStats.avgCompanyRating}</span>
-                        <Award className="w-6 h-6 text-primary opacity-25" />
-                    </div>
-                </Card>
-            </div>
-
-            {/* --- TAB HEADERS --- */}
-            <div className="flex border-b border-slate-100 dark:border-slate-800">
-                <button onClick={() => setActiveTab('kpi')} className={`px-6 py-4 text-sm font-black border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'kpi' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    <BarChart3 className="w-4 h-4" />
-                    لوحة تحليلات الأداء وطلبات الموظفين
-                </button>
-                <button onClick={() => setActiveTab('evaluations')} className={`px-6 py-4 text-sm font-black border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'evaluations' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    <ClipboardList className="w-4 h-4" />
-                    إدارة تقييمات الموظفين وعقود العمل ({appraisals.length})
-                </button>
-                <button onClick={() => handleSwitchToForm('create')} className={`px-6 py-4 text-sm font-black border-b-2 transition-colors flex items-center gap-2 ${activeTab === 'newForm' ? 'border-primary text-primary' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>
-                    <FileText className="w-4 h-4" />
-                    {formMode === 'create' ? 'نموذج تقييم جديد' : 'تعديل التقييم'}
-                </button>
-            </div>
-
-            {/* --- Tab 1: KPI ANALYTICS DASHBOARD --- */}
-            {activeTab === 'kpi' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Charts Panel */}
-                    <Card className="lg:col-span-2 p-6 bg-white dark:bg-slate-900 border-none shadow-sm" title="توزيع درجات التقييم داخل الشركة">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center mt-6">
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie data={pieChartDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={4} dataKey="value">
-                                            {pieChartDistribution.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.color} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <div className="space-y-3">
-                                {pieChartDistribution.map((item, i) => (
-                                    <div key={i} className="flex justify-between items-center text-xs">
-                                        <span className="flex items-center gap-2 font-black text-slate-600 dark:text-slate-400">
-                                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
-                                            {item.name}
-                                        </span>
-                                        <span className="font-mono font-black text-slate-800 dark:text-white bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                            {item.value} موظف
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </Card>
-
-                    {/* Left Quick Compliance Vetting Grid */}
-                    <div className="space-y-6">
-                        <Card className="p-6 bg-white dark:bg-slate-900 border-none shadow-sm" title="نظام الرقابة والامتثال والقسم اليدوي">
-                            <div className="space-y-4 mt-4">
-                                <div className="p-4 bg-rose-50 dark:bg-rose-950/10 rounded-2xl border border-rose-100 dark:border-rose-900 flex items-start gap-3">
-                                    <ShieldAlert className="w-5 h-5 text-rose-500 mt-0.5 shrink-0" />
-                                    <div>
-                                        <h4 className="text-xs font-black text-rose-800 dark:text-rose-400 uppercase">تنبيه تقصير وانخفاض الكفاءة</h4>
-                                        <p className="text-[10px] text-rose-600 dark:text-rose-400 font-bold mt-1 leading-relaxed">
-                                            تم رصد تقييم بمستوى (ضعيف) للموظفة <strong className="font-black text-rose-700">سحر جاسم الفيلي</strong>. يقترح النظام إرسال إنذار أداء عمالي وحفظه كإثبات قانوني في مكتب العمل.
-                                        </p>
-                                        <button onClick={() => {
-                                            const s = appraisals.find(a => a.employeeId === 'emp-2');
-                                            if (s) openPrintFormDetails(s, 'warning');
-                                        }} className="text-[10px] font-black underline text-rose-700 dark:text-rose-300 mt-2 hover:opacity-80 block text-right">
-                                            إصدار ورقة إنذار قانونية معتمدة ←
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/10 rounded-2xl border border-emerald-100 dark:border-emerald-900 flex items-start gap-3">
-                                    <Award className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
-                                    <div>
-                                        <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 uppercase">مستحقو الترقيات والبدلات</h4>
-                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-1 leading-relaxed">
-                                            الموظف ممتاز الأداء <strong className="font-black text-emerald-700">أحمد محمود العبدالله</strong> مستحق ترقية مالية بنسبة 15%. تم فحص السجل التاريخي بنجاح وتوافق 2 سنوات "ممتاز".
-                                        </p>
-                                        <button onClick={() => {
-                                            const s = appraisals.find(a => a.employeeId === 'emp-1');
-                                            if (s) openPrintFormDetails(s, 'promotion');
-                                        }} className="text-[10px] font-black underline text-emerald-700 dark:text-emerald-300 mt-2 hover:opacity-80 block text-right">
-                                            توليد قرار ترقية رسمي ←
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-                    </div>
-
-                    {/* Interactive Demos Quick Launch Track */}
-                    <div className="lg:col-span-3">
-                        <Card className="p-6 bg-white dark:bg-slate-900 border-none shadow-sm" title="النماذج الأربعة التفاعلية للتشغيل والامتحانات القانونية">
-                            <p className="text-xs text-slate-400 mb-6 font-bold">انقر على الإجراءات السريعة لرؤية سير عمل المعاملات ونماذجها وسيقوم النظام بتفعيل خطوط التوقيع والأختام.</p>
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                {appraisals.map((app) => (
-                                    <div key={app.id} className="p-4 bg-slate-50 dark:bg-slate-800 border border-slate-100 rounded-3xl flex flex-col justify-between hover:border-primary/20 hover:shadow-md transition-all">
-                                        <div>
-                                            <div className="flex justify-between items-center mb-2">
-                                                <Badge text={app.overallGrade === 'Excellent' ? 'ممتاز' : app.overallGrade === 'Weak' ? 'ضعيف' : app.overallGrade === 'Very Good' ? 'جيد جداً' : 'جيد'} color={app.overallGrade === 'Excellent' ? 'green' : app.overallGrade === 'Weak' ? 'rose' : 'blue'} />
-                                                <span className="text-[10px] font-sans font-black text-slate-400">{app.referenceNumber}</span>
-                                            </div>
-                                            <h4 className="text-sm font-black text-slate-800 dark:text-white mb-1">{app.employeeName}</h4>
-                                            <p className="text-[10px] text-slate-500 font-bold uppercase">{app.employeeJobTitle} | {app.employeeDepartment}</p>
-                                            
-                                            {/* Status Timeline step */}
-                                            <div className="mt-4 p-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100">
-                                                <div className="text-[9px] text-slate-400 font-bold">مرحلة سير العمل الحالية:</div>
-                                                <div className="text-[11px] font-black text-slate-700 dark:text-slate-300 mt-1 flex items-center gap-1.5">
-                                                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                                                    {app.status === 'Signed & Completed' ? 'مكتمل واعتماد الأختام' : app.status === 'Under Financial Review' ? 'تحت التدقيق المالي وبدلات الترقية' : app.status === 'Under HR Review' ? 'تحت مراجعة إدارة الموارد البشرية والتظلمات' : 'مسودة المباشر'}
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-6 flex flex-col gap-2">
-                                            <Button variant="outline" size="sm" onClick={() => { setSelectedAppraisal(app); setIsDetailsModalOpen(true); }} className="w-full text-center py-2 text-xs flex justify-center items-center gap-1">
-                                                <Eye className="w-3.5 h-3.5" />
-                                                عرض شاشة سير التجهيز
-                                            </Button>
-
-                                            <div className="grid grid-cols-2 gap-1.5">
-                                                <Button variant="ghost" className="bg-primary/5 hover:bg-primary/10 text-primary py-2 text-[10px]" onClick={() => openPrintFormDetails(app, app.overallGrade === 'Excellent' ? 'promotion' : app.overallGrade === 'Weak' ? 'warning' : 'appraisal')}>
-                                                    <Printer className="w-3 h-3 me-1" />
-                                                    طباعة القانوني
-                                                </Button>
-                                                <Button variant="ghost" className="bg-slate-100 hover:bg-slate-200 py-2 text-[10px]" onClick={() => handleSwitchToForm('edit', app)}>
-                                                    <Edit className="w-3 h-3 me-1" />
-                                                    تعديل البيانات
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </Card>
-                    </div>
-                </div>
-            )}
-
-            {/* --- TAB CONTENT: APPRAISALS --- */}
-            {activeTab === 'evaluations' && (
-                <div className="space-y-4">
-                    {/* Filtering rails */}
-                    <div className="flex flex-col md:flex-row gap-4 bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-50">
-                        <div className="relative flex-grow">
-                            <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
-                            <input 
-                                type="text"
-                                placeholder="ابحث باسم الموظف، المسمى الوظيفي، الرقم المالي..."
-                                className="w-full ps-12 pe-4 py-3 bg-slate-50 dark:bg-slate-800 rounded-2xl border-none text-sm font-bold focus:ring-2 focus:ring-primary"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <select 
-                                className="bg-slate-50 dark:bg-slate-800 rounded-2xl border-none text-xs font-black px-4 py-3 cursor-pointer outline-none focus:ring-2 focus:ring-primary"
-                                value={deptFilter}
-                                onChange={(e) => setDeptFilter(e.target.value)}
-                            >
-                                <option value="All">جميع الأقسام</option>
-                                <option value="المالية">المالية</option>
-                                <option value="العمليات">العمليات</option>
-                                <option value="الشؤون القانونية">الشؤون القانونية</option>
-                                <option value="الشركات">الشركات</option>
-                            </select>
-
-                            <select 
-                                className="bg-slate-50 dark:bg-slate-800 rounded-2xl border-none text-xs font-black px-4 py-3 cursor-pointer outline-none focus:ring-2 focus:ring-primary"
-                                value={levelFilter}
-                                onChange={(e) => setLevelFilter(e.target.value)}
-                            >
-                                <option value="All">كل المستويات الوظيفية</option>
-                                <option value={RoleLevel.EXECUTIVE}>التنفيذي / القيادي</option>
-                                <option value={RoleLevel.MANAGERIAL}>الإداري / الإشرافي</option>
-                                <option value={RoleLevel.OPERATIONAL}>التشغيلي / الخدمي</option>
-                                <option value={RoleLevel.TECHNICAL}>الفني / التخصصي</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Appraisals Grid displaying all elements */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {filteredAppraisalsList.map((app) => (
-                            <Card key={app.id} className="p-6 bg-white dark:bg-slate-900 border-none shadow-sm hover:shadow-md transition-all relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-full -mr-16 -mt-16 group-hover:scale-150 transition-all duration-700"></div>
-                                
-                                <div className="flex justify-between items-start mb-4 relative">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="text-[10px] font-sans font-black text-slate-400">{app.referenceNumber}</span>
-                                            <Badge text={app.roleLevel === RoleLevel.EXECUTIVE ? 'قيادي' : app.roleLevel === RoleLevel.MANAGERIAL ? 'إداري' : app.roleLevel === RoleLevel.TECHNICAL ? 'تخصصي' : 'تشغيلي'} color="indigo" />
-                                        </div>
-                                        <h3 className="text-base font-black text-slate-800 dark:text-white">{app.employeeName}</h3>
-                                        <p className="text-[11px] text-slate-400 font-bold uppercase mt-0.5">{app.employeeJobTitle} • {app.employeeDepartment}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-lg text-[10px] font-black text-slate-600 dark:text-slate-400">
-                                            {app.appraisalPeriod}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 my-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl relative">
-                                    <div className="text-center">
-                                        <div className="text-xs text-slate-400 font-bold mb-0.5">التقييم وسير التدقيق</div>
-                                        <div className="text-lg font-black text-primary font-mono">{app.overallScore} / 5</div>
-                                    </div>
-                                    <div className="text-center border-s border-stone-200 dark:border-slate-700">
-                                        <div className="text-xs text-slate-400 font-bold mb-0.5">التقدير المقابل</div>
-                                        <div className="text-sm font-black text-slate-700 dark:text-slate-300">
-                                            {app.overallGrade === 'Excellent' ? 'ممتاز' : app.overallGrade === 'Weak' ? 'ضعيف' : app.overallGrade === 'Very Good' ? 'جيد جداً' : 'جيد'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="text-[11px] text-slate-500 font-bold leading-relaxed line-clamp-2 h-9 mb-4 italic">
-                                    "{app.generalNotes || 'لم تسجل أي ملاحظات رئيسية'}"
-                                </div>
-
-                                {/* Smart tags alerts on list */}
-                                <div className="mb-4 space-y-1">
-                                    {app.recommendations.warning && (
-                                        <div className="px-3 py-1 bg-rose-50 text-rose-700 font-black text-[9px] rounded-lg flex items-center gap-1">
-                                            <ShieldAlert className="w-3 h-3" />
-                                            مقتبس: إنذار تقصير أداء المادة 41 مفعل
-                                        </div>
-                                    )}
-                                    {app.isTransferSubmitted && (
-                                        <div className="px-3 py-1 bg-amber-50 text-amber-700 font-black text-[9px] rounded-lg flex items-center gap-1">
-                                            <ArrowRightLeft className="w-3 h-3" />
-                                            طلب نقل داخلي نشط لـ {app.transferTargetDept}
-                                        </div>
-                                    )}
-                                    {app.isGrievanceSubmitted && (
-                                        <div className="px-3 py-1 bg-purple-50 text-purple-700 font-black text-[9px] rounded-lg flex items-center gap-1">
-                                            <MessageSquare className="w-3 h-3" />
-                                            هناك تظلم إداري نشط مقدم ضد هذا التقييم
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center justify-between border-t border-slate-50 pt-4 mt-2">
-                                    <div>
-                                        <span className="text-[9px] font-black uppercase text-slate-400 block mb-0.5">الحالة الحركية</span>
-                                        <span className="text-[11px] font-black text-slate-600 dark:text-slate-300">{app.status}</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <button onClick={() => { setSelectedAppraisal(app); setIsDetailsModalOpen(true); }} className="p-2 text-slate-400 hover:text-primary hover:bg-slate-50 rounded-xl" title="تفاصيل السجل والمراحل">
-                                            <Eye className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDuplicate(app)} className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-slate-50 rounded-xl" title="تكرار وإنتاج نسخة مسودة (Duplicate)">
-                                            <Copy className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleSwitchToForm('edit', app)} className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-slate-50 rounded-xl" title="تعديل وتعديل الحقول">
-                                            <Edit className="w-4 h-4" />
-                                        </button>
-                                        <button onClick={() => handleDelete(app.id)} className="p-2 text-slate-400 hover:text-rose-500 hover:bg-slate-50 rounded-xl" title="حذف بالكامل">
-                                            <Trash className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            </Card>
-                        ))}
-
-                        {filteredAppraisalsList.length === 0 && (
-                            <div className="col-span-full py-20 text-center bg-slate-50 dark:bg-slate-800 rounded-3xl">
-                                <HelpCircle className="w-12 h-12 text-slate-300 mx-auto mb-2" />
-                                <h4 className="text-sm font-black text-slate-600">لم يعثر التصفية على نتائج مطابقة</h4>
-                                <p className="text-[11px] text-slate-400 font-bold mt-1">تأكد من تعديل فلاتر المستويات أو البحث بشكل صحيح.</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* --- Tab 3: NEW / EDIT APPRAISAL FORM WORKPLACE --- */}
-            {activeTab === 'newForm' && (
-                <form onSubmit={handleSaveForm} className="space-y-6">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        {/* Middle Input criteria */}
-                        <Card className="lg:col-span-2 p-6 bg-white dark:bg-slate-900 border-none shadow-sm space-y-6" title={formMode === 'create' ? 'صياغة نموذج تقييم أداء وتوطين ذكي جديد' : 'تحديث ملف الأداء والمستحقات والمسارات'}>
-                            {/* Metadata */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-black text-slate-500 block">الموظف المراد تقييمه</label>
-                                    <select 
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-black"
-                                        value={formEmployeeId}
-                                        onChange={(e) => setFormEmployeeId(e.target.value)}
-                                        required
-                                        disabled={formMode === 'edit'}
-                                    >
-                                        {employees.map(emp => (
-                                            <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeId})</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-black text-slate-500 block">المستوى الوظيفي وقالب التقييم</label>
-                                    <select 
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-black"
-                                        value={formRoleLevel}
-                                        onChange={(e) => setFormRoleLevel(e.target.value as RoleLevel)}
-                                        required
-                                    >
-                                        <option value={RoleLevel.EXECUTIVE}>التنفيذي / القيادي (معايير استراتيجية وأرباح)</option>
-                                        <option value={RoleLevel.MANAGERIAL}>الإداري / الإشرافي (مسؤوليات القيادة والمحاسبة)</option>
-                                        <option value={RoleLevel.TECHNICAL}>الفني / التخصصي (دقة المخرجات والمسائل الفنية)</option>
-                                        <option value={RoleLevel.OPERATIONAL}>التشغيلي / الخدمي (الانضباط والكمية والتعليمات)</option>
-                                    </select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-black text-slate-500 block">فترة التقييم السنوية</label>
-                                    <input 
-                                        type="text" 
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-black"
-                                        value={formAppraisalPeriod}
-                                        onChange={(e) => setFormAppraisalPeriod(e.target.value)}
-                                        required
-                                        placeholder="مثال: 2025 / 2026"
-                                    />
-                                </div>
-
-                                <div className="space-y-1">
-                                    <label className="text-xs font-black text-slate-500 block">تاريخ التقييم</label>
-                                    <input 
-                                        type="date" 
-                                        className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-black"
-                                        value={formAppraisalDate}
-                                        onChange={(e) => setFormAppraisalDate(e.target.value)}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Dynamic Scoreboards for quantitative & qualitative metrics */}
-                            <div className="space-y-4 pt-4 border-t border-slate-50">
-                                <h3 className="text-xs font-black text-primary uppercase tracking-widest border-s-4 border-primary ps-2 mb-4">
-                                    تقييم المعايير الأساسية والأوزان للائحة (1 - 5)
-                                </h3>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Quantitative */}
-                                    <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                        <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                            معايير تقييم كمي (Quantitative Metrics)
-                                        </h4>
-
-                                        <div className="space-y-3">
-                                            {[
-                                                { label: 'كفاءة إنجاز المهام والتوقيت', val: scoreEfficiency, set: setScoreEfficiency },
-                                                { label: 'حجم المخرجات والإنتاجية', val: scoreOutput, set: setScoreOutput },
-                                                { label: 'الانضباط والالتزام بالدوام الرسمي', val: scoreAttendance, set: setScoreAttendance },
-                                                { label: 'مستوى الالتزام باللوائح والسياسات الداخلية', val: scoreCompliance, set: setScoreCompliance },
-                                            ].map((sc, i) => (
-                                                <div key={i} className="space-y-1">
-                                                    <div className="flex justify-between items-center text-[10px] font-black">
-                                                        <span className="text-slate-500">{sc.label}</span>
-                                                        <span className="text-primary">{sc.val} / 5</span>
-                                                    </div>
-                                                    <input 
-                                                        type="range" min="1" max="5" step="0.5" 
-                                                        className="w-full accent-primary cursor-pointer" 
-                                                        value={sc.val} onChange={(e) => sc.set(parseFloat(e.target.value))}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Qualitative */}
-                                    <div className="space-y-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-3xl border border-slate-100 dark:border-slate-800">
-                                        <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                            معايير تقييم نوعي والتوجه الوطني (Qualitative Metrics)
-                                        </h4>
-
-                                        <div className="space-y-3">
-                                            {[
-                                                { label: 'القيادة والمبادرة والتمكين الإداري', val: scoreLeadership, set: setScoreLeadership },
-                                                { label: 'النزاهة والالتزام بأخلاقيات المهنة', val: scoreIntegrity, set: setScoreIntegrity },
-                                                { label: 'التنسيق والتعامل مع العملاء والشركاء', val: scoreClient, set: setScoreClient },
-                                                { label: 'الانتماء لبرامج التوطين والكوادر الوطنية كويتياً', val: scoreNational, set: setScoreNational },
-                                            ].map((sc, i) => (
-                                                <div key={i} className="space-y-1">
-                                                    <div className="flex justify-between items-center text-[10px] font-black">
-                                                        <span className="text-slate-500">{sc.label}</span>
-                                                        <span className="text-emerald-600">{sc.val} / 5</span>
-                                                    </div>
-                                                    <input 
-                                                        type="range" min="1" max="5" step="0.5" 
-                                                        className="w-full accent-emerald-500 cursor-pointer" 
-                                                        value={sc.val} onChange={(e) => sc.set(parseFloat(e.target.value))}
-                                                    />
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Action plan & Notes */}
-                            <div className="space-y-4 pt-4 border-t border-slate-50">
-                                <h3 className="text-xs font-black text-primary uppercase tracking-widest border-s-4 border-primary ps-2 mb-4">
-                                    الملاحظات والتوصيات التطويرية والمستقبلية
-                                </h3>
-                                
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-black text-slate-500">ملاحظات المدير العام المباشرة</label>
-                                        <textarea 
-                                            rows={2}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-bold"
-                                            value={formNotes}
-                                            onChange={(e) => setFormNotes(e.target.value)}
-                                            placeholder="اكتب خلاصة تقييم السلوك والأداء المميز أو جوانب التقصير للموظف..."
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-xs font-black text-slate-500">خطة تقويم الأداء وتدريب الموظف الحركية (Corrective Action Plan)</label>
-                                        <textarea 
-                                            rows={2}
-                                            className="w-full bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border-none outline-none focus:ring-2 focus:ring-primary text-xs font-bold"
-                                            value={formActionPlan}
-                                            onChange={(e) => setFormActionPlan(e.target.value)}
-                                            placeholder="تحدد بالتفصيل دورات التطوير أو خطة التقويم المجدولة بالأيام في الكويت..."
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </Card>
-
-                        {/* Left sidebar: Live Check compliance, Auto retrieved details and Recommendation toggles */}
-                        <div className="space-y-6">
-                            {/* Auto retrieved panel */}
-                            <Card className="p-4 bg-slate-50 dark:bg-slate-900 border-none shadow-sm" title="الاستدعاء الذكي للمتطلبات">
-                                {selectedEmployeeMeta ? (
-                                    <div className="space-y-3 mt-4 text-xs font-bold text-slate-600 dark:text-slate-300">
-                                        <div className="flex justify-between border-b border-stone-200 dark:border-slate-800 pb-2">
-                                            <span>الراتب الأساسي الحالي:</span>
-                                            <span className="text-primary font-mono font-black">{selectedEmployeeMeta.basicSalary} د.ك</span>
-                                        </div>
-                                        <div className="flex justify-between border-b border-stone-200 dark:border-slate-800 pb-2">
-                                            <span>تاريخ الانضمام للشركة:</span>
-                                            <span className="font-mono">{selectedEmployeeMeta.joiningDate}</span>
-                                        </div>
-                                        <div className="flex justify-between border-b border-stone-200 dark:border-slate-800 pb-2">
-                                            <span>حالات الغياب الحالية:</span>
-                                            <span className={selectedEmployeeMeta.attendanceAbsences > 5 ? 'text-rose-500 font-black' : ''}>{selectedEmployeeMeta.attendanceAbsences} أيام غياب</span>
-                                        </div>
-                                        <div className="flex justify-between border-b border-stone-200 dark:border-slate-800 pb-2">
-                                            <span>أيام تأخير الحضور:</span>
-                                            <span className={selectedEmployeeMeta.attendanceDelays > 8 ? 'text-rose-500 font-black' : ''}>{selectedEmployeeMeta.attendanceDelays} دقائق/ساعات</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>سجل المخالفات/الإنذارات:</span>
-                                            <span className={selectedEmployeeMeta.warningsCount > 0 ? 'text-rose-600 font-black' : 'text-emerald-500'}>
-                                                {selectedEmployeeMeta.warningsCount} إنذار رسمي مسجل
-                                            </span>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-xs text-slate-400 font-bold text-center mt-4 pb-2">يرجى تحديد موظف لاستباط بياناته عمالياً.</div>
-                                )}
-                            </Card>
-
-                            {/* Smart warning blocks triggered by form variables */}
-                            {showPromotionRestrictionAlert && (
-                                <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-2.5">
-                                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                                    <div className="text-[10px] text-amber-800 font-bold leading-relaxed">
-                                        <strong>تنبيه شؤون الترقية عمالياً:</strong> الموظف لا يملك تقييم أداء "Excellent الممتاز" لهذا العام. وفقاً للقرارات المنظمة بالكويت، يستحق الموظف الترقية إذا استوفى متوسط ممتاز لآخر عامين.
-                                    </div>
-                                </div>
-                            )}
-
-                            {showLowPerformanceWarningAlert && (
-                                <div className="p-4 bg-rose-50 rounded-2xl border border-rose-200 flex items-start gap-2.5 animate-bounce">
-                                    <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-                                    <div className="text-[10px] text-rose-800 font-black leading-relaxed">
-                                        <strong>توجيه إنذار أداء أول مستند عمالياً:</strong> التقييم العام يقل عن التقدير المقبول. يقترح النظام تفعيل خانة "إنذار قانوني للموظف" لتجنب إشكاليات دعاوى إنهاء الخدمة غير المبرر أمام المحكمة العمالية الكويتية.
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Recommendation actions */}
-                            <Card className="p-6 bg-white dark:bg-slate-900 border-none shadow-sm" title="القرارات والتوصيات المقترحة">
-                                <div className="space-y-4 mt-4">
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-primary rounded outline-none focus:ring-0"
-                                            checked={recPromotion}
-                                            onChange={(e) => {
-                                                setRecPromotion(e.target.checked);
-                                                if (e.target.checked) setRecSalaryInc(true); // Prom implies raised salary
-                                            }}
-                                        />
-                                        <span className="text-xs font-black text-slate-700 dark:text-slate-300">يوصي بالترقية لدرجة أعلى</span>
-                                    </label>
-
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-primary rounded outline-none"
-                                            checked={recSalaryInc}
-                                            onChange={(e) => setRecSalaryInc(e.target.checked)}
-                                        />
-                                        <span className="text-xs font-black text-slate-700 dark:text-slate-300">منح زيادة في الراتب الأساسي</span>
-                                    </label>
-
-                                    {recSalaryInc && (
-                                        <div className="ps-7 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 block">نسبة الزيادة (% الأساسي)</label>
-                                            <input 
-                                                type="number" min="1" max="50" 
-                                                className="w-24 bg-slate-50 dark:bg-slate-800 p-2 text-xs rounded-xl border-none outline-none font-black"
-                                                value={recSalaryPct}
-                                                onChange={(e) => setRecSalaryPct(parseInt(e.target.value) || 0)}
-                                            />
-                                        </div>
-                                    )}
-
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-primary rounded outline-none"
-                                            checked={recBonus}
-                                            onChange={(e) => setRecBonus(e.target.checked)}
-                                        />
-                                        <span className="text-xs font-black text-slate-700 dark:text-slate-300">منح مكافأة تميز (Bonus)</span>
-                                    </label>
-
-                                    {recBonus && (
-                                        <div className="ps-7 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 block">المبلغ المالي مقطوع (د.ك)</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-24 bg-slate-50 dark:bg-slate-800 p-2 text-xs rounded-xl border-none outline-none font-black"
-                                                value={recBonusAmt}
-                                                onChange={(e) => setRecBonusAmt(parseFloat(e.target.value) || 0)}
-                                            />
-                                        </div>
-                                    )}
-
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-rose-500 rounded outline-none"
-                                            checked={recWarning}
-                                            onChange={(e) => {
-                                                setRecWarning(e.target.checked);
-                                                if (e.target.checked) setRecDisciplinary('إنذار أداء أول كتابي رسمي');
-                                            }}
-                                        />
-                                        <span className="text-xs font-black text-rose-600">إصدار إنذار تقصير قانوني كتابي</span>
-                                    </label>
-
-                                    {recWarning && (
-                                        <div className="ps-7 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 block">نص المخالفة أو صيغة الإنذار</label>
-                                            <input 
-                                                type="text" 
-                                                className="w-full bg-slate-50 dark:bg-slate-800 p-2 text-xs rounded-xl border-none outline-none font-semibold text-rose-700"
-                                                value={recDisciplinary}
-                                                onChange={(e) => setRecDisciplinary(e.target.value)}
-                                                placeholder="إنذار أداء أول، نهائي، إلخ..."
-                                            />
-                                        </div>
-                                    )}
-
-                                    {/* Action items for transfer requests */}
-                                    <label className="flex items-center gap-3 cursor-pointer">
-                                        <input 
-                                            type="checkbox" 
-                                            className="w-4 h-4 text-amber-500 rounded outline-none"
-                                            checked={formIsTransfer}
-                                            onChange={(e) => setFormIsTransfer(e.target.checked)}
-                                        />
-                                        <span className="text-xs font-black text-amber-600">إرفاق طلب نقل قسم داخلي</span>
-                                    </label>
-
-                                    {formIsTransfer && (
-                                        <div className="ps-7 space-y-1">
-                                            <label className="text-[10px] font-black text-slate-400 block">القسم المستهدف للنقل إليه</label>
-                                            <input 
-                                                type="text" 
-                                                className="w-full bg-slate-50 dark:bg-slate-800 p-2 text-xs rounded-xl border-none outline-none font-black text-amber-700"
-                                                value={formTransferDept}
-                                                onChange={(e) => setFormTransferDept(e.target.value)}
-                                                placeholder="مثل: إدارة التدقيق القانوني"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="mt-8 border-t border-slate-50 pt-4 flex gap-2">
-                                    <Button type="submit" variant="primary" className="flex-grow py-3 rounded-2xl text-xs font-black">
-                                        {formMode === 'create' ? 'اعتماد وحفظ المسودة بالتاريخ' : 'حفظ مراجعة التغييرات'}
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => setActiveTab('evaluations')} className="py-3 rounded-2xl text-xs font-bold">
-                                        إلغاء الأمر
-                                    </Button>
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
-                </form>
-            )}
-
-            {/* --- DETAILED DIALOG WITH WORKFLOW TIMELINE --- */}
-            <Modal isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} title={`تفاصيل ملف الأداء وتقييم الكفاءة: ${selectedAppraisal?.employeeName}`} size="xl">
-                {selectedAppraisal && (
-                    <div className="space-y-6 max-h-[80vh] overflow-y-auto p-4 scrollbar-thin">
-                        
-                        {/* Interactive status selector for workflow testing */}
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border border-slate-100">
-                            <div>
-                                <h4 className="text-xs font-black text-slate-400 uppercase">التحكم التفاعلي في حالة سير المعاملة</h4>
-                                <p className="text-[10px] text-slate-500 font-bold mt-0.5">قم بتعديل الحالة لتتحرك المؤشرات وتسلسل الأنيميشن في لوحة شؤون الموظفين عمالياً.</p>
-                            </div>
-                            <select 
-                                className="bg-white dark:bg-slate-900 text-xs font-black p-2.5 rounded-xl border border-slate-200 outline-none focus:ring-1 focus:ring-primary"
-                                value={selectedAppraisal.status}
-                                onChange={(e) => handleWorkflowChange(selectedAppraisal.id, e.target.value as PerformanceAppraisalStatus)}
-                            >
-                                <option value="Draft">مسودة رئيس القسم المباشر (Draft)</option>
-                                <option value="Pending Line Manager">معلّقة لموافقة المدير المباشر</option>
-                                <option value="Under HR Review">مرفوعة لمراجعة شؤون الموظفين القانونية</option>
-                                <option value="Under Financial Review">قيد المراجعة والبدلات المالية والترقيات</option>
-                                <option value="Signed & Completed">مكتمل، مختوم ومعتمد بالكامل (Signed & Completed)</option>
-                            </select>
-                        </div>
-
-                        {/* Interactive Rich Animations Timeline */}
-                        <div className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 block text-center">خطوات التدقيق ومسار الحركة (Workflow Stages)</h3>
-                            <div className="flex flex-col md:flex-row justify-between items-center relative gap-8 md:gap-2">
-                                {/* Connector horizontal line */}
-                                <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 hidden md:block -z-0"></div>
-                                <div className="absolute top-1/2 left-0 h-1 bg-primary -translate-y-1/2 hidden md:block -z-0 transition-all duration-700" style={{
-                                    width: selectedAppraisal.status === 'Signed & Completed' ? '100%' :
-                                           selectedAppraisal.status === 'Under Financial Review' ? '75%' :
-                                           selectedAppraisal.status === 'Under HR Review' ? '50%' :
-                                           selectedAppraisal.status === 'Pending Line Manager' ? '25%' : '0%'
-                                }}></div>
-
-                                {[
-                                    { stage: 'Draft', label: 'المباشر / مسودة' },
-                                    { stage: 'Pending Line Manager', label: 'المدير المباشر' },
-                                    { stage: 'Under HR Review', label: 'الموارد البشرية' },
-                                    { stage: 'Under Financial Review', label: 'التفتيش المالي' },
-                                    { stage: 'Signed & Completed', label: 'معتمد ومثبت' },
-                                ].map((step, i) => {
-                                    const stagesList = ['Draft', 'Pending Line Manager', 'Under HR Review', 'Under Financial Review', 'Signed & Completed'];
-                                    const currentIdx = stagesList.indexOf(selectedAppraisal.status);
-                                    const thisIdx = stagesList.indexOf(step.stage);
-                                    const isPassed = thisIdx <= currentIdx;
-                                    const isActive = thisIdx === currentIdx;
-
-                                    return (
-                                        <div key={i} className="flex md:flex-col items-center gap-4 md:gap-2 z-10 shrink-0">
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs shadow-md transition-all duration-500 ${isPassed ? 'bg-primary text-white scale-110' : 'bg-white text-slate-400'}`}>
-                                                {isPassed ? '✓' : i + 1}
-                                            </div>
-                                            <span className={`text-[10px] font-black uppercase text-center ${isActive ? 'text-primary' : isPassed ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400'}`}>
-                                                {step.label}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Detailed Score Analysis */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                            <div className="h-48 bg-slate-50 rounded-2xl p-2">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <RadarChart outerRadius={60} data={radarData}>
-                                        <PolarGrid />
-                                        <PolarAngleAxis dataKey="subject" tick={{ fontSize: 9, fontWeight: 700 }} />
-                                        <Radar name="الأداء" dataKey="score" stroke="#3B82F6" fill="#3B82F6" fillOpacity={0.3} />
-                                    </RadarChart>
-                                </ResponsiveContainer>
-                            </div>
-
-                            <div className="space-y-2 text-xs">
-                                <h4 className="font-black text-slate-700 dark:text-slate-400 mb-2 border-b pb-1">تحليل درجات معايير التقييم</h4>
-                                {Object.entries(selectedAppraisal.criteria).map(([key, value]: [string, any]) => (
-                                    <div key={key} className="flex justify-between items-center bg-slate-50 dark:bg-slate-800 p-2 rounded-xl">
-                                        <span className="text-slate-500 font-bold">{value.name}</span>
-                                        <span className="font-mono font-black text-primary">{value.score} / 5</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Notes and plan details display */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border">
-                                <h4 className="text-xs font-black text-primary block mb-2">ملاحظات وقرار التقييم الاستراتيجي</h4>
-                                <p className="text-xs font-bold leading-relaxed text-slate-600 dark:text-slate-300">
-                                    {selectedAppraisal.generalNotes || 'لا تتوفر أي ملاحظات إجمالية.'}
-                                </p>
-                            </div>
-
-                            <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border">
-                                <h4 className="text-xs font-black text-primary block mb-2">خطة التطوير العلاجية والتقويم المجدولة</h4>
-                                <p className="text-xs font-bold leading-relaxed text-slate-600 dark:text-slate-300">
-                                    {selectedAppraisal.correctiveActionPlan || 'لم تدرج أي خطط إجبارية بالقسم.'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Recommendation details & Printable Action Buttons */}
-                        <div className="p-6 bg-white dark:bg-slate-900 border rounded-3xl space-y-4">
-                            <h3 className="text-xs font-black text-primary uppercase">الوثائق القانونية المتاحة للطباعة المعتمدة (Adala Official printable) On Demand</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                <Button variant="outline" className="flex items-center gap-2 justify-center py-3 text-xs" onClick={() => openPrintFormDetails(selectedAppraisal, 'appraisal')}>
-                                    <Printer className="w-4 h-4" />
-                                    طباعة ورقة تقييم الأداء السنوي
-                                </Button>
-                                
-                                {selectedAppraisal.recommendations.promotion && (
-                                    <Button variant="outline" className="flex items-center gap-2 justify-center py-3 text-xs border-emerald-500 hover:bg-emerald-50" onClick={() => openPrintFormDetails(selectedAppraisal, 'promotion')}>
-                                        <Printer className="w-4 h-4 text-emerald-500" />
-                                        قرار ترقية وتعديل مالي رسمي
-                                    </Button>
-                                )}
-
-                                {selectedAppraisal.recommendations.warning && (
-                                    <Button variant="outline" className="flex items-center gap-2 justify-center py-3 text-xs border-rose-500 hover:bg-rose-50" onClick={() => openPrintFormDetails(selectedAppraisal, 'warning')}>
-                                        <Printer className="w-4 h-4 text-rose-500" />
-                                        كتاب إنذار تقصير أداء رسمي
-                                    </Button>
-                                )}
-
-                                {selectedAppraisal.isTransferSubmitted && (
-                                    <Button variant="outline" className="flex items-center gap-2 justify-center py-3 text-xs border-amber-500 hover:bg-amber-50" onClick={() => openPrintFormDetails(selectedAppraisal, 'transfer')}>
-                                        <Printer className="w-4 h-4 text-amber-500" />
-                                        قرار نقل موظف داخلي
-                                    </Button>
-                                )}
-
-                                {selectedAppraisal.isGrievanceSubmitted && (
-                                    <Button variant="outline" className="flex items-center gap-2 justify-center py-3 text-xs border-purple-500 hover:bg-purple-50" onClick={() => openPrintFormDetails(selectedAppraisal, 'grievance')}>
-                                        <Printer className="w-4 h-4 text-purple-500" />
-                                        تظلم إداري ومذكرة رد
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-4 border-t">
-                            <Button variant="primary" onClick={() => setIsDetailsModalOpen(false)}>إغلاق التفاصيل</Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
-            {/* --- COMPREHENSIVE LEGAL PRINTABLE TEMPLATE MODAL --- */}
-            <Modal isOpen={isPrintModalOpen} onClose={() => setIsPrintModalOpen(false)} title="معاينة المستند الرسمي واستصدار وثيقة معتمدة" size="xl">
-                {selectedAppraisal && (
-                    <div className="space-y-6 max-h-[85vh] overflow-y-auto p-4 scrollbar-thin">
-                        <div className="bg-amber-50 border border-amber-200 p-3 rounded-2xl flex items-center justify-between">
-                            <div className="text-[11px] text-amber-800 font-bold">
-                                <strong>تنويه الطباعة:</strong> هذا المستند مجهز بتسنيق الطباعة السليم في الكويت. سيقوم المتصفح بإزالة أزرار الحواشي وعرض الأختام والرموز المائية بشكل رسمي عند الضغط على زر الطباعة.
-                            </div>
-                            <Button variant="primary" size="sm" onClick={() => window.print()} className="font-black text-xs shrink-0 flex items-center gap-1.5 ms-4">
-                                <Printer className="w-4 h-4" />
-                                إملاء أمر الطباعة للمتصفح (Print Document)
-                            </Button>
-                        </div>
-
-                        {/* PRINT AREA (Fully customized styled white paper) */}
-                        <div className="bg-white text-black p-10 border shadow-md font-sans rounded-3xl min-h-[29cm] relative print:border-none print:shadow-none print:p-0 select-text" style={{ direction: 'rtl' }}>
-                            {/* Company watermarks absolute */}
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.03] select-none pointer-events-none z-0">
-                                <div className="w-96 h-96 border-8 border-primary rounded-full flex items-center justify-center font-black text-3xl text-primary font-serif">
-                                    ADALA PRO
-                                </div>
-                            </div>
-                            
-                            {/* Main Document Header according to Kuwait labor standards */}
-                            <div className="border-b-2 border-slate-300 pb-4 flex justify-between items-center z-10 relative">
-                                <div className="text-right space-y-1">
-                                    <h2 className="text-lg font-black text-slate-800 font-serif">مجموعة عدالة للمحاماة والاستشارت القانونية</h2>
-                                    <p className="text-[10px] text-slate-500 font-bold font-sans">قسم شؤون الموظفين والامتثال العمالي • دولة الكويت</p>
-                                    <p className="text-[9px] text-slate-400 font-bold">هاتف: 965254000+ • ص.ب: 1547 الحزام الرقمي</p>
-                                </div>
-                                <div className="text-center">
-                                    <div className="w-14 h-14 bg-slate-100 rounded-full border flex items-center justify-center font-black text-xs text-slate-400 mb-1">
-                                        شعـار
-                                    </div>
-                                    <span className="text-[9px] font-black text-slate-400 inline-block uppercase tracking-wider">ADALA LEGAL GROUP</span>
-                                </div>
-                            </div>
-
-                            {/* Reference & Numbers bar */}
-                            <div className="my-6 flex justify-between items-center text-[10px] text-slate-500 font-bold z-10 relative bg-slate-50 p-2.5 rounded-lg">
-                                <span>الرقم المرجعي المالي: {selectedAppraisal.referenceNumber}</span>
-                                <span>التاريخ المعتمد: {selectedAppraisal.appraisalDate}</span>
-                                <span>البلد: دولة الكويت • قانون العمل 6/2010</span>
-                            </div>
-
-                            {/* --- DYNAMIC TEMPLATES SWITCH RENDER --- */}
-                            
-                            {/* Template 1: Yearly Appraisal Sheet */}
-                            {printDocType === 'appraisal' && (
-                                <div className="space-y-6 z-10 relative">
-                                    <div className="text-center">
-                                        <h1 className="text-xl font-black underline text-slate-900 leading-tight">نموذج تقييم الأداء السنوي الوظيفي للعام {selectedAppraisal.appraisalPeriod}</h1>
-                                    </div>
-
-                                    {/* Personal details of employee */}
-                                    <div className="border border-slate-200 rounded-2xl p-4 bg-slate-50 grid grid-cols-2 gap-y-3 text-xs font-semibold text-slate-700">
-                                        <div>اسم الموظف كويتياً: <strong>{selectedAppraisal.employeeName}</strong></div>
-                                        <div>الرقم المدني الكويتي: <strong className="font-mono">{selectedAppraisal.civilId}</strong></div>
-                                        <div>المسمى الوظيفي: <strong>{selectedAppraisal.employeeJobTitle}</strong></div>
-                                        <div>القسم التابع له: <strong>{selectedAppraisal.employeeDepartment}</strong></div>
-                                        <div>تاريخ الدخول والتعاقد: <strong className="font-mono">{selectedAppraisal.joiningDate}</strong></div>
-                                        <div>المستوى الوظيفي المربوط: <strong>{selectedAppraisal.roleLevel === RoleLevel.EXECUTIVE ? 'قيادي تنفيذي' : selectedAppraisal.roleLevel === RoleLevel.MANAGERIAL ? 'إداري إشرافي' : selectedAppraisal.roleLevel === RoleLevel.TECHNICAL ? 'تخصصي فني' : 'خدمي تشغيلي'}</strong></div>
-                                    </div>
-
-                                    {/* Grid of scores */}
-                                    <div className="space-y-3">
-                                        <h3 className="text-sm font-black text-slate-800 border-b pb-1">أولاً: تفاصيل الدرجات والتقييم الكمي والنوعي للدور الوظيفي</h3>
-                                        <table className="w-full border-collapse border border-slate-300 text-xs">
-                                            <thead>
-                                                <tr className="bg-slate-100">
-                                                    <th className="border border-slate-300 p-2 text-right">معيار الكفاءة والتوجه الوطني لبرنامج قوى العاملة</th>
-                                                    <th className="border border-slate-300 p-2 text-center w-24">الدرجة</th>
-                                                    <th className="border border-slate-300 p-2 text-center w-28">الوزن الأقصى</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {Object.entries(selectedAppraisal.criteria).map(([key, crit]: [string, any]) => (
-                                                    <tr key={key} className="hover:bg-slate-50">
-                                                        <td className="border border-slate-300 p-2 font-bold">{crit.name}</td>
-                                                        <td className="border border-slate-300 p-2 text-center font-mono font-black text-primary">{crit.score} / 5</td>
-                                                        <td className="border border-slate-300 p-2 text-center font-mono font-medium">{crit.weight}%</td>
-                                                    </tr>
-                                                ))}
-                                                <tr className="bg-slate-100 font-black">
-                                                    <td className="border border-slate-300 p-2 text-right">المعدل العام الموزون والتقدير الكلي المقابل لمكتب العمل الكويتي</td>
-                                                    <td className="border border-slate-300 p-2 text-center font-mono text-primary text-sm">{selectedAppraisal.overallScore} / 5</td>
-                                                    <td className="border border-slate-300 p-2 text-center text-emerald-600 text-[11px]">
-                                                        {selectedAppraisal.overallGrade === 'Excellent' ? 'الممتاز' : selectedAppraisal.overallGrade === 'Weak' ? 'الضعيف' : selectedAppraisal.overallGrade === 'Very Good' ? 'جيد جداً' : 'جيد'}
-                                                    </td>
-                                                </tr>
-                                            </tbody>
-                                        </table>
-                                    </div>
-
-                                    {/* General comments */}
-                                    <div className="space-y-2">
-                                        <h3 className="text-sm font-black text-slate-800 border-b pb-1">ثانياً: ملاحظات شؤون الموظفين وتوصيات الإدارة</h3>
-                                        <p className="text-xs leading-relaxed text-slate-700 font-semibold bg-slate-50 p-3 rounded-xl min-h-12 border">
-                                            "{selectedAppraisal.generalNotes || 'لم تسجل أي ملاحظات مخصصة.'}"
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Template 2: Promotion / Salary raises letter */}
-                            {printDocType === 'promotion' && (
-                                <div className="space-y-6 z-10 relative">
-                                    <div className="text-center">
-                                        <h1 className="text-xl font-black underline text-slate-950 leading-tight block">قرار إداري رقم (QA-PROM-25) بخصوص ترقية ومنح بدل تميز موظف</h1>
-                                    </div>
-
-                                    <p className="text-xs font-bold leading-relaxed text-slate-800 font-sans text-right">
-                                        إن رئيس قطاع الموارد البشرية والامتثال في مجموعة <strong className="font-black text-slate-900">عدالة للمحاماة</strong> بدولة الكويت، بعد الاطلاع على أحكام القانون رقم 6 لسنة 2010 في شأن العمل في القطاع الأهلي وتعديلاته، وبناءً على لائحة تنظيم العمل الممنوحة واعتماد لجنة الترقيات والتدقيق القانوني بالأسبوع المالي وبناءً على تقييم الأداء السنوي للموظف بمرتبة ممتاز للعامين المنصرمين:
-                                    </p>
-
-                                    <h3 className="text-sm font-black text-slate-900 underline">قررنا الآتي وعممناه مالياً:</h3>
-
-                                    <div className="ps-4 space-y-3 text-xs leading-relaxed font-semibold text-slate-800">
-                                        <div>
-                                            <strong>مادة (1):</strong> يرقّى السيد / <strong className="font-black text-primary">{selectedAppraisal.employeeName}</strong>، ويعدّل مسمّاه الوظيفي المعتمد لدى الهيئة العامة للقوى العاملة في الكويت اعتباراً من الشهر القادم.
-                                        </div>
-                                        <div>
-                                            <strong>مادة (2):</strong> يمنح الموظف المذكور زيادة مالية استثنائية على الراتب الأساسي بنسبة <strong className="font-black font-sans text-emerald-600 font-mono">{selectedAppraisal.recommendations.salaryIncreasePct}%</strong> ليصبح راتبه الكلي المربوط والمسجل في سجل الهيئة والبنك هو <strong className="font-black text-primary font-mono">{(selectedAppraisal.basicSalary * (1 + selectedAppraisal.recommendations.salaryIncreasePct / 100) + selectedAppraisal.allowancesAmount).toFixed(3)} د.ك</strong> شاملاً كافة البدلات والعلاوات المسجلة.
-                                        </div>
-                                        <div>
-                                            <strong>مادة (3):</strong> تلتزم الإدارة المالية وعلاقات العمل بموافاة الموظف بكتاب لمن يهمه الأمر وبتسليم الختم والسجلات الموازية وبإبلاغ المؤسسة العامة للتأمينات الاجتماعية لتعديل شرائح الراتب المعتمدة رسمياً.
-                                        </div>
-                                    </div>
-
-                                    <div className="pt-8">
-                                        <p className="text-xs font-bold text-slate-500">صدر هذا المستند آلياً ويدوياً في ديوان الإدارة - السالمية - الكويت.</p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Template 3: Warning Letter under Article 41 Kuwait Labor law */}
-                            {printDocType === 'warning' && (
-                                <div className="space-y-6 z-10 relative">
-                                    <div className="text-center">
-                                        <h1 className="text-xl font-black underline text-red-700 leading-tight block">كتاب إنذار رسمي كتابي أول بتقصير الأداء ومخالفة اللوائح</h1>
-                                    </div>
-
-                                    <p className="text-xs font-bold text-slate-400 font-semibold">التاريخ: {selectedAppraisal.appraisalDate}</p>
-
-                                    <div className="space-y-4 text-xs leading-relaxed font-semibold text-slate-800">
-                                        <p>
-                                            إلى الموظفة: <strong>{selectedAppraisal.employeeName}</strong> المحترمة،<br/>
-                                            المسمى الوظيفي المسجل: مساعد عمليات / قسم قطاع العمليات واللوجستيك.
-                                        </p>
-
-                                        <p className="text-justify leading-relaxed">
-                                            توجّه إليكم إدارة الموارد البشرية والامتثال في <strong>مجموعة عدالة للمحاماة والاستشارت القانونية</strong> هذا الإنذار الرسمي المكتوب بسبب تراجع وانخفاض كفاءة الأداء الوظيفي الخاص بكم بشكل حاد وحصولكم على تقييم سنوي بتقدير <strong className="font-black text-red-600">ضعيف (Weak) بدرجة {selectedAppraisal.overallScore} من 5</strong>، بالإضافة لتسجيل عدد <strong className="font-sans text-red-600 font-black">{selectedAppraisal.attendanceAbsences} أيام غياب غياب غير مشروع</strong> وعدد <strong className="font-sans text-red-600 font-black">{selectedAppraisal.attendanceDelays} حالات تأخير حضور</strong> دون عذر مقبول أو تقرير طبي رسمي خلال العام.
-                                        </p>
-
-                                        <p className="text-justify leading-relaxed bg-red-50 p-4 border border-red-100 rounded-2xl text-[11px] text-red-900 leading-relaxed font-bold">
-                                            <strong>التبعات القانونية وفق قانون العمل الكويتي رقم 6 لسنة 2010:</strong><br/>
-                                            بموجب المادة 41 والمادة 44 من العمل بالقطاع الأهلي، تعتبر هذه المعاملة إنذاراً رسمياً كتابياً أولياً. وفي حال لم يتم إبداء تحسن جوهري وملموس في دقة المعاملات والحضور والالتزام بخطة التقويم السبعينية خلال 90 يوماً من استلام هذا الإخطار، فإن الشركة تحتفظ بحقها الكامل في فسخ عقد العمل الخاص بكم مع الاحتفاظ بكافة الدفوع القانونية وحماية مصالح صاحب العمل المنصوص عليها.
-                                        </p>
-
-                                        <p>
-                                            نأمل منكم الالتزام التام والتعاون مع مدير قسم العمليات لتجنب اتخاذ أي إجراءات تأديبية تصاعدية أخرى.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Template 4: Department Transfer Code */}
-                            {printDocType === 'transfer' && (
-                                <div className="space-y-6 z-10 relative">
-                                    <div className="text-center">
-                                        <h1 className="text-xl font-black underline text-slate-950 leading-tight block">قرار إداري داخلي رقم (QA-TRANS-26) بنقل موظف داخلي وتسكين مسمى</h1>
-                                    </div>
-
-                                    <p className="text-xs font-bold leading-relaxed text-slate-800 text-right">
-                                        بناءً على طلب النقل الداخلي المرفوع من الموظف السيد / <strong className="font-black text-primary">{selectedAppraisal.employeeName}</strong>، وبناءً على حاجة العمل وإعادة توزيع الكوادر الإدارية لتعزيز الكفاءة وبناءً على تخرجه واعتماده، تقرر الآتي:
-                                    </p>
-
-                                    <div className="ps-4 space-y-3 text-xs leading-relaxed font-semibold text-slate-800">
-                                        <div>
-                                            <strong>مادة (1):</strong> نقل السيد / <strong className="font-black">{selectedAppraisal.employeeName}</strong> من موقعه وإدارته الحالية وهي <strong className="text-red-600">{selectedAppraisal.employeeDepartment}</strong> إلى الإدارة الجديدة المستهدفة وهي <strong className="text-emerald-600 font-black">{selectedAppraisal.transferTargetDept || 'إدارة التدقيق القانوني والمالي الكلي'}</strong> بذات درجته المالية وبدلاته المقررة.
-                                        </div>
-                                        <div>
-                                            <strong>مادة (2):</strong> يسري مفعول هذا النقل والتسكين وتعديل المسؤوليات والتقارير التنظيمية اعتباراً من الدورة المالية والوظيفية لمنتصف العام تزامناً مع إخلاء طرفه رسمياً من مديره السابق.
-                                        </div>
-                                        <div>
-                                            <strong>مادة (3):</strong> يُخطر المدقق المالي لإجراء تعديل الهيكلة التنظيمية في سجل الرواتب وإعداد ملف الرفع السحابي.
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Template 5: Disciplinary Grievance Resolution */}
-                            {printDocType === 'grievance' && (
-                                <div className="space-y-6 z-10 relative">
-                                    <div className="text-center">
-                                        <h1 className="text-xl font-black underline text-slate-950 leading-tight block">قرار شؤون الموظفين في التظلم الإداري المقدم بروابط مذكرات المحكمة</h1>
-                                    </div>
-
-                                    <div className="space-y-4 text-xs leading-relaxed font-semibold text-slate-800 bg-slate-50 p-4 border rounded-2xl">
-                                        <p>
-                                            المتظلم: <strong>السيد / {selectedAppraisal.employeeName}</strong> (باحث قانوني • قسم الشؤون القانونية).<br/>
-                                            موضوع التظلم: الطعن في التقييم السنوي للعام {selectedAppraisal.appraisalPeriod}.
-                                        </p>
-
-                                        <div className="p-4 bg-purple-50 rounded-2xl border border-purple-100">
-                                            <p className="text-[11px] text-purple-900 leading-relaxed font-bold">
-                                                <strong>حيثيات التظلم الإداري المقيد بقسم تظلمات الموظفين:</strong><br/>
-                                                "{selectedAppraisal.grievanceNote || 'تظلم من انخفاض درجات معايير المخرجات وصياغة المذكرات.'}"
-                                            </p>
-                                        </div>
-
-                                        <p className="text-justify leading-relaxed">
-                                            <strong>رأي لجنة شؤون الموظفين والتدقيق الكلي:</strong><br/>
-                                            بعد إجراء فحص دقيق لسجلات المحكمة الكلية والتثبت من مذكرات الدفاع المكتوبة وعددها 14 مذكرة دفاع في القضايا التجارية والعمالية الكبرى، تبيّن صحّة ادعاءات الباحث القانوني. وقد أوصت لجنة التفتيش الإداري بالتعاون مع رئيس قسم التدقيق بإعادة تقدير المعايير ورفع مخرجاته ومواءمتها مع منجزاته الفعلية لتحقيق العدالة الوظيفية.
-                                        </p>
-
-                                        <p>
-                                            <strong>القرار الملحق:</strong> يقبل التظلم شكلاً وموضوعاً، ويحال ملف التقييم لرئيس القسم لإعادة صياغة الدرجات وربط المستحقات المالية المناسبة.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Official Double Signature Grids & Seals & Stamp areas */}
-                            <div className="mt-16 pt-10 border-t-2 border-slate-100 grid grid-cols-4 gap-4 text-center text-xs font-semibold z-10 relative no-print-bg">
-                                <div className="space-y-8">
-                                    <div className="text-[10px] text-slate-400 block">إعداد وتوقيع الموظف</div>
-                                    <div className="italic text-slate-400 font-serif h-12 flex items-end justify-center">
-                                        {selectedAppraisal.signatures.employee ? 'موقّع إلكترونياً' : '......................'}
-                                    </div>
-                                    <span className="text-[9px] text-slate-400 block">{selectedAppraisal.signatures.employee?.signedAt || ''}</span>
-                                </div>
-
-                                <div className="space-y-8">
-                                    <div className="text-[10px] text-slate-400 block font-bold">رئيس القسم المباشر</div>
-                                    <div className="italic text-indigo-300 font-serif h-12 flex items-end justify-center font-bold">
-                                        {selectedAppraisal.managerName}
-                                    </div>
-                                    <span className="text-[9px] text-slate-400 block">{selectedAppraisal.signatures.manager?.signedAt || ''}</span>
-                                </div>
-
-                                <div className="space-y-8">
-                                    <div className="text-[10px] text-slate-400 block">اعتماد وإمضاء التدقيق القانوني</div>
-                                    <div className="italic text-slate-300 font-serif h-12 flex items-end justify-center">
-                                        صبري شطا
-                                    </div>
-                                    <span className="text-[9px] text-slate-400 block">معتمد بالختم الكلي</span>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div className="text-[10px] text-slate-400 block">الختم وشعار مكتب الامتثال الكلي</div>
-                                    <div className="flex justify-center items-center h-16">
-                                        <div className="w-16 h-16 rounded-full border-4 border-dashed border-primary/40 flex items-center justify-center font-black text-[9px] text-primary/40 text-center uppercase tracking-tighter leading-tight p-1 select-none pointer-events-none">
-                                            مجموعة عدالة<br/>الكويت
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Official Footer with QR code */}
-                            <div className="mt-16 pt-4 border-t border-slate-200 flex justify-between items-center text-[8px] text-slate-400 grayscale opacity-80 z-10 relative">
-                                <span className="max-w-md">
-                                    هذه الوثيقة رسمية ومعاقب على تزويرها جنائياً بموجب القانون الكويتي رقم 31 لسنة 1970 بتعديل قانون الجزاء. يرجى التحقق من صحة المستند وتتبع رمز الاستجابة السريع لمصادقة شؤون الموظفين.
-                                </span>
-                                <div className="flex items-center gap-2">
-                                    <div className="space-y-1 font-sans text-right">
-                                        <span className="block font-black">QR Verification Code</span>
-                                        <span className="block text-[7px] text-slate-500 font-mono">ID: {selectedAppraisal.id}</span>
-                                    </div>
-                                    <div className="w-10 h-10 border bg-slate-100 flex items-center justify-center text-[8px] font-black text-slate-300 p-0.5 font-mono">
-                                        QR CO
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end pt-4 border-t">
-                            <Button variant="outline" onClick={() => setIsPrintModalOpen(false)}>إغلاق المعاينة</Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
+        return { ...r, decisionStatus: nextStatus };
+      }
+      return r;
+    }));
+    triggerToast(translate('تم تغيير حالة التوصية والقرار', 'Recommendation Status Updated'), translate('تم تحديث حالة التنفيذ ومزامنه الكادر المالي الموصف.', 'Status synced back.'));
+  };
+
+  // --- Filtering appraisals list logic ---
+  const filteredAppraisals = useMemo(() => {
+    return appraisals.filter(app => {
+      const emp = employees.find(e => e.id === app.employeeId);
+      if (!emp) return false;
+
+      // Unarchived list on general view
+      if (archivedAppraisalIds.includes(app.id) && statusFilter !== 'Archived') return false;
+      if (statusFilter === 'Archived' && !archivedAppraisalIds.includes(app.id)) return false;
+
+      // search query
+      const empName = getEmployeeName(emp).toLowerCase();
+      const jobTitleStr = getEmployeeJob(emp).toLowerCase();
+      const searchLower = searchTerm.toLowerCase();
+      const matchSearch = empName.includes(searchLower) ||
+                          jobTitleStr.includes(searchLower) ||
+                          (emp.civilId && emp.civilId.includes(searchLower)) ||
+                          (app.refId && app.refId.toLowerCase().includes(searchLower));
+
+      // Department Filter
+      const empDept = getEmployeeDept(emp);
+      const matchDept = deptFilter === 'All' || empDept === deptFilter;
+
+      // Status Filter (excluding Archived which is handled above)
+      const matchStatus = statusFilter === 'All' || statusFilter === 'Archived' || app.status === statusFilter;
+
+      // Score evaluation tier
+      let tier = PerformanceTier.NEEDS_IMPROVEMENT;
+      if (app.overallScore >= 4.5) tier = PerformanceTier.EXCELLENT;
+      else if (app.overallScore >= 3.8) tier = PerformanceTier.EXCEEDS_EXPECTATIONS;
+      else if (app.overallScore >= 3.0) tier = PerformanceTier.MEETS_EXPECTATIONS;
+
+      const matchTier = tierFilter === 'All' || tier === tierFilter;
+
+      return matchSearch && matchDept && matchStatus && matchTier;
+    });
+  }, [appraisals, employees, archivedAppraisalIds, searchTerm, deptFilter, tierFilter, statusFilter, language]);
+
+  // General statistics
+  const appraisalListScoreAverage = useMemo(() => {
+    if (filteredAppraisals.length === 0) return 0;
+    const sum = filteredAppraisals.reduce((acc, cur) => acc + (cur.overallScore || 0), 0);
+    return sum / filteredAppraisals.length;
+  }, [filteredAppraisals]);
+
+
+
+  return (
+    <div className="min-h-screen bg-slate-50/50 p-4 md:p-8 space-y-8" dir={isAr ? 'rtl' : 'ltr'}>
+      
+      {/* Toast Notification Container */}
+      <AnimatePresence>
+        {toast && (
+          <Toast
+            message={toast.message}
+            sub={toast.sub}
+            type={toast.type}
+            onClose={() => setToast(null)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Modernized Title & Executive Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white border p-6 rounded-[24px] shadow-xs border-slate-150 relative">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#00796B]" />
+            <span className="text-[10px] text-slate-400 font-black uppercase tracking-wider">{t.firmName}</span>
+          </div>
+          <h1 className="text-xl md:text-2xl font-black text-[#004D40] tracking-tight">{t.title}</h1>
+          <p className="text-[11px] text-slate-400 font-semibold">{t.subtitle}</p>
         </div>
-    );
+
+        <div className="flex items-center gap-2">
+          {/* Language Switch */}
+          <button
+            onClick={() => {
+              const next = language === 'ar' ? 'en' : 'ar';
+              setLanguage(next);
+              localStorage.setItem('alwagayan_lang', next);
+            }}
+            className="h-11 px-4 text-xs font-black bg-slate-50 hover:bg-slate-100 border rounded-xl text-slate-650 cursor-pointer flex items-center gap-1"
+          >
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" style={{ animationDuration: '6s' }} />
+            <span>{isAr ? 'ENG' : 'العربية'}</span>
+          </button>
+
+          {/* New Appraisal Trigger */}
+          <button
+            onClick={() => resetWizard('create')}
+            className="h-11 bg-[#00796B] hover:bg-[#004D40] text-white border-none px-5 text-xs font-black rounded-xl cursor-pointer flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            <span>{t.newBtn}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs Menu Section */}
+      <div className="flex flex-wrap gap-2 text-xs font-black text-slate-400 select-none pb-1 hover:text-slate-500">
+        {[
+          { id: 'dashboard', label: isAr ? 'لوحة القيادة والرقابة' : 'Appraisal Dashboard', icon: Shield },
+          { id: 'appraisals_list', label: isAr ? 'صكوك وسجلات الأداء' : 'Appraisal Records', icon: FileText },
+          { id: 'kpis_track', label: isAr ? 'مؤشرات الأداء الكادرية' : 'KPI Comparison Matrix', icon: Fingerprint },
+          { id: 'development_plans', label: isAr ? 'خطط التطوير والتحسين' : 'Improvement Plans', icon: BookOpen },
+          { id: 'recommendations', label: isAr ? 'التوصيات والقرارات الكادرية' : 'Recommendations Ledger', icon: Coins },
+          { id: 'reports_analytics', label: isAr ? 'مستودع التقارير والتحليلات' : 'Reporting Suite & Charts', icon: Award }
+        ].map(tab => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`h-11 px-4.5 rounded-xl flex items-center gap-2 cursor-pointer font-bold transition-all border ${
+                isActive 
+                  ? 'bg-[#00796B] text-white border-[#00796B] shadow-sm font-black' 
+                  : 'bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-850'
+              }`}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{tab.label}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Main Panel Content Renderers */}
+      <div className="space-y-8">
+        
+        {/* TAB 1: EXECUTIVE PERFORMANCE DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <div className="space-y-6">
+            
+            {/* Real ERP warnings & leave status alerts */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              <div className="bg-white border rounded-[22px] p-5 shadow-xs border-slate-150 space-y-4">
+                <div className="flex items-center gap-2 justify-between border-b pb-2">
+                  <h3 className="text-xs font-black text-slate-800">{isAr ? 'عقود الموظفين وحالة الفترات' : 'Employee Status Indicators'}</h3>
+                  <Users className="w-4 h-4 text-[#00796B]" />
+                </div>
+                <div className="space-y-3.5 text-[11px] font-semibold text-slate-650">
+                  {employees.slice(0, 3).map(emp => {
+                    const warnings = disciplinaryLogs.filter((d: any) => d.employeeName === emp.name || d.employeeName === emp.fullNameAr || d.employeeName === emp.fullName?.[language]);
+                    const isEos = eosCases.some((e: any) => e.employeeId === emp.id);
+                    return (
+                      <div key={emp.id} className="flex justify-between items-center bg-slate-50 border p-2.5 rounded-xl hover:border-[#00796B] transition-all">
+                        <div>
+                          <p className="text-xs font-black text-slate-800">{getEmployeeName(emp)}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{getEmployeeJob(emp)}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1 font-sans">
+                          {warnings.length > 0 && (
+                            <span className="bg-rose-50 text-rose-600 px-2 py-0.5 text-[8.5px] rounded border border-rose-100 font-bold">
+                              {warnings.length} {isAr ? 'إنذارات تأديبية' : 'Dispute warnings'}
+                            </span>
+                          )}
+                          {isEos && (
+                            <span className="bg-amber-50 text-amber-600 px-2 py-0.5 text-[8.5px] rounded border border-amber-100 font-bold">
+                              {isAr ? 'نهاية الخدمة نشط' : 'EOS Active Case'}
+                            </span>
+                          )}
+                          {!warnings.length && !isEos && (
+                            <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 text-[8.5px] rounded border border-emerald-100 font-bold">
+                              {isAr ? 'حالة امتياز' : 'Compliant'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-[22px] p-5 shadow-xs border-slate-150 space-y-4">
+                <div className="flex items-center gap-2 justify-between border-b pb-2">
+                  <h3 className="text-xs font-black text-slate-800">{isAr ? 'انضباط الحضور والإجازات المعتمدة' : 'Biometric Attendance & Leave Stats'}</h3>
+                  <Clock className="w-4 h-4 text-[#00796B]" />
+                </div>
+                <div className="space-y-3.5 text-[11px] font-semibold text-slate-650">
+                  {employees.slice(2, 5).map(emp => {
+                    const leaves = leaveRequests.filter((l: any) => l.employeeName === emp.name || l.employeeName === emp.fullNameAr || l.employeeName === emp.fullName?.[language]);
+                    const totalDays = leaves.reduce((sum: number, current: any) => sum + (current.numberOfDays || current.days || 0), 0);
+                    return (
+                      <div key={emp.id} className="flex justify-between items-center bg-slate-50 border p-2.5 rounded-xl">
+                        <div>
+                          <p className="text-xs font-black text-slate-800">{getEmployeeName(emp)}</p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">{getEmployeeDept(emp)}</p>
+                        </div>
+                        <div className="text-left font-mono font-black">
+                          <p className="text-[#00796B]">{totalDays} {isAr ? 'أيام إجازة' : 'Leave Days'}</p>
+                          <p className="text-[9px] text-slate-400 font-sans font-bold">{isAr ? 'مطابق %96' : '96% Attendance'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-white border rounded-[22px] p-5 shadow-xs border-slate-150 space-y-4">
+                <div className="flex items-center gap-2 justify-between border-b pb-2">
+                  <h3 className="text-xs font-black text-slate-800">{isAr ? 'التصنيف المالي للرواتب والأثر الكادري' : 'Financial & Payroll Evaluation Hub'}</h3>
+                  <Coins className="w-4 h-4 text-[#004D40]" />
+                </div>
+                <div className="space-y-3.5 text-[11px] font-semibold text-slate-650">
+                  {employees.slice(0, 3).map(emp => {
+                    const pay = payrollLedger.find((p: any) => p.employeeName === emp.name || p.employeeName === emp.fullNameAr || p.employeeName === emp.fullName?.[language]);
+                    const baseSalary = pay?.basicSalary || emp.basicSalary || 1500;
+                    return (
+                      <div key={emp.id} className="flex justify-between items-center bg-slate-50 border p-2.5 rounded-xl">
+                        <div>
+                          <p className="text-xs font-black text-slate-800">{getEmployeeName(emp)}</p>
+                          <p className="text-[10px] text-slate-400 font-mono mt-0.5">{emp.employeeId}</p>
+                        </div>
+                        <div className="text-left font-mono font-black">
+                          <p className="text-slate-800">{baseSalary} د.ك</p>
+                          <p className="text-[9px] text-emerald-600 font-sans font-bold">{isAr ? '+ علاوة سنوية نشطة' : '+ Active bonus'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+            {/* General quick stats bar */}
+            <div className="bg-gradient-to-r from-[#004D40] to-[#00796B] rounded-[24px] p-6 text-white grid grid-cols-1 md:grid-cols-4 gap-6 font-bold text-center leading-normal">
+              <div>
+                <p className="text-[10px] text-slate-300 uppercase">{isAr ? 'عدد وثائق التقييم' : 'Total Appraisals'}</p>
+                <p className="text-2xl font-black mt-1 font-mono">{appraisals.length}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-300 uppercase">{isAr ? 'المتوسط الحسابي الموحد' : 'System average grade'}</p>
+                <p className="text-2xl font-black mt-1 font-sans">
+                  {(appraisals.reduce((sum, curr) => sum + (curr.overallScore || 0), 0) / (appraisals.length || 1)).toFixed(2)} / 5.0
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-300 uppercase">{isAr ? 'الأهداف السنوية الجارية' : 'Target Goals set'}</p>
+                <p className="text-2xl font-black mt-1 font-mono">{goals.length}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-300 uppercase">{isAr ? 'خطط الـ 90 يوماً للتطوير' : 'Regulatory Dev plans'}</p>
+                <p className="text-2xl font-black mt-1 font-mono">{developmentPlans.length}</p>
+              </div>
+            </div>
+
+            {/* List of recent activities / alerts */}
+            <div className="bg-white border rounded-[22px] p-6 border-slate-150 space-y-4">
+              <h3 className="text-xs font-black text-slate-800 uppercase flex items-center gap-1.5 border-b pb-3">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
+                <span>{isAr ? 'الامتثال وقرارات لجان عدالة للأداء' : 'Statutory Compliance & Legal Decisions'}</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-semibold">
+                <div className="p-4 bg-emerald-50/40 rounded-xl border border-emerald-100 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-extrabold text-[#004D40]">{isAr ? 'تثبيت نهائي وتمرير التوطين' : 'Permanent Localization Confirmed'}</h4>
+                    <p className="text-slate-650 text-[11px] leading-relaxed">
+                      {isAr ? 'اجتازت الأستاذة مريم ناصر الصقر تقييم فترة التجربة والتحقق بنجاح بمعدل كفاءة 4.88 ومصادقة الشركاء الشاغلين بالتوقيع.' : 'Sahr Jassem successfully cleared her probation period with score 4.15 and authorized legal stamp.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-amber-50/40 rounded-xl border border-amber-100 flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h4 className="font-extrabold text-amber-900">{isAr ? 'خطة تدخل علاجية إجبارية بالبصمة' : 'Mandatory remedial compliance required'}</h4>
+                    <p className="text-slate-600 text-[11px] leading-relaxed">
+                      {isAr ? 'رصد باحث الموارد انخفاض تتبع البصمة لبدر المطيري لأقل من %87. تم إدراج خطة صقل إجبارية بمجمع وزارة الشؤون لمطابقة لوائح الوفاء.' : 'A corrective training is issued for Bader Al-Mutairi to monitor his presence dockets under Ministry dockets.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 2: SYSTEMATIC APPRAISALS LEDGER WRAPPER */}
+        {activeTab === 'appraisals_list' && (
+          <div className="space-y-6">
+            
+            {/* Filters panel */}
+            <div className="bg-white border rounded-[22px] p-5 shadow-xs border-slate-150 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <h3 className="text-xs font-bold text-slate-800">{isAr ? 'البحث وتصفية الصكوك الدورية' : 'Filter & Search Appraisal dossiers'}</h3>
+                  <p className="text-[10px] text-slate-400">{isAr ? 'فحص السجلات الحالية للمستشارين من خلال مستويات الكفاءة أو تاريخ الاعتماد' : 'Locate past certified files, draft items or archive dockets'}</p>
+                </div>
+                {/* Score calculated badge */}
+                <div className="px-3.5 py-1.5 bg-[#E0F2F1] text-[#004D40] text-[10px] font-black rounded-lg">
+                  {isAr ? 'متوسط أداء القائمة الحالية:' : 'Current filtered average:'} {appraisalListScoreAverage.toFixed(2)} / 5.0
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Search query input */}
+                <div className="relative">
+                  <Search className="absolute right-3 top-3 w-4.5 h-4.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder={t.searchPlaceholder}
+                    className="w-full h-11 pr-10 pl-3 bg-slate-50 border rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-[#00796B]"
+                  />
+                </div>
+
+                {/* Dept Filter */}
+                <select
+                  value={deptFilter}
+                  onChange={(e) => setDeptFilter(e.target.value)}
+                  className="h-11 px-3 bg-slate-50 border rounded-xl text-xs font-bold text-slate-705"
+                >
+                  <option value="All">{t.allDepts}</option>
+                  <option value={isAr ? 'الشؤون التجارية والشركات' : 'Corporate & Commercial'}>{isAr ? 'الشؤون التجارية والشركات' : 'Corporate & Commercial'}</option>
+                  <option value={isAr ? 'القانون العام والجنائي' : 'Criminal & Public Law'}>{isAr ? 'القانون العام والجنائي' : 'Criminal & Public Law'}</option>
+                  <option value={isAr ? 'التحكيم والوساطة القضائية' : 'Arbitration'}>{isAr ? 'التحكيم والوساطة القضائية' : 'Arbitration'}</option>
+                  <option value={isAr ? 'الشؤون القانونية' : 'Legal Affairs'}>{isAr ? 'الشؤون القانونية' : 'Legal Affairs'}</option>
+                </select>
+
+                {/* Score Tier Filter */}
+                <select
+                  value={tierFilter}
+                  onChange={(e) => setTierFilter(e.target.value)}
+                  className="h-11 px-3 bg-slate-50 border rounded-xl text-xs font-bold text-slate-705"
+                >
+                  <option value="All">{t.allTiers}</option>
+                  <option value={PerformanceTier.EXCELLENT}>{t.excellent}</option>
+                  <option value={PerformanceTier.EXCEEDS_EXPECTATIONS}>{t.veryGood}</option>
+                  <option value={PerformanceTier.MEETS_EXPECTATIONS}>{t.good}</option>
+                  <option value={PerformanceTier.NEEDS_IMPROVEMENT}>{t.weak}</option>
+                </select>
+
+                {/* Approval Status Filter */}
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="h-11 px-3 bg-slate-50 border rounded-xl text-xs font-bold text-slate-705"
+                >
+                  <option value="All">{t.allStatus}</option>
+                  <option value="Certified">{t.certified}</option>
+                  <option value="Pending Legal/HR Approval">{t.pending}</option>
+                  <option value="Draft">{t.draft}</option>
+                  <option value="Archived">{isAr ? 'صكوك مؤرشفة ومؤمنة' : 'Archived ledger items'}</option>
+                </select>
+              </div>
+            </div>
+
+            {/* List Renderer Grid */}
+            {filteredAppraisals.length === 0 ? (
+              <div className="bg-white border rounded-[22px] p-12 shadow-xs border-slate-150 text-center space-y-3">
+                <FileText className="w-12 h-12 text-slate-300 mx-auto" />
+                <h4 className="text-xs font-black text-slate-800">{t.emptyList}</h4>
+                <p className="text-[10px] text-slate-400 max-w-md mx-auto">{t.emptySub}</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {filteredAppraisals.map(app => {
+                  const emp = employees.find(e => e.id === app.employeeId);
+                  if (!emp) return null;
+
+                  const isArchived = archivedAppraisalIds.includes(app.id);
+                  let ratingText = t.good;
+                  let ratingColor = 'bg-slate-100 text-slate-700';
+
+                  if (app.overallScore >= 4.5) {
+                    ratingText = t.excellent;
+                    ratingColor = 'bg-[#E0F2F1] text-[#004D40] border-[#00796B]/20';
+                  } else if (app.overallScore >= 3.8) {
+                    ratingText = t.veryGood;
+                    ratingColor = 'bg-emerald-50 text-emerald-800 border-emerald-100';
+                  } else if (app.overallScore < 3.0) {
+                    ratingText = t.weak;
+                    ratingColor = 'bg-rose-50 text-rose-700 border-rose-100';
+                  }
+
+                  const matchedTypeAr = APPRAISAL_TYPES.find(x => x.id === app.formType)?.ar || 'تقييم كادري شامل';
+
+                  return (
+                    <motion.div
+                      layout
+                      key={app.id}
+                      className="bg-white border rounded-[22px] p-5 shadow-xs border-slate-150 hover:border-[#00796B] transition-all space-y-4 relative flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        {/* Avatar & Header */}
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-[#00796B] text-white flex items-center justify-center font-black text-xs font-sans">
+                              {emp.avatarInitials || emp.name?.slice(0, 2) || 'MA'}
+                            </div>
+                            <div>
+                              <h4 className="text-xs font-black text-slate-850 hover:text-[#00796B] transition-all cursor-pointer" onClick={() => { setSelectedAppraisalForPrint(app); setIsPrintModalOpen(true); }}>
+                                {getEmployeeName(emp)}
+                              </h4>
+                              <p className="text-[9.5px] text-slate-400 font-bold">{getEmployeeJob(emp)}</p>
+                            </div>
+                          </div>
+                          
+                          <span className={`px-2 py-0.5 text-[8px] rounded-md font-black uppercase text-center border ${ratingColor}`}>
+                            {ratingText}
+                          </span>
+                        </div>
+
+                        {/* Appraisal parameters */}
+                        <div className="grid grid-cols-2 gap-2 bg-slate-50 p-3 rounded-xl text-[10px] text-slate-500 font-semibold border border-slate-100">
+                          <div>
+                            <span className="block text-[8px] text-slate-400 uppercase font-black">{t.civilIdLabel}</span>
+                            <span className="text-slate-700 font-mono font-bold block mt-0.5">{emp.civilId || '296052403198'}</span>
+                          </div>
+                          <div>
+                            <span className="block text-[8px] text-slate-400 uppercase font-bold">{t.periodLabel}</span>
+                            <span className="text-[#004D40] block font-black mt-0.5">{app.appraisalPeriod}</span>
+                          </div>
+                        </div>
+
+                        {/* Weighted score display */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="block text-[8.5px] text-slate-400 font-bold uppercase">{t.scoreLabel}</span>
+                            <div className="flex items-baseline gap-1 mt-0.5">
+                              <span className="text-lg font-black text-[#004D40] font-sans">{app.overallScore}</span>
+                              <span className="text-[9.5px] text-slate-400">/ 5</span>
+                            </div>
+                          </div>
+                          <div className="text-left">
+                            <span className="block text-[8px] text-slate-400 font-bold">{isAr ? 'نمط وصياغة المستند' : 'Template Type'}</span>
+                            <span className="text-[9.5px] text-[#00796B] font-extrabold mt-0.5 block">{isAr ? matchedTypeAr.slice(0, 24) + '...' : app.formType}</span>
+                          </div>
+                        </div>
+
+                        {/* Satus values & actions */}
+                        <div className="border-t border-slate-100 pt-3 flex items-center justify-between text-xs">
+                          <span className={`px-2 py-0.5 text-[8.5px] rounded ${
+                            app.status === 'Certified' 
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100 font-bold' 
+                              : app.status === 'Draft'
+                              ? 'bg-slate-100 text-slate-500 border border-slate-200'
+                              : 'bg-amber-50 text-amber-600 border border-amber-100 font-bold'
+                          }`}>{app.status === 'Certified' ? t.certified : app.status === 'Draft' ? t.draft : t.pending}</span>
+
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setSelectedAppraisalForPrint(app); setIsPrintModalOpen(true); }} className="p-1.5 hover:bg-slate-50 text-[#00796B] hover:text-[#004D40] rounded transition-all cursor-pointer bg-transparent border-none">
+                              <Printer className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDuplicate(app)} className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-slate-600 rounded transition-all cursor-pointer bg-transparent border-none">
+                              <Copy className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => resetWizard('edit', app)} className="p-1.5 hover:bg-slate-50 text-slate-400 hover:text-blue-600 rounded transition-all cursor-pointer bg-transparent border-none">
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleToggleArchive(app.id, getEmployeeName(emp))} className={`p-1.5 hover:bg-slate-50 rounded transition-all cursor-pointer bg-transparent border-none ${isArchived ? 'text-[#00796B]' : 'text-slate-400 hover:text-slate-850'}`}>
+                              <Archive className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDelete(app.id)} className="p-1.5 hover:bg-slate-50 text-slate-350 hover:text-rose-600 rounded transition-all cursor-pointer bg-transparent border-none">
+                              <Trash className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* TAB 3: KEY PERFORMANCE INDICATORS COMPARE MATRIX */}
+        {activeTab === 'kpis_track' && (
+          <div className="bg-white border rounded-[24px] p-6 shadow-xs border-[#B2DFDB]/30 space-y-6">
+            <div className="border-b pb-3 flex justify-between items-center">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase">{isAr ? 'مصفوفة درجات ومعايير الأداء الرئيسية KPI للمستشارين' : 'Core KPI Metric Analysis Index Ledger'}</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">{isAr ? 'مراجعة وتعديل درجات الكفاءة الفردية ومحاور العمل القضائي بمكتب صبري شطا' : 'Full system comparison of custom weights, success ratios and hours'}</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto rounded-xl border">
+              <table className="w-full text-right text-xs font-semibold border-collapse">
+                <thead>
+                  <tr className="bg-[#E0F2F1] text-[#004D40] uppercase text-[9.5px] font-extrabold border-b">
+                    <th className="p-4">{isAr ? 'اسم المستشار القانوني / الموظف' : 'Advising Associate Name'}</th>
+                    <th className="p-4">{isAr ? 'نمط ودورة التقييم' : 'Appraisal Term & Template'}</th>
+                    <th className="p-4 text-center">{isAr ? 'الصياغة والبحث (5)' : 'Drafting Briefs'}</th>
+                    <th className="p-4 text-center">{isAr ? 'إنجاز الجلسات (5)' : 'Success Ratio'}</th>
+                    <th className="p-4 text-center">{isAr ? 'النزاهة والسلوك (5)' : 'Client Ethics'}</th>
+                    <th className="p-4 text-center">{isAr ? 'الامتثال والبصمة (5)' : 'Hours Compliance'}</th>
+                    <th className="p-4 text-center">{isAr ? 'المعدل النهائي الثابت' : 'Weighted Outcome'}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {appraisals.map(app => {
+                    const emp = employees.find(e => e.id === app.employeeId);
+                    if (!emp) return null;
+                    return (
+                      <tr key={app.id} className="hover:bg-slate-50/50 transition-all font-semibold">
+                        <td className="p-4 font-black text-slate-900">{getEmployeeName(emp)}</td>
+                        <td className="p-4 text-slate-500 text-[10px]">{app.appraisalPeriod} ({APPRAISAL_TYPES.find(x => x.id === app.formType)?.ar.slice(0, 16) || 'سنوي'}...)</td>
+                        <td className="p-4 text-center font-sans font-extrabold text-slate-600">{app.scores?.drafting ?? 5}</td>
+                        <td className="p-4 text-center font-sans font-extrabold text-slate-600">{app.scores?.successRate ?? 5}</td>
+                        <td className="p-4 text-center font-sans font-extrabold text-slate-600">{app.scores?.clientRelations ?? 5}</td>
+                        <td className="p-4 text-center font-sans font-extrabold text-slate-600">{app.scores?.compliance ?? 5}</td>
+                        <td className="p-4 text-center font-sans font-black text-[#00796B]">{app.overallScore}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: DEVELOPMENT WORK BOARDS & IMPROVEMENTS */}
+        {activeTab === 'development_plans' && (
+          <div className="space-y-6">
+            
+            {/* Quick Goals & Dev actions wrapper */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              
+              {/* Core Goals (CRUD) */}
+              <div className="bg-white border rounded-[22px] p-6 border-slate-150 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase">{isAr ? 'أهداف الكفاءة والأداء السنوي' : 'Core Statutory Target Goals'}</h3>
+                    <p className="text-[9.5px] text-slate-400 mt-0.5">{isAr ? 'تتبع ومطابقة الأهداف المستهدفة للمستشارين' : 'Annual goals mapped for promotion parameters'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (employees.length > 0) {
+                        setNewGoalData({ employeeId: employees[0].id, titleAr: '', titleEn: '', targetDate: new Date().toISOString().split('T')[0], statusAr: 'قيد التنفيذ' });
+                        setIsGoalModalOpen(true);
+                      }
+                    }}
+                    className="h-8 px-3.5 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-lg text-[9.5px] font-black cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'إدراج هدف' : 'Add Goal'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3.5 text-xs font-semibold">
+                  {goals.map(g => {
+                    const emp = employees.find(e => e.id === g.employeeId);
+                    return (
+                      <div key={g.id} className="p-4.5 bg-slate-50 rounded-xl border border-slate-100 relative">
+                        <button onClick={() => handleDeleteGoal(g.id)} className="absolute top-4 left-4 p-1 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-rose-600 border-none bg-transparent cursor-pointer">
+                          <Trash className="w-4 h-4" />
+                        </button>
+                        <span className="text-[8px] bg-[#E0F2F1] text-[#00796B] border border-[#00796B]/20 font-black px-2 py-0.5 rounded uppercase">الهدف السنوي</span>
+                        <h4 className="text-xs font-black text-slate-850 mt-1.5">{translate(g.titleAr, g.titleEn)}</h4>
+                        <p className="text-[10px] text-slate-400 font-bold mt-1.5 flex items-center gap-1.5">
+                          <Users className="w-3.5 h-3.5 text-[#00796B]" />
+                          <span>المستشار المتابع: <strong>{getEmployeeName(emp)}</strong></span>
+                        </p>
+                        <div className="flex justify-between items-center text-[9px] text-slate-400 font-bold border-t pt-3 mt-3">
+                          <span>أجل الوفاء: <strong className="font-mono">{g.targetDate}</strong></span>
+                          <span className="bg-emerald-50 text-emerald-700 px-2.5 py-0.5 rounded border border-emerald-100 font-black">{g.statusAr}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Development Corrective 90-days Plans (CRUD) */}
+              <div className="bg-white border rounded-[22px] p-6 border-slate-150 space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="text-xs font-black text-slate-800 uppercase">{isAr ? 'سجلات تقويم الأداء الـ 90 يوماً' : 'Remedial Improvement Plans'}</h3>
+                    <p className="text-[9.5px] text-slate-400 mt-0.5">{isAr ? 'خطط التدخل الإجبارية لمطابقة القوانين للمتدني أداؤهم' : 'Mandatory monitoring logs for low scores'}</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      if (employees.length > 0) {
+                        setNewDevData({ employeeId: employees[0].id, titleAr: '', titleEn: '', mentor: isAr ? 'أ. صبري شطا' : 'Sabri Shatta', targetDate: new Date().toISOString().split('T')[0], progress: 25 });
+                        setIsDevPlanModalOpen(true);
+                      }
+                    }}
+                    className="h-8 px-3.5 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-lg text-[9.5px] font-black cursor-pointer flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isAr ? 'إدراج خطة' : 'Add Plan'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3.5 text-xs font-semibold">
+                  {developmentPlans.map(d => {
+                    const emp = employees.find(e => e.id === d.employeeId);
+                    return (
+                      <div key={d.id} className="p-4.5 bg-slate-50 border border-slate-100 rounded-xl relative">
+                        <button onClick={() => handleDeleteDevPlan(d.id)} className="absolute top-4 left-4 p-1 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-rose-600 border-none bg-transparent cursor-pointer">
+                          <Trash className="w-4 h-4" />
+                        </button>
+                        <span className="text-[8px] bg-amber-50 text-amber-700 border border-amber-200 font-extrabold px-2 py-0.5 rounded uppercase">خطة صقل علاجية</span>
+                        <h4 className="text-xs font-black text-slate-850 mt-1.5">{translate(d.titleAr, d.titleEn)}</h4>
+                        <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-450 mt-2 font-bold leading-normal">
+                          <div>المستهدف صقله: <strong className="text-slate-700">{getEmployeeName(emp)}</strong></div>
+                          <div>المعلم المسؤول: <strong className="text-slate-700">{d.mentor}</strong></div>
+                        </div>
+                        <div className="pt-3 mt-3 border-t flex items-center justify-between">
+                          <span className="text-[10px] text-slate-400 font-mono">تاريخ الصب: {d.targetDate}</span>
+                          <div className="w-28 space-y-1 select-none">
+                            <div className="flex justify-between items-center text-[8.5px] font-mono text-[#00796B] font-bold">
+                              <span>قوة التقدم:</span>
+                              <span>{d.progress}%</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                              <div className="bg-[#00796B] h-full rounded-full" style={{ width: `${d.progress}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB 5: RECOMMENDATIONS & EXECUTIVE DECISIONS LOG */}
+        {activeTab === 'recommendations' && (
+          <div className="bg-white border rounded-[24px] p-6 shadow-xs border-[#B2DFDB]/30 space-y-6">
+            <div className="border-b pb-4 flex justify-between items-center">
+              <div>
+                <h3 className="text-xs font-black text-slate-800 uppercase">{isAr ? 'لوحة التوجيهات وحوكمة التوصيات الاستشارية المعتمدة' : 'Official Recommendations & Statutory HR Decisions Ledger'}</h3>
+                <p className="text-[10px] text-slate-400 mt-0.5">{isAr ? 'عقود ترقيات مستشاري الشركاء، التكافل المالي، وقرارات اللجان بموجب قانون العمل' : 'Manage corporate promotions, scale adjustments and corrective training schedules'}</p>
+              </div>
+              <button
+                onClick={() => {
+                  if (employees.length > 0) {
+                    setNewRecData({ employeeId: employees[0].id, typeAr: 'زيادة راتب ترقية الأداء', typeEn: 'Scale Promotion Hike', recommendationTextAr: '', recommendationTextEn: '', effectiveDate: new Date().toISOString().split('T')[0], decisionStatus: 'Pending' });
+                    setIsRecModalOpen(true);
+                  }
+                }}
+                className="h-9 px-4 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl text-xs font-black cursor-pointer flex items-center gap-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>{isAr ? 'إدراج توجيه كادري' : 'Record Recommendation'}</span>
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {recommendations.map(rec => {
+                const emp = employees.find(e => e.id === rec.employeeId);
+                return (
+                  <div key={rec.id} className="p-5 bg-slate-50 rounded-2xl border border-slate-100 flex flex-wrap justify-between items-start gap-4 relative">
+                    <button onClick={() => handleDeleteRec(rec.id)} className="absolute top-4 left-4 p-1 hover:bg-slate-200/60 rounded-full text-slate-400 hover:text-rose-500 border-none bg-transparent cursor-pointer">
+                      <Trash className="w-4 h-4" />
+                    </button>
+                    
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8.5px] bg-[#E0F2F1] text-[#00796B] border border-[#00796B]/20 px-2 text-[8px] py-0.5 rounded font-black uppercase">
+                          {translate(rec.typeAr, rec.typeEn)}
+                        </span>
+                        <span className="font-mono text-[9px] text-slate-400">ID: {rec.refId}</span>
+                      </div>
+                      
+                      <h4 className="text-xs font-black text-[#004D40]">
+                        توجيه الترشيح للمستشار المتابع: <span className="text-slate-800 font-black">{getEmployeeName(emp)}</span>
+                      </h4>
+                      <p className="text-slate-650 text-[11.5px] leading-relaxed max-w-2xl font-semibold">
+                        "{translate(rec.recommendationTextAr, rec.recommendationTextEn)}"
+                      </p>
+                      
+                      <div className="flex gap-4 text-[9.5px] text-slate-400 font-bold font-sans">
+                        <span>أجل الوجوب والتنفيذ: <strong>{rec.effectiveDate}</strong></span>
+                        <span>مستوى تقييم الموظف بالبصمة: <strong className="text-[#00796B]">ممتاز واستثنائي</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="w-full sm:w-auto flex flex-col items-end gap-2 shrink-0">
+                      <span className={`px-3 py-1 text-[10px] rounded-lg font-black uppercase text-center border ${
+                        rec.decisionStatus === 'Approved' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        rec.decisionStatus === 'Implemented' ? 'bg-[#00796B]/10 text-[#00796B] border-[#00796B]/20' :
+                        'bg-amber-50 text-amber-600 border-amber-100'
+                      }`}>
+                        {rec.decisionStatus === 'Pending' ? t.pending : rec.decisionStatus === 'Approved' ? (isAr ? 'مصادق ومعتمد' : 'Approved') : (isAr ? 'تم تنفيذه آلياً بالرواتب' : 'Implemented')}
+                      </span>
+
+                      <div className="flex gap-1.5 mt-2">
+                        <button
+                          onClick={() => toggleRecStatus(rec.id, rec.decisionStatus)}
+                          className="px-3.5 h-8 bg-[#00796B]/10 hover:bg-[#00796B]/20 text-[#00796B] border-none text-[9.5px] font-black rounded-lg cursor-pointer"
+                        >
+                          {isAr ? 'تحديث الحالة / تفعيل بالرواتب' : 'Progress State'}
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 6: REPORTS & CHARTS VISUALIZERS */}
+        {activeTab === 'reports_analytics' && (
+          <PerformanceReportsSuite
+            appraisals={appraisals}
+            employees={employees}
+            goals={goals}
+            developmentPlans={developmentPlans}
+            language={language}
+          />
+        )}
+
+      </div>
+
+      {/* --- INTAKE WIZARD FOR APPRAISALS (4 STEPS) --- */}
+      <AnimatePresence>
+        {isWizardOpen && (
+          <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="bg-white rounded-[24px] w-full max-w-2xl p-6 md:p-8 border shadow-2xl space-y-6"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center border-b pb-4" dir={isAr ? 'rtl' : 'ltr'}>
+                <div>
+                  <span className="text-[9px] font-black uppercase text-[#00796B] bg-[#E0F2F1] px-3 py-1 rounded-md">منظومة المطابقة والامتثال القانوني</span>
+                  <h3 className="text-sm md:text-base font-black text-[#004D40] mt-1.5">
+                    {formMode === 'create' ? t.wizardTitleAddNew : t.wizardTitleEdit}
+                  </h3>
+                </div>
+                <button onClick={() => setIsWizardOpen(false)} className="p-1 hover:bg-slate-50 rounded text-slate-400 hover:text-slate-700 cursor-pointer bg-transparent border-none">
+                  <span className="text-lg font-bold">✕</span>
+                </button>
+              </div>
+
+              {/* Steps Progress slider */}
+              <div className="flex justify-between items-center text-[10px] font-extrabold text-slate-400 border-b pb-3.5 select-none" dir={isAr ? 'rtl' : 'ltr'}>
+                {[1, 2, 3, 4].map(stepNum => (
+                  <div key={stepNum} className="flex items-center gap-1.5">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs ${
+                      wizardStep >= stepNum ? 'bg-[#00796B] text-white' : 'bg-slate-150 text-slate-500'
+                    }`}>{stepNum}</span>
+                    <span className={wizardStep === stepNum ? 'text-[#00796B] font-black' : 'hidden md:inline font-bold'}>
+                      {stepNum === 1 && (isAr ? 'ملف الموظف والنمط' : 'Employee & Pattern')}
+                      {stepNum === 2 && (isAr ? 'درجات الـ KPIs' : 'KPI score matrix')}
+                      {stepNum === 3 && (isAr ? 'مسار الغايات والتمكين' : 'Goals & Trainings')}
+                      {stepNum === 4 && (isAr ? 'بصمة الصك والاعتماد' : 'Digital Stamp')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Form Content wrapper */}
+              <div className="space-y-4 text-xs font-semibold text-slate-700 leading-normal" dir={isAr ? 'rtl' : 'ltr'}>
+                
+                {/* STEP 1: Employee and and evaluation type */}
+                {wizardStep === 1 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-slate-400 block uppercase font-black text-[9px]">{t.selectEmployee}</label>
+                      <select
+                        value={wEmployeeId}
+                        onChange={(e) => setWEmployeeId(e.target.value)}
+                        className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-700 focus:ring-1 focus:ring-[#00796B] focus:outline-none"
+                      >
+                        {employees.map(emp => (
+                          <option key={emp.id} value={emp.id}>
+                            {getEmployeeName(emp)} ({getEmployeeJob(emp)})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Integrated alerts */}
+                    <div className="p-4 bg-slate-50 border rounded-2xl space-y-3 border-slate-150 text-[11px] font-bold">
+                      <p className="text-emerald-700 font-black">✔ {t.autofillAlert}</p>
+                      {activeEmployeeMeta && (
+                        <div className="grid grid-cols-2 gap-4 pt-1 text-slate-650 leading-relaxed">
+                          <div>{isAr ? 'الرقم المدني الكويتي:' : 'Civil ID:'} <span className="font-mono text-slate-700 font-extrabold">{activeEmployeeMeta.civilId || '296052403198'}</span></div>
+                          <div>{isAr ? 'القسم / الدائرة:' : 'Department:'} <span className="text-slate-705 font-black">{getEmployeeDept(activeEmployeeMeta)}</span></div>
+                          <div>{isAr ? 'الحالة والمستحقات بالفريق:' : 'Salary details:'} <span className="text-slate-705 font-mono">{(activeEmployeeMeta.basicSalary || activeEmployeeMeta.salary || 1500) + (activeEmployeeMeta.allowancesAmount || 0)} د.ك</span></div>
+                          <div>{isAr ? 'ساعات الحضور والغياب:' : 'Attendance:'} <span className="text-emerald-600 font-black">طبيعي ومطابق %96</span></div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] text-slate-450 block uppercase font-bold">{isAr ? 'دورة التقييم ومطابقتها' : 'Appraisal Term'}</label>
+                        <input
+                          type="text"
+                          value={wPeriod}
+                          onChange={(e) => setWPeriod(e.target.value)}
+                          className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-slate-700"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] text-slate-450 block uppercase font-bold">{isAr ? 'تاريخ التقرير المبرم' : 'Report Date'}</label>
+                        <input
+                          type="date"
+                          value={wDate}
+                          onChange={(e) => setWDate(e.target.value)}
+                          className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl font-bold font-mono text-slate-700 text-left"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-[9px] text-slate-450 block uppercase font-bold">{isAr ? 'النموذج القانوني المعتمد' : 'Appraisal Template Template'}</label>
+                        <select
+                          value={appraisalFormType}
+                          onChange={(e) => setAppraisalFormType(e.target.value)}
+                          className="w-full h-10 bg-slate-50 border border-[#00796B]/20 rounded-xl px-2 font-black text-slate-700 text-xs"
+                        >
+                          {APPRAISAL_TYPES.map(f => (
+                            <option key={f.id} value={f.id}>{translate(f.ar, f.en)}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 2: KPI scores */}
+                {wizardStep === 2 && (
+                  <div className="space-y-4">
+                    <p className="text-[9.5px] text-slate-400 uppercase font-black tracking-wider border-b pb-1.5">تحديد درجات الاستحقاق لـ ({APPRAISAL_TYPES.find(x => x.id === appraisalFormType)?.ar || 'بند تقييم الأداء'})</p>
+                    
+                    <div className="space-y-3">
+                      
+                      {/* Dynamic form additions based on selection */}
+                      {appraisalFormType === 'probation' && (
+                        <div className="p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl space-y-2 mb-2 font-bold text-slate-700">
+                          <p className="text-amber-800 text-[9.5px] font-black uppercase">💡 {isAr ? 'حالة التثبيت عمالياً بموجب المادة 32 (فترة التجربة):' : 'Kuwait labor Article 32 (Probation):'}</p>
+                          <div className="flex gap-4">
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="radio" name="probation_radio" checked={probationOutcome === 'Confirm'} onChange={() => setProbationOutcome('Confirm')} />
+                              <span>{isAr ? 'تثبيت الموظف نهائياً' : 'Approve Perm Contract'}</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="radio" name="probation_radio" checked={probationOutcome === 'Extend'} onChange={() => setProbationOutcome('Extend')} />
+                              <span>{isAr ? 'تمديد فترة التجربة الكادرية' : 'Extend Probation'}</span>
+                            </label>
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input type="radio" name="probation_radio" checked={probationOutcome === 'Dismiss'} onChange={() => setProbationOutcome('Dismiss')} />
+                              <span>{isAr ? 'إنهاء الخدمة لعدم الصلاحية' : 'Dismiss Employee'}</span>
+                            </label>
+                          </div>
+                        </div>
+                      )}
+
+                      {appraisalFormType === 'promotion' && (
+                        <div className="p-3.5 bg-emerald-50/50 border border-emerald-200 rounded-xl space-y-2 mb-2 font-bold text-slate-700">
+                          <p className="text-[#004D40] text-[9.5px] font-black uppercase">💵 {isAr ? 'الترقية والزيادة المالية المقترحة بالراتب الأساسي:' : 'Proposed Increment (Salary hike):'}</p>
+                          <div className="flex items-center gap-2">
+                            <span>الزيادة المقترحة بالراتب:</span>
+                            <input
+                              type="number"
+                              value={proposedHike}
+                              onChange={(e) => setProposedHike(parseInt(e.target.value) || 0)}
+                              className="w-20 text-center h-8.5 border rounded-lg font-mono font-black text-[#00796B]"
+                            />
+                            <span>د.ك شهرياً</span>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-between items-center bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="space-y-0.5">
+                          <h4 className="text-[11.5px] font-black text-slate-800">{t.kpi1}</h4>
+                          <p className="text-[9px] text-[#00796B] font-bold max-w-md">{t.kpi1Desc}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          step="0.1"
+                          value={scoreDrafting}
+                          onChange={(e) => setScoreDrafting(parseFloat(e.target.value))}
+                          className="w-16 h-9 text-center border bg-white rounded-lg font-sans font-black text-[#00796B]"
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="space-y-0.5">
+                          <h4 className="text-[11.5px] font-black text-slate-800">{t.kpi2}</h4>
+                          <p className="text-[9px] text-[#00796B] font-bold max-w-md">{t.kpi2Desc}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          step="0.1"
+                          value={scoreSuccess}
+                          onChange={(e) => setScoreSuccess(parseFloat(e.target.value))}
+                          className="w-16 h-9 text-center border bg-white rounded-lg font-sans font-black text-[#00796B]"
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="space-y-0.5">
+                          <h4 className="text-[11.5px] font-black text-slate-800">{t.kpi3}</h4>
+                          <p className="text-[9px] text-[#00796B] font-bold max-w-md">{t.kpi3Desc}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          step="0.1"
+                          value={scoreClient}
+                          onChange={(e) => setScoreClient(parseFloat(e.target.value))}
+                          className="w-16 h-9 text-center border bg-white rounded-lg font-sans font-black text-[#00796B]"
+                        />
+                      </div>
+
+                      <div className="flex justify-between items-center bg-slate-50/50 p-2.5 rounded-xl border border-slate-100">
+                        <div className="space-y-0.5">
+                          <h4 className="text-[11.5px] font-black text-slate-800">{t.kpi4}</h4>
+                          <p className="text-[9px] text-[#00796B] font-bold max-w-md">{t.kpi4Desc}</p>
+                        </div>
+                        <input
+                          type="number"
+                          min={1}
+                          max={5}
+                          step="0.1"
+                          value={scoreCompliance}
+                          onChange={(e) => setScoreCompliance(parseFloat(e.target.value))}
+                          className="w-16 h-9 text-center border bg-white rounded-lg font-sans font-black text-[#00796B]"
+                        />
+                      </div>
+
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 3: Strengths, Areas & Trainings */}
+                {wizardStep === 3 && (
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[9.5px] text-slate-450 block uppercase font-bold">{t.strengthsLabel} (بالعربية)</label>
+                      <input
+                        type="text"
+                        value={wStrengthsAr}
+                        onChange={(e) => setWStrengthsAr(e.target.value)}
+                        placeholder="مثال: صياغة متكاملة، كسب قضايا العقود ذات الملايين..."
+                        className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[9.5px] text-slate-450 block uppercase font-bold">{t.improvementsLabel} (بالعربية)</label>
+                      <input
+                        type="text"
+                        value={wImprovementsAr}
+                        onChange={(e) => setWImprovementsAr(e.target.value)}
+                        placeholder="مثال: تكثيف سرعة المرافعة الشفوية أمام دائر الاستئناف..."
+                        className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-400 block uppercase font-bold">Strengths (In English)</label>
+                        <input
+                          type="text"
+                          value={wStrengthsEn}
+                          onChange={(e) => setWStrengthsEn(e.target.value)}
+                          placeholder="E.g., Exceptional constitutional defenses..."
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-sans"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-400 block uppercase font-bold">Improvements (In English)</label>
+                        <input
+                          type="text"
+                          value={wImprovementsEn}
+                          onChange={(e) => setWImprovementsEn(e.target.value)}
+                          placeholder="E.g., Needs more commercial exposure..."
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-sans"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-450 block uppercase font-bold">{t.trainingLabel} (بالعربية)</label>
+                        <input
+                          type="text"
+                          value={wTrainingAr}
+                          onChange={(e) => setWTrainingAr(e.target.value)}
+                          placeholder="ورشة التحكيم التجاري المعتمدة..."
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-400 block uppercase font-bold">Seminars (In English)</label>
+                        <input
+                          type="text"
+                          value={wTrainingEn}
+                          onChange={(e) => setWTrainingEn(e.target.value)}
+                          placeholder="Specialized Arbitration training..."
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-sans"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4: Signatures and digital validation Code */}
+                {wizardStep === 4 && (
+                  <div className="space-y-4">
+                    <div className="bg-[#E0F2F1]/30 p-4.5 rounded-xl border border-[#B2DFDB]/50 space-y-2">
+                      <h4 className="text-xs font-black text-[#004D40]">{translate('مراجعة تفاصيل الحصيلة والمطابقة', 'Weighted appraisal outcomes review')}</h4>
+                      <div className="flex justify-between items-center text-xs font-black">
+                        <span>المعدل الكلي التراكمي:</span>
+                        <span className="text-lg font-black text-[#00796B] font-sans">{formOverallScore} / 5</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-450 block uppercase font-bold">{t.signeeLabel}</label>
+                        <input
+                          type="text"
+                          value={wSigneeAr}
+                          onChange={(e) => setWSigneeAr(e.target.value)}
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-[9.5px] text-slate-450 block uppercase font-bold">بصمة الاعتماد الرقمي للمكتب (SHA-CODE)</label>
+                        <input
+                          type="text"
+                          value={wDigitalCode}
+                          onChange={(e) => setWDigitalCode(e.target.value)}
+                          className="w-full h-11 px-3 bg-slate-50 border rounded-xl font-mono text-slate-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-50 rounded-xl border text-[10px] leading-relaxed text-slate-500 font-bold">
+                      ✔ بموجب الفحوص اللائحية وربط قواعد البيانات، يؤكد مكتب المحامي صبري شطا صحة المطابقة الكادرية ونزاهة الاستقصاء، وتمرير نسخة لقواعد بيانات شؤون الموظفين عمالياً آلياً بنسبة ١٠٠%.
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Wizard Footer controls */}
+              <div className="pt-4 border-t flex justify-between font-bold text-xs select-none">
+                <div>
+                  {wizardStep > 1 && (
+                    <button type="button" onClick={() => setWizardStep(prev => prev - 1)} className="h-11 px-4 text-xs font-bold bg-slate-100 hover:bg-slate-200 border-none text-slate-650 rounded-xl cursor-pointer">{t.prevBtn}</button>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setIsWizardOpen(false)} className="h-11 px-4 border text-slate-500 hover:bg-slate-50 bg-white rounded-xl cursor-pointer font-bold">{t.cancel}</button>
+                  
+                  {wizardStep < 4 ? (
+                    <button type="button" onClick={() => setWizardStep(prev => prev + 1)} className="h-11 px-5 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl cursor-pointer text-xs font-black">{t.nextBtn}</button>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => handleWizardSubmit('Draft')} className="h-11 px-4.5 bg-slate-100 hover:bg-slate-200 text-[#00796B] border-none rounded-xl cursor-pointer text-xs font-black">{t.saveDraft}</button>
+                      <button type="button" onClick={() => handleWizardSubmit('Certified')} className="h-11 px-6 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl cursor-pointer text-xs font-black">{t.submitCertify}</button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- WYSIWYG PRE-PRINT PREVIEW STUDIO MODAL --- */}
+      <PrePrintEditorModal
+        isOpen={isPrintModalOpen}
+        onClose={() => {
+          setIsPrintModalOpen(false);
+          setSelectedAppraisalForPrint(null);
+        }}
+        appraisal={selectedAppraisalForPrint}
+        employee={selectedAppraisalForPrint ? employees.find(e => e.id === selectedAppraisalForPrint.employeeId) : null}
+        language={language}
+        onSave={(updatedApp) => {
+          setAppraisals(appraisals.map(a => a.id === updatedApp.id ? updatedApp : a));
+          triggerToast(translate('تم حفظ تعديلات التحرير بالدفتر الرئيسي', 'Pre-print edits saved'), translate('تم قفل وحفظ تفاصيل الصك المعدل بالموارد البشرية.', 'Dossier values saved back successfully.'));
+        }}
+      />
+
+      {/* --- ADD GOAL FORM MODAL --- */}
+      <AnimatePresence>
+        {isGoalModalOpen && (
+          <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="bg-white rounded-[24px] w-full max-w-md p-6 border shadow-2xl space-y-5 text-xs text-slate-700"
+              dir={isAr ? 'rtl' : 'ltr'}
+            >
+              <div className="flex justify-between items-center border-b pb-3 font-bold">
+                <h3 className="text-xs font-black text-[#004D40]">إدراج هدف سنوي كادري جديد</h3>
+                <button onClick={() => setIsGoalModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 bg-transparent border-none cursor-pointer">✕</button>
+              </div>
+
+              <form onSubmit={handleAddGoal} className="space-y-4 font-semibold text-xs text-slate-700 leading-normal">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">ربطه بالمستشار الاستهدافي</label>
+                  <select
+                    value={newGoalData.employeeId}
+                    onChange={(e) => setNewGoalData({ ...newGoalData, employeeId: e.target.value })}
+                    className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-bold text-slate-700"
+                  >
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{getEmployeeName(emp)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">أفق وموضوع الهدف باللغة العربية</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={newGoalData.titleAr}
+                    onChange={(e) => setNewGoalData({ ...newGoalData, titleAr: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold text-slate-750"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pb-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">Title (In English)</label>
+                    <input
+                      type="text"
+                      value={newGoalData.titleEn}
+                      onChange={(e) => setNewGoalData({ ...newGoalData, titleEn: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-sans"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">أجل الاستحقاق النهائي</label>
+                    <input
+                      type="date"
+                      required
+                      value={newGoalData.targetDate}
+                      onChange={(e) => setNewGoalData({ ...newGoalData, targetDate: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl text-left"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold leading-normal select-none">
+                  <button type="button" onClick={() => setIsGoalModalOpen(false)} className="h-10 px-4 bg-slate-50 border rounded-xl cursor-pointer">إلغاء</button>
+                  <button type="submit" className="h-10 px-6 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl cursor-pointer">إدراج ومطابقة الهدف بالدفتر</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- ADD DEV PLAN MODAL --- */}
+      <AnimatePresence>
+        {isDevPlanModalOpen && (
+          <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="bg-white rounded-[24px] w-full max-w-md p-6 border shadow-2xl space-y-5 text-xs text-slate-700"
+              dir={isAr ? 'rtl' : 'ltr'}
+            >
+              <div className="flex justify-between items-center border-b pb-3 font-bold">
+                <h3 className="text-xs font-black text-[#004D40]">إطلاق خطة تقويم وصقل جديدة 90 يوماً</h3>
+                <button onClick={() => setIsDevPlanModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 bg-transparent border-none cursor-pointer">✕</button>
+              </div>
+
+              <form onSubmit={handleAddDevPlan} className="space-y-4 font-semibold text-xs leading-normal">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">الموظف المقصر المستهدف بصقل الأداء</label>
+                  <select
+                    value={newDevData.employeeId}
+                    onChange={(e) => setNewDevData({ ...newDevData, employeeId: e.target.value })}
+                    className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                  >
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{getEmployeeName(emp)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">خطة ومحاور التقويم الوجوبية (عربي)</label>
+                  <textarea
+                    rows={2}
+                    required
+                    value={newDevData.titleAr}
+                    onChange={(e) => setNewDevData({ ...newDevData, titleAr: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pb-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">Mentor/المعلم المقيّم</label>
+                    <input
+                      type="text"
+                      required
+                      value={newDevData.mentor}
+                      onChange={(e) => setNewDevData({ ...newDevData, mentor: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">تاريخ نهاية مسار التقويم</label>
+                    <input
+                      type="date"
+                      required
+                      value={newDevData.targetDate}
+                      onChange={(e) => setNewDevData({ ...newDevData, targetDate: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl text-left"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">قوة البدء والتقدم للبرنامج (%):</label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    value={newDevData.progress}
+                    onChange={(e) => setNewDevData({ ...newDevData, progress: parseInt(e.target.value) || 0 })}
+                    className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-slate-200"
+                  />
+                  <span className="font-mono mt-1 block text-right font-black text-[#00796B]">{newDevData.progress}%</span>
+                </div>
+
+                <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold leading-normal select-none">
+                  <button type="button" onClick={() => setIsDevPlanModalOpen(false)} className="h-10 px-4 bg-slate-50 border rounded-xl cursor-pointer">إلغاء</button>
+                  <button type="submit" className="h-10 px-6 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl cursor-pointer font-black text-xs">تعميد كشف التقويم والمراقبة</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* --- ADD RECOMMENDATION MODAL --- */}
+      <AnimatePresence>
+        {isRecModalOpen && (
+          <div className="fixed inset-0 z-[9990] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <motion.div
+              initial={{ scale: 0.98, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.98, opacity: 0 }}
+              className="bg-white rounded-[24px] w-full max-w-md p-6 border shadow-2xl space-y-5 text-xs text-slate-700"
+              dir={isAr ? 'rtl' : 'ltr'}
+            >
+              <div className="flex justify-between items-center border-b pb-3 font-bold">
+                <h3 className="text-xs font-black text-[#004D40]">تسجيل توصية وقرار وتوجيه كادري</h3>
+                <button onClick={() => setIsRecModalOpen(false)} className="p-1 text-slate-400 hover:text-slate-600 bg-transparent border-none cursor-pointer">✕</button>
+              </div>
+
+              <form onSubmit={handleAddRec} className="space-y-4 font-semibold text-xs leading-normal">
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">الموظف الموصى له بالقرار</label>
+                  <select
+                    value={newRecData.employeeId}
+                    onChange={(e) => setNewRecData({ ...newRecData, employeeId: e.target.value })}
+                    className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                  >
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{getEmployeeName(emp)}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pb-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">نوع التوجيه والقرار (عربي)</label>
+                    <input
+                      type="text"
+                      required
+                      value={newRecData.typeAr}
+                      placeholder="علاوة سنوية، ترقية كادر..."
+                      onChange={(e) => setNewRecData({ ...newRecData, typeAr: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl font-bold text-slate-705"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-slate-400 block uppercase font-bold">تاريخ نفاذ ومطابقة التوجيه</label>
+                    <input
+                      type="date"
+                      required
+                      value={newRecData.effectiveDate}
+                      onChange={(e) => setNewRecData({ ...newRecData, effectiveDate: e.target.value })}
+                      className="w-full h-10 px-3 bg-slate-50 border rounded-xl text-left"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] text-slate-400 block uppercase font-bold">صياغة نص القرار والتوصية الوجوبية (عربي)</label>
+                  <textarea
+                    rows={3}
+                    required
+                    value={newRecData.recommendationTextAr}
+                    placeholder="بناءً على التقارير الفنية ولجنة النزاهة والمطابقة، يوصى بزيادة قدرها..."
+                    onChange={(e) => setNewRecData({ ...newRecData, recommendationTextAr: e.target.value })}
+                    className="w-full p-2.5 bg-slate-50 border rounded-xl font-bold text-slate-700"
+                  />
+                </div>
+
+                <div className="pt-3 border-t flex justify-end gap-2 text-xs font-bold leading-normal select-none">
+                  <button type="button" onClick={() => setIsRecModalOpen(false)} className="h-10 px-4 bg-slate-50 border rounded-xl cursor-pointer">إلغاء</button>
+                  <button type="submit" className="h-10 px-6 bg-[#00796B] hover:bg-[#004D40] text-white border-none rounded-xl cursor-pointer font-black text-xs">حفظ القرار بالدفاتر وتوزيع الإشراك</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
 };
 
 export default EmployeePerformancePage;

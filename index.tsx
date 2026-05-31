@@ -5,6 +5,7 @@ import './index.css'; // Global base styles, Tailwind is primary
 import './services/i18n';
 import { JurisdictionProvider } from './components/JurisdictionContext';
 import { CaseTaskProvider } from './components/CaseTaskContext';
+import { LanguageProvider } from './components/i18n/LanguageProvider';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,10 +15,12 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
-    <JurisdictionProvider>
-      <CaseTaskProvider>
-        <App />
-      </CaseTaskProvider>
-    </JurisdictionProvider>
+    <LanguageProvider>
+      <JurisdictionProvider>
+        <CaseTaskProvider>
+          <App />
+        </CaseTaskProvider>
+      </JurisdictionProvider>
+    </LanguageProvider>
   </React.StrictMode>
 );

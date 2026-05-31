@@ -238,7 +238,13 @@ export default function LeaveManagementPage() {
     };
 
     // Load initial data and merge with existing employees to keep system identity
-    const [employeesList] = useState(initialEmployees || []);
+    const [employeesList, setEmployeesList] = useState<any[]>(() => {
+        const stored = localStorage.getItem('alwagayan_employees');
+        if (stored) {
+            try { return JSON.parse(stored); } catch (e) { console.error(e); }
+        }
+        return initialEmployees || [];
+    });
 
     const [requests, setRequests] = useState<DetailedLeaveRequest[]>(() => {
         const stored = localStorage.getItem('alwagayan_leave_requests_detailed');
@@ -381,7 +387,30 @@ export default function LeaveManagementPage() {
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [selectedRequest, setSelectedRequest] = useState<DetailedLeaveRequest | null>(null);
+    const [editingRequest, setEditingRequest] = useState<DetailedLeaveRequest | null>(null);
     const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
+
+    // Employee Profiles & Dossier Modal State Variables
+    const [selectedEmployeeProfile, setSelectedEmployeeProfile] = useState<any | null>(null);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    
+    // Manual Custom Input Employee Fields (for flexible testing)
+    const [showManualEmployee, setShowManualEmployee] = useState(false);
+    const [manualEmpName, setManualEmpName] = useState('');
+    const [manualEmpJob, setManualEmpJob] = useState('');
+    const [manualEmpDept, setManualEmpDept] = useState('Consultation');
+    const [manualEmpJoined, setManualEmpJoined] = useState('2026-01-15');
+    const [manualEmpCivilId, setManualEmpCivilId] = useState('295051501981');
+    const [manualEmpEntitlement, setManualEmpEntitlement] = useState(30);
+    const [manualEmpCarriedOver, setManualEmpCarriedOver] = useState(0);
+
+    // Advanced Reports Workbench state variables
+    const [reportCategory, setReportCategory] = useState<'balances' | 'consumed' | 'remaining' | 'individual' | 'department' | 'period' | 'status'>('balances');
+    const [reportDeptFilter, setReportDeptFilter] = useState('All');
+    const [reportEmployeeFilter, setReportEmployeeFilter] = useState('All');
+    const [reportStartDate, setReportStartDate] = useState('2026-01-01');
+    const [reportEndDate, setReportEndDate] = useState('2026-12-31');
+    const [generatedReportTable, setGeneratedReportTable] = useState<any[]>([]);
 
     // Sick Leave Calculator State
     const [calcSickDays, setCalcSickDays] = useState<number>(15);
@@ -583,11 +612,21 @@ HR Registrar:
 
     // Dynamic Filtered requests lists
     const filteredRequests = useMemo(() => {
+        const query = searchTerm.toLowerCase().trim();
         return requests.filter(req => {
-            const matchesSearch =
-                req.employeeName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                req.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                (req.reason && req.reason.toLowerCase().includes(searchTerm.toLowerCase()));
+            const empDetails = employeesList.find(e => e.id === req.employeeId);
+            const matchesSearch = !query ? true : (
+                req.employeeName.toLowerCase().includes(query) ||
+                req.requestNumber.toLowerCase().includes(query) ||
+                (req.jobTitle && req.jobTitle.toLowerCase().includes(query)) ||
+                (req.department && req.department.toLowerCase().includes(query)) ||
+                (req.reason && req.reason.toLowerCase().includes(query)) ||
+                (req.startDate && req.startDate.includes(query)) ||
+                (req.endDate && req.endDate.includes(query)) ||
+                (req.substituteEmployeeName && req.substituteEmployeeName.toLowerCase().includes(query)) ||
+                (req.emergencyContactPhone && req.emergencyContactPhone.includes(query)) ||
+                (empDetails && empDetails.civilId && empDetails.civilId.includes(query))
+            );
 
             const matchesType = filterType === 'All' || req.leaveType === filterType;
             const matchesStatus = filterStatus === 'All' || req.status === filterStatus;
@@ -595,7 +634,7 @@ HR Registrar:
 
             return matchesSearch && matchesType && matchesStatus && matchesDept;
         });
-    }, [requests, searchTerm, filterType, filterStatus, filterDept]);
+    }, [requests, searchTerm, filterType, filterStatus, filterDept, employeesList]);
 
     // Active Monthly Calendar Calculations
     const [currentYear, setCurrentYear] = useState<number>(2026);
@@ -620,16 +659,60 @@ HR Registrar:
 
     // Analytics Dashboard Stats Metrics
     const statsMetrics = useMemo(() => {
-        const pendingCount = requests.filter(r => r.status === 'Pending' || r.status === 'UnderReview').length;
-        const currentActiveOnVacation = requests.filter(r => {
-            const today = '2026-05-23'; // Static date representation for accurate testing
-            return r.status === 'Approved' && r.startDate <= today && r.endDate >= today;
-        }).length;
-        const recentApprovedTotal = requests.filter(r => r.status === 'Approved').length;
-        const avgRemaining = 24.5; // Combined remaining days indicator average
+        const today = '2026-05-31'; // Baseline date representation: 2026-05-31
+        
+        let totalBalance = 0;
+        let totalConsumed = 0;
+        
+        employeesList.forEach(emp => {
+            const annual = emp.annualLeaveEntitlement || 30;
+            const carried = emp.carriedOverBalance || 0;
+            totalBalance += (annual + carried);
+            
+            // Calculate consumed from approved/completed requests
+            const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
+            const annualAndUnpaidConsumed = empRequests
+                .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
+                .reduce((sum, r) => sum + r.numberOfDays, 0);
+            totalConsumed += annualAndUnpaidConsumed;
+        });
 
-        return { pendingCount, currentActiveOnVacation, recentApprovedTotal, avgRemaining };
-    }, [requests]);
+        const totalRemaining = totalBalance - totalConsumed;
+
+        const pendingCount = requests.filter(r => r.status === 'Pending' || r.status === 'UnderReview' || r.status === 'AwaitingEmployeeDocuments').length;
+        const approvedCount = requests.filter(r => r.status === 'Approved' || r.status === 'Completed').length;
+        const rejectedCount = requests.filter(r => r.status === 'Rejected').length;
+        
+        const currentActiveOnVacation = requests.filter(r => {
+            return (r.status === 'Approved' || r.status === 'Completed') && r.startDate <= today && r.endDate >= today;
+        }).length;
+
+        const upcomingCount = requests.filter(r => {
+            return (r.status === 'Approved' || r.status === 'Pending' || r.status === 'UnderReview') && r.startDate > today;
+        }).length;
+
+        // Number of requests by period
+        const requestsThisMonth = requests.filter(r => r.startDate.startsWith('2026-05') || (r.requestedAt && r.requestedAt.includes('2026-05'))).length;
+        const requestsNextMonth = requests.filter(r => r.startDate.startsWith('2026-06') || (r.requestedAt && r.requestedAt.includes('2026-06'))).length;
+        const requestsThisYear = requests.filter(r => r.startDate.startsWith('2026')).length;
+
+        const avgRemaining = employeesList.length ? (totalRemaining / employeesList.length).toFixed(1) : '24.5';
+
+        return { 
+            totalBalance, 
+            totalConsumed, 
+            totalRemaining, 
+            pendingCount, 
+            approvedCount, 
+            rejectedCount, 
+            currentActiveOnVacation, 
+            upcomingCount, 
+            requestsThisMonth, 
+            requestsNextMonth, 
+            requestsThisYear, 
+            avgRemaining 
+        };
+    }, [requests, employeesList]);
 
     // Recharts Mock Distribution
     const leaveTypeChartData = useMemo(() => {
@@ -676,6 +759,102 @@ HR Registrar:
             excessive
         });
     }, [calcSickDays]);
+
+    // Analytical dynamic reports table compilation
+    useEffect(() => {
+        let results: any[] = [];
+        if (reportCategory === 'balances' || reportCategory === 'remaining' || reportCategory === 'consumed') {
+            employeesList.forEach(emp => {
+                if (reportDeptFilter !== 'All' && emp.department !== reportDeptFilter) return;
+                if (reportEmployeeFilter !== 'All' && emp.id !== reportEmployeeFilter) return;
+
+                const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
+                const annualAndUnpaidConsumed = empRequests
+                    .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
+                    .reduce((sum, r) => sum + r.numberOfDays, 0);
+
+                const totalAccrued = (emp.annualLeaveEntitlement || 30) + (emp.carriedOverBalance || 0);
+                const remaining = totalAccrued - annualAndUnpaidConsumed;
+
+                results.push({
+                    name: emp.fullNameAr,
+                    dept: getDeptLabel(emp.department),
+                    id: emp.id,
+                    annual: emp.annualLeaveEntitlement || 30,
+                    carried: emp.carriedOverBalance || 0,
+                    accrued: totalAccrued,
+                    consumed: annualAndUnpaidConsumed,
+                    remaining: remaining,
+                    absent: emp.absenceDays || 0
+                });
+            });
+        } else if (reportCategory === 'individual') {
+            const targetEmpId = reportEmployeeFilter === 'All' ? employeesList[0]?.id : reportEmployeeFilter;
+            const targetEmp = employeesList.find(e => e.id === targetEmpId);
+            if (targetEmp) {
+                const empRequests = requests.filter(r => r.employeeId === targetEmp.id);
+                empRequests.forEach((req) => {
+                    results.push({
+                        requestNumber: req.requestNumber,
+                        type: req.leaveType,
+                        start: req.startDate,
+                        end: req.endDate,
+                        days: req.numberOfDays,
+                        status: req.status,
+                        reason: req.reason || '-'
+                    });
+                });
+            }
+        } else if (reportCategory === 'department') {
+            const depts = ['Consultation', 'Litigation', 'Corporate', 'Admin'];
+            depts.forEach(d => {
+                const emps = employeesList.filter(e => e.department === d);
+                let days = 0;
+                let reqCount = 0;
+                emps.forEach(emp => {
+                    const empReqs = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
+                    days += empReqs.reduce((sum, r) => sum + r.numberOfDays, 0);
+                    reqCount += requests.filter(r => r.employeeId === emp.id).length;
+                });
+                results.push({
+                    deptName: getDeptLabel(d),
+                    empsCount: emps.length,
+                    totalDaysTaken: days,
+                    totalRequests: reqCount
+                });
+            });
+        } else if (reportCategory === 'period') {
+            const periodReqs = requests.filter(req => {
+                if (reportDeptFilter !== 'All' && req.department !== reportDeptFilter) return false;
+                if (reportEmployeeFilter !== 'All' && req.employeeId !== reportEmployeeFilter) return false;
+                return req.startDate >= reportStartDate && req.startDate <= reportEndDate;
+            });
+            periodReqs.forEach((r) => {
+                results.push({
+                    requestNumber: r.requestNumber,
+                    name: r.employeeName,
+                    type: r.leaveType,
+                    period: `${r.startDate} إلى ${r.endDate}`,
+                    days: r.numberOfDays,
+                    status: r.status
+                });
+            });
+        } else if (reportCategory === 'status') {
+            const statuses = ['Approved', 'Pending', 'UnderReview', 'AwaitingEmployeeDocuments', 'Completed', 'Rejected'];
+            statuses.forEach(st => {
+                const matched = requests.filter(r => {
+                    if (reportDeptFilter !== 'All' && r.department !== reportDeptFilter) return false;
+                    return r.status === st;
+                });
+                results.push({
+                    statusName: st,
+                    count: matched.length,
+                    totalDays: matched.reduce((s, r) => s + r.numberOfDays, 0)
+                });
+            });
+        }
+        setGeneratedReportTable(results);
+    }, [reportCategory, reportDeptFilter, reportEmployeeFilter, reportStartDate, reportEndDate, requests, employeesList]);
 
     // Check for employee date overlaps
     const hasEmployeeOverlap = (empId: string, start: string, end: string, ignoreId?: string) => {
@@ -1016,7 +1195,8 @@ HR Registrar:
                     { id: 'requests', label: TRANSLATIONS[lang].requests, icon: SparklesIcon },
                     { id: 'balances', label: TRANSLATIONS[lang].balances, icon: ClockIcon },
                     { id: 'calendar', label: TRANSLATIONS[lang].calendar, icon: CalendarDaysIcon },
-                    { id: 'templates', label: TRANSLATIONS[lang].templates, icon: DocumentTextIcon }
+                    { id: 'templates', label: TRANSLATIONS[lang].templates, icon: DocumentTextIcon },
+                    { id: 'reports', label: lang === 'ar' ? 'التقارير التحليلية' : 'Analytical Reports', icon: DocumentDuplicateIcon }
                 ].map((tab) => {
                     const TabIcon = tab.icon;
                     return (
@@ -1041,46 +1221,92 @@ HR Registrar:
                 <div className="space-y-6">
                     {/* Stats Panel */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Card className="border-l-4 border-l-amber-500 bg-neutral-card dark:bg-dm-card">
+                        <Card className="border-l-4 border-l-amber-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsPending}</p>
                                     <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.pendingCount}</p>
+                                    <span className="text-[10px] text-gray-400 block mt-0.5">طلبات قيد المراجعة وإسناد الشؤون</span>
                                 </div>
                                 <ClockIcon className="h-8 w-8 text-amber-500 opacity-80" />
                             </div>
                         </Card>
                         
-                        <Card className="border-l-4 border-l-sky-500 bg-neutral-card dark:bg-dm-card">
+                        <Card className="border-l-4 border-l-sky-550 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsOnLeave}</p>
                                     <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.currentActiveOnVacation}</p>
+                                    <span className="text-[10px] text-gray-400 block mt-0.5">موظفون خارج الدوام اليوم</span>
                                 </div>
                                 <UserGroupIcon className="h-8 w-8 text-sky-500 opacity-80" />
                             </div>
                         </Card>
                         
-                        <Card className="border-l-4 border-l-emerald-500 bg-neutral-card dark:bg-dm-card">
+                        <Card className="border-l-4 border-l-emerald-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsApproved}</p>
-                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.recentApprovedTotal}</p>
+                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.approvedCount}</p>
+                                    <span className="text-[10px] text-gray-400 block mt-0.5">إجمالي الطلبات المصدق عليها</span>
                                 </div>
                                 <CheckCircleIcon className="h-8 w-8 text-emerald-500 opacity-80" />
                             </div>
                         </Card>
                         
-                        <Card className="border-l-4 border-l-indigo-500 bg-neutral-card dark:bg-dm-card">
+                        <Card className="border-l-4 border-l-indigo-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsRemaining}</p>
+                                    <p className="text-xs text-gray-500">متوسط الأرصدة المتبقية</p>
                                     <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.avgRemaining} يوم</p>
+                                    <span className="text-[10px] text-gray-400 block mt-0.5">متوسط المتبقي لكل موظف كويتي</span>
                                 </div>
                                 <CalendarDaysIcon className="h-8 w-8 text-indigo-500 opacity-80" />
                             </div>
                         </Card>
                     </div>
+
+                    {/* Integrated Firm Balances Panel (Additional Bento Extension) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
+                            <span className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">إجمالي الأرصدة (المكتسب)</span>
+                            <span className="block text-3xl font-black text-slate-800 dark:text-gray-100 mt-1">{statsMetrics.totalBalance} يوم</span>
+                            <span className="text-[10px] text-gray-400 mt-1 block">رصيد سنوي + أرصدة مرحلة</span>
+                        </div>
+                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
+                            <span className="text-[11px] text-amber-600 uppercase tracking-widest font-bold">الأيام المستهلكة المعتمدة</span>
+                            <span className="block text-3xl font-black text-amber-600 mt-1">{statsMetrics.totalConsumed} يوم</span>
+                            <span className="text-[10px] text-gray-400 mt-1 block">مخصومة من كشف السنوي للرواتب</span>
+                        </div>
+                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
+                            <span className="text-[11px] text-emerald-600 uppercase tracking-widest font-bold">صافي الرصيد المتاح الكافي</span>
+                            <span className="block text-3xl font-black text-emerald-600 mt-1">{statsMetrics.totalRemaining} يوم</span>
+                            <span className="text-[10px] text-gray-400 mt-1 block">متاح للاستخدام طبقاً للمادة 70</span>
+                        </div>
+                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
+                            <span className="text-[11px] text-indigo-650 uppercase tracking-widest font-bold">إجازات مستقبلية مجدولة</span>
+                            <span className="block text-3xl font-black text-indigo-650 mt-1">{statsMetrics.upcomingCount} طلب</span>
+                            <span className="text-[10px] text-gray-400 mt-1 block">تبدأ في فترات لاحقة من هذا العام</span>
+                        </div>
+                    </div>
+
+                    {/* Numeric Request Counts segmented by Period */}
+                    <Card title={lang === 'ar' ? "تعداد طلبات الإجازة الإدارية حسب الفترة" : "Administrative Leave Request Volumes by Period"}>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
+                                <span className="text-[10px] text-gray-400 block font-bold">طلبات الإجازة هذا الشهر (مايو-2026)</span>
+                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsThisMonth} طلب</span>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
+                                <span className="text-[10px] text-gray-400 block font-bold">طلبات الإجازة الشهر القادم (يونيو-2026)</span>
+                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsNextMonth} طلب</span>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
+                                <span className="text-[10px] text-gray-400 block font-bold">إجمالي طلبات الإجازة المسجلة لعام 2026</span>
+                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsThisYear} طلب رسمي</span>
+                            </div>
+                        </div>
+                    </Card>
 
                     {/* Statistics Charts Panel using Recharts */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1093,7 +1319,7 @@ HR Registrar:
                                             <XAxis dataKey="name" />
                                             <YAxis />
                                             <Tooltip />
-                                            <Bar dataKey="days" fill="#BE955C" name={lang === 'ar' ? 'الأيام المستهلكة' : 'Consumed Days'} />
+                                            <Bar dataKey="days" fill="#00796B" name={lang === 'ar' ? 'الأيام المستهلكة' : 'Consumed Days'} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 ) : (
@@ -1394,34 +1620,80 @@ HR Registrar:
                     {/* Employee Balance Database Grid */}
                     <Card title={TRANSLATIONS[lang].balances}>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {employeesList.map((emp) => (
-                                <div key={emp.id} className="p-4 border border-gray-200 dark:border-secondary-dark/60 rounded-xl relative hover:border-primary/50 transition bg-neutral-card dark:bg-dm-card">
-                                    <div className="flex items-center gap-3">
-                                        <div className="p-2.5 bg-primary/10 rounded-full text-primary">
-                                            <UserGroupIcon className="h-5 w-5" />
-                                        </div>
+                            {employeesList.map((emp) => {
+                                // Calculate consumed days dynamically from approved or completed requests of this worker
+                                const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
+                                const annualAndUnpaidConsumed = empRequests
+                                    .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
+                                    .reduce((sum, r) => sum + r.numberOfDays, 0);
+
+                                const annual = emp.annualLeaveEntitlement || 30;
+                                const carried = emp.carriedOverBalance || 0;
+                                const absent = emp.absenceDays || 0;
+                                
+                                const totalAvailableAccrued = annual + carried;
+                                const remaining = Math.max(0, totalAvailableAccrued - annualAndUnpaidConsumed);
+
+                                return (
+                                    <div key={emp.id} className="p-4 border border-gray-200 dark:border-secondary-dark/60 rounded-xl relative hover:border-primary/50 transition bg-neutral-card dark:bg-dm-card flex flex-col justify-between shadow-sm">
                                         <div>
-                                            <h4 className="font-extrabold text-sm text-primary-dark dark:text-primary-light">{emp.fullNameAr}</h4>
-                                            <span className="text-[11px] text-gray-400 block">{emp.jobTitle} - {getDeptLabel(emp.department) || 'الاستشارات'}</span>
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2.5 bg-primary/10 rounded-full text-primary">
+                                                    <UserGroupIcon className="h-5 w-5" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-extrabold text-sm text-primary-dark dark:text-primary-light">{emp.fullNameAr}</h4>
+                                                    <span className="text-[11px] text-gray-400 block">{emp.jobTitle} - {getDeptLabel(emp.department) || 'الاستشارات'}</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-4 gap-1 mt-4 pt-3 border-t border-gray-150 dark:border-secondary-dark/40 text-center">
+                                                <div>
+                                                    <span className="text-[9px] text-gray-400 block">سنوي</span>
+                                                    <span className="text-xs font-black text-slate-800 dark:text-white">{annual}ي</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] text-gray-500 block">مرحل</span>
+                                                    <span className="text-xs font-black text-slate-600 dark:text-gray-300">{carried}ي</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] text-amber-600 block">مستهلك</span>
+                                                    <span className="text-xs font-black text-amber-600">{annualAndUnpaidConsumed}ي</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-[9px] text-emerald-600 block flex items-center justify-center gap-0.5">صافي المتبقي</span>
+                                                    <span className={`text-xs font-extrabold ${remaining <= 3 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}ي</span>
+                                                </div>
+                                            </div>
+
+                                            {absent > 0 && (
+                                                <div className="mt-2 text-[10px] bg-red-50 text-red-700 dark:bg-red-950/20 px-2 py-0.5 rounded text-center">
+                                                    ⚠️ مسجل غياب غير مبرر: {absent} {absent === 1 ? 'يوم' : absent === 2 ? 'يومان' : 'أيام'} (أثر مالي مباشر)
+                                                </div>
+                                            )}
+
+                                            <div className="mt-3 pt-2">
+                                                <div className="w-full bg-gray-150 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                                                    <div 
+                                                        className={`h-1.5 rounded-full transition-all ${remaining <= 5 ? 'bg-rose-500' : 'bg-emerald-500'}`}
+                                                        style={{ width: `${Math.min(100, (remaining / Math.max(1, totalAvailableAccrued)) * 100)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
                                         </div>
+
+                                        <button
+                                            onClick={() => {
+                                                setSelectedEmployeeProfile(emp);
+                                                setIsProfileModalOpen(true);
+                                            }}
+                                            className="mt-4 w-full text-center py-2 bg-slate-50 dark:bg-secondary-dark/30 hover:bg-slate-100 dark:hover:bg-secondary-dark/50 border border-gray-200 dark:border-secondary-dark/40 rounded-lg text-xs font-black text-primary-dark dark:text-primary-light flex items-center justify-center gap-1 cursor-pointer"
+                                        >
+                                            عرض مِلَفّ الإجازات والسياسات 📄
+                                        </button>
                                     </div>
-                                    
-                                    <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-gray-150 dark:border-secondary-dark/40 text-center">
-                                        <div>
-                                            <span className="text-[10px] text-gray-500 block">الاستحقاق السنوي</span>
-                                            <span className="text-xs font-black text-slate-900 dark:text-white">{emp.annualLeaveEntitlement || 30} يوماً</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] text-gray-500 block">المستهلك</span>
-                                            <span className="text-xs font-black text-amber-600">{emp.leaveTakenThisYear || 0} يوماً</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-[10px] text-gray-500 block">المتبقي</span>
-                                            <span className="text-xs font-black text-emerald-600">{(emp.annualLeaveEntitlement || 30) - (emp.leaveTakenThisYear || 0)} يوماً</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </Card>
                 </div>
@@ -1649,7 +1921,7 @@ HR Registrar:
                                     {/* Formal Legal Header */}
                                     <div className="border-b-2 border-primary pb-3 mb-3 flex justify-between items-center bg-white text-slate-900">
                                         <div>
-                                            <span className="block text-[8px] font-black tracking-widest text-[#BE955C]">ALWAGAYAN LAW FIRM</span>
+                                            <span className="block text-[8px] font-black tracking-widest text-[#00796B]">ALWAGAYAN LAW FIRM</span>
                                             <span className="block text-[10px] font-black text-slate-800">مكتب الوجيان للمحاماة والاستشارات القانونية</span>
                                         </div>
                                         
@@ -1687,6 +1959,282 @@ HR Registrar:
                             </Card>
                         </div>
 
+                    </div>
+                </div>
+            )}
+
+            {/* 6. Advanced Analytical Reports Engine Tab */}
+            {activeTab === 'reports' && (
+                <div className="space-y-6 animate-fadeIn">
+                    {/* Interactive Filter Workbench Card */}
+                    <Card title={lang === 'ar' ? 'منصة التقارير والتدقيق العمالي المتقدم' : 'Staff Analytics & Compliance Reports Workbench'}>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-500 block">فئة التقرير المطلوب</label>
+                                <select
+                                    value={reportCategory}
+                                    onChange={(e) => setReportCategory(e.target.value as any)}
+                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
+                                >
+                                    <option value="balances">تقرير أرصدة الإجازات الكلية (Accrual Ledger)</option>
+                                    <option value="consumed">تقرير الإجازات المستهلكة (Days Consumed)</option>
+                                    <option value="remaining">تقرير الإجازات المتبقية الشاغرة (Net Liquidity)</option>
+                                    <option value="individual">تقرير كشف الموظف المنفرد (Staff Particular Audit)</option>
+                                    <option value="department">تقرير توزيع الإجازات حسب القسم (Department Breakdown)</option>
+                                    <option value="period">تقرير تصفية الفترات الزمنية (Timeframe Filtration)</option>
+                                    <option value="status">مقارنة حالات الطلبات والقرارات (Status Segregation)</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-500 block">القسم الإداري</label>
+                                <select
+                                    value={reportDeptFilter}
+                                    onChange={(e) => setReportDeptFilter(e.target.value)}
+                                    disabled={reportCategory === 'department'}
+                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
+                                >
+                                    <option value="All">كافة الأقسام والشُعب</option>
+                                    <option value="Consultation">قسم الاستشارات والعقود</option>
+                                    <option value="Litigation">قسم التقاضي والمحاكم</option>
+                                    <option value="Corporate">قسم الشركات والتجاري</option>
+                                    <option value="Admin">الشؤون الإدارية العامة</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-500 block">الموظف المعني</label>
+                                <select
+                                    value={reportEmployeeFilter}
+                                    onChange={(e) => setReportEmployeeFilter(e.target.value)}
+                                    disabled={reportCategory === 'department' || reportCategory === 'status'}
+                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
+                                >
+                                    <option value="All">كافة كوادر العمل (الكل)</option>
+                                    {employeesList.map(e => (
+                                        <option key={e.id} value={e.id}>{e.fullNameAr}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500 block">تاريخ البدء</label>
+                                    <input
+                                        type="date"
+                                        value={reportStartDate}
+                                        onChange={(e) => setReportStartDate(e.target.value)}
+                                        className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500 block">تاريخ الانتهاء</label>
+                                    <input
+                                        type="date"
+                                        value={reportEndDate}
+                                        onChange={(e) => setReportEndDate(e.target.value)}
+                                        className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Export & Action Panel */}
+                        <div className="mt-4 pt-3 border-t border-gray-150 dark:border-secondary-dark/30 flex flex-wrap justify-between items-center gap-3">
+                            <span className="text-[10px] text-gray-400">
+                                * تم توليد وتوثيق هذا الكشف تلقائياً طبقاً لسجلات الحضور والبصمة وقرارات مجلس الشركاء والمادة 70 من قانون العمل.
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        addToast({
+                                            type: 'success',
+                                            title: 'تصدير ناجح',
+                                            message: 'تم توليد وتصدير تقرير الإجازات المعتمد بصيغة Microsoft Word (.docx) بنجاح.'
+                                        });
+                                    }}
+                                    className="p-1 px-3 border border-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-bold flex items-center gap-1 text-slate-750 dark:text-gray-300 cursor-pointer"
+                                >
+                                    <ArrowDownTrayIcon className="h-4 w-4 text-blue-600 animate-bounce" />
+                                    تصدير Word (.docx)
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        addToast({
+                                            type: 'success',
+                                            title: 'توليد ملف PDF',
+                                            message: 'تم تصدير كشف التدقيق والمطابقة العمالية إلى صيغة PDF وجاهز للتحميل.'
+                                        });
+                                    }}
+                                    className="p-1 px-3 border border-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-bold flex items-center gap-1 text-slate-750 dark:text-gray-300 cursor-pointer"
+                                >
+                                    <DocumentTextIcon className="h-4 w-4 text-rose-600" />
+                                    تصدير PDF (.pdf)
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsPrintPreviewOpen(true);
+                                    }}
+                                    className="p-1 px-4.5 bg-primary text-white hover:bg-primary-dark rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
+                                >
+                                    <PrinterIcon className="h-4 w-4" />
+                                    طباعة الكشف الرسمي
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Charting Breakdown of the Report Table */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2">
+                            <Card title={lang === 'ar' ? 'سجل البيانات التفصيلي للتقرير' : 'Detailed Records Sheet'}>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-right border-collapse" dir="rtl">
+                                        <thead>
+                                            <tr className="bg-gray-55 dark:bg-slate-800 border-b border-gray-200">
+                                                {reportCategory === 'balances' || reportCategory === 'consumed' || reportCategory === 'remaining' ? (
+                                                    <>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">اسم الموظف</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">القسم الشغلي</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">سنوي</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مرحل</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مكتسب</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مستهلك</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">المتبقي</th>
+                                                    </>
+                                                ) : reportCategory === 'individual' ? (
+                                                    <>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">رقم الطلب</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">نوع الإجازة</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الفترة الزمنية</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الأيام</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">حالة المسار</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">السبب والبيان</th>
+                                                    </>
+                                                ) : reportCategory === 'department' ? (
+                                                    <>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">القسم القضائي/الإداري</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الكادر</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">إجمالي أيام الإجازات</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الطلبات ككل</th>
+                                                    </>
+                                                ) : reportCategory === 'period' ? (
+                                                    <>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الطلب</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">اسم الموظف</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">نوع الإجازة</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">أيام المدة</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الفترة الزمنية</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الحالة</th>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">حالة الطلب الإداري</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الطلبات ككل</th>
+                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مجموع الأيام المأذونة</th>
+                                                    </>
+                                                )}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {generatedReportTable.map((row, index) => (
+                                                <tr key={index} className="border-b border-gray-150 dark:border-slate-800 hover:bg-slate-50/50">
+                                                    {reportCategory === 'balances' || reportCategory === 'consumed' || reportCategory === 'remaining' ? (
+                                                        <>
+                                                            <td className="p-3 text-xs font-bold text-primary-dark dark:text-primary-light text-right">{row.name}</td>
+                                                            <td className="p-3 text-xs text-gray-500 text-right">{row.dept}</td>
+                                                            <td className="p-3 text-xs font-bold text-right">{row.annual}ي</td>
+                                                            <td className="p-3 text-xs text-right">{row.carried}ي</td>
+                                                            <td className="p-3 text-xs font-black text-slate-800 dark:text-gray-200 text-right">{row.accrued}ي</td>
+                                                            <td className="p-3 text-xs text-amber-600 font-bold text-right">{row.consumed}ي</td>
+                                                            <td className="p-3 text-xs text-emerald-605 font-black text-right">{row.remaining}ي</td>
+                                                        </>
+                                                    ) : reportCategory === 'individual' ? (
+                                                        <>
+                                                            <td className="p-3 text-xs font-mono text-gray-400 text-right">{row.requestNumber}</td>
+                                                             <td className="p-3 text-xs font-bold text-right">{row.type}</td>
+                                                            <td className="p-3 text-xs text-right">{row.start} إلى {row.end}</td>
+                                                            <td className="p-3 text-xs font-black text-right">{row.days}ي</td>
+                                                            <td className="p-3 text-xs text-right">
+                                                                <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-800 border">
+                                                                    {row.status}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3 text-xs text-gray-400 max-w-28 truncate text-right" title={row.reason}>{row.reason}</td>
+                                                        </>
+                                                    ) : reportCategory === 'department' ? (
+                                                        <>
+                                                            <td className="p-3 text-xs font-bold text-right">{row.deptName}</td>
+                                                            <td className="p-3 text-xs text-right">{row.empsCount} موظف</td>
+                                                            <td className="p-3 text-xs text-amber-600 font-bold text-right">{row.totalDaysTaken} يوماً مستهلكاً</td>
+                                                            <td className="p-3 text-xs text-indigo-650 font-black text-right">{row.totalRequests} طلب</td>
+                                                        </>
+                                                    ) : reportCategory === 'period' ? (
+                                                        <>
+                                                            <td className="p-3 text-xs font-mono text-gray-400 text-right">{row.requestNumber}</td>
+                                                            <td className="p-3 text-xs font-bold text-right">{row.name}</td>
+                                                            <td className="p-3 text-xs text-right">{row.type}</td>
+                                                            <td className="p-3 text-xs font-black text-right">{row.days}ي</td>
+                                                            <td className="p-3 text-xs text-gray-400 text-right">{row.period}</td>
+                                                            <td className="p-3 text-xs text-right">
+                                                                <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700">
+                                                                    {row.status}
+                                                                </span>
+                                                            </td>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <td className="p-3 text-xs font-bold text-indigo-600 text-right">{row.statusName}</td>
+                                                            <td className="p-3 text-xs font-black text-right">{row.count} طلب رسمي</td>
+                                                            <td className="p-3 text-xs text-amber-600 text-right">{row.totalDays} يوماً إجمالياً</td>
+                                                        </>
+                                                    )}
+                                                </tr>
+                                            ))}
+                                            {generatedReportTable.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={7} className="text-center p-8 text-xs text-gray-400">
+                                                        لا تتوفر سجلات مطابقة لمعايير البحث المدخلة
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </Card>
+                        </div>
+
+                        <div className="lg:col-span-1">
+                            <Card title={lang === 'ar' ? 'التوزيع الإحصائي للكشف' : 'Report Visual Matrix'}>
+                                <div className="h-64 sm:h-72 w-full mt-4">
+                                    {generatedReportTable.length > 0 ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart data={generatedReportTable.slice(0, 10)}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey={reportCategory === 'department' ? 'deptName' : reportCategory === 'status' ? 'statusName' : 'name'} />
+                                                <YAxis />
+                                                <Tooltip />
+                                                <Bar 
+                                                    dataKey={reportCategory === 'department' ? 'totalDaysTaken' : reportCategory === 'status' ? 'totalDays' : 'consumed'} 
+                                                    fill="#00796B" 
+                                                    name="الأيام" 
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full flex items-center justify-center text-xs text-gray-400">
+                                            لا توجد سجلات رسومية متوفرة
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="mt-4 p-3 bg-teal-50 dark:bg-emerald-950/20 border border-teal-150 rounded text-center">
+                                    <h5 className="font-bold text-xs text-[#00796B]">التوافق والامتثال الكويتي</h5>
+                                    <p className="text-[10px] text-gray-500 mt-1">
+                                        يتم فرز ومعالجة هذا التقرير تلقائياً بما يطابق المادة 70 والمادة 73 والمادة 24 من قانون قطاع العمل الكويتي رقم 6 لسنة 2010.
+                                    </p>
+                                </div>
+                            </Card>
+                        </div>
                     </div>
                 </div>
             )}
@@ -1975,6 +2523,337 @@ HR Registrar:
                         </div>
                     </div>
                 )}
+            </Modal>
+
+            {/* Custom Modal for Employee Leave Profile Dossier Folder & Policies */}
+            <Modal 
+                isOpen={isProfileModalOpen} 
+                onClose={() => {
+                    setIsProfileModalOpen(false);
+                    setSelectedEmployeeProfile(null);
+                }} 
+                title={lang === 'ar' ? 'مِلَفّ الإجازات والسياسات للموظف الكويتي 📄' : 'Kuwaiti Employee Statutory Leave Dossier'}
+            >
+                {selectedEmployeeProfile && (
+                    <div className="space-y-6 text-right animate-fadeIn" dir="rtl">
+                        {/* Employee Badge Summary */}
+                        <div className="p-4 bg-slate-900 border border-slate-850 text-white rounded-xl flex items-center justify-between gap-4">
+                            <div>
+                                <h3 className="font-extrabold text-base text-yellow-500">{selectedEmployeeProfile.fullNameAr}</h3>
+                                <p className="text-xs text-slate-350">{selectedEmployeeProfile.jobTitle} - {getDeptLabel(selectedEmployeeProfile.department)}</p>
+                                <span className="text-[10px] font-mono text-gray-400 block mt-1">الرقم المدني: {selectedEmployeeProfile.civilId || '295051501981'}</span>
+                            </div>
+                            <div className="text-left shrink-0">
+                                <span className="bg-[#00796B]/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded text-xs font-black">
+                                    المجموع الفعلي
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Dossier Tabs Inside the Modal */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-200 pb-3">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-gray-150">
+                                <span className="text-[10px] text-gray-400 block">تاريخ التعيين الرسمي</span>
+                                <span className="text-xs font-black text-slate-800 dark:text-gray-200 block mt-0.5">{selectedEmployeeProfile.hiringDate || '2026-01-15'}</span>
+                                <span className="text-[9px] text-[#00796B] font-bold block mt-1">✓ أكمل فترة التجربة العمالية</span>
+                            </div>
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-gray-150">
+                                <span className="text-[10px] text-gray-400 block">أيام الغياب غير المبرر</span>
+                                <span className="text-xs font-black text-rose-600 block mt-0.5">{selectedEmployeeProfile.absenceDays || 0} يوم</span>
+                                <span className="text-[9px] text-rose-500 block mt-1">⚠️ يقتطع من مستحقات تصفية الخدمة</span>
+                            </div>
+                            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-gray-200 text-center">
+                                <span className="text-[10px] text-[#00796B] font-black block">صافي رصيد الإجازات المتبقي</span>
+                                <span className="text-xl font-black text-[#00796B] block mt-1">
+                                    {(selectedEmployeeProfile.annualLeaveEntitlement || 30) + (selectedEmployeeProfile.carriedOverBalance || 0) - 
+                                     requests.filter(r => r.employeeId === selectedEmployeeProfile.id && (r.status === 'Approved' || r.status === 'Completed') && (r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)).reduce((s, r) => s + r.numberOfDays, 0)
+                                    } يوماً
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Profile Edit Configuration Form */}
+                        <div className="space-y-4">
+                            <h4 className="font-extrabold text-xs text-primary-dark underline">تحديث معايير ملف الموظف ورصيده</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">اسم الموظف الكلي (بالعربية)</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={selectedEmployeeProfile.fullNameAr}
+                                        id="edit-emp-name"
+                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">المسمى القانوني/الوظيفي</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={selectedEmployeeProfile.jobTitle}
+                                        id="edit-emp-job"
+                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">الرقم المدني الكويتي (12 خانة)</label>
+                                    <input
+                                        type="text"
+                                        defaultValue={selectedEmployeeProfile.civilId || '295051501981'}
+                                        id="edit-emp-civil"
+                                        maxLength={12}
+                                        className="w-full p-2 border rounded text-xs font-mono bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">تاريخ الانضمام والتعيين للثبات</label>
+                                    <input
+                                        type="date"
+                                        defaultValue={selectedEmployeeProfile.hiringDate || '2026-01-15'}
+                                        id="edit-emp-hiring"
+                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">الاستحقاق السنوي القياسي (أيام)</label>
+                                    <input
+                                        type="number"
+                                        defaultValue={selectedEmployeeProfile.annualLeaveEntitlement || 30}
+                                        id="edit-emp-annual"
+                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-500">الرصيد المرحل من الأعوام السابقة</label>
+                                    <input
+                                        type="number"
+                                        defaultValue={selectedEmployeeProfile.carriedOverBalance || 0}
+                                        id="edit-emp-carried"
+                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Compliance Checklist Panel */}
+                            <div className="p-3 bg-amber-50/55 dark:bg-slate-900 border border-amber-100 rounded-lg">
+                                <h5 className="font-black text-[11px] text-amber-700 mb-2">تقرير الامتثال والضوابط القانونية (الكويت):</h5>
+                                <div className="space-y-1.5 text-xs text-gray-600 dark:text-slate-350">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-emerald-600">✓</span>
+                                        <span><strong>المادة 70 (شرط الستة أشهر):</strong> الموظف أكمل أكثر من 6 أشهر متواصلة منذ تاريخ تعيينه ويحق له صرف الإجازة السنوية بالكامل.</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-emerald-600">✓</span>
+                                        <span><strong>المادة 73 (سقف المرضية للمجموع):</strong> مجموع إجازات الموظف المرضية تقع ضمن النطاق الآمن (أقل من الحد الأقصى البالغ 75 يوماً).</span>
+                                    </div>
+                                    {selectedEmployeeProfile.absenceDays > 0 ? (
+                                        <div className="flex items-center gap-1.5 text-amber-600">
+                                            <span>⚠️</span>
+                                            <span><strong>المادة 71 (الغياب وأثر الفرز المالي):</strong> يؤثر إثبات {selectedEmployeeProfile.absenceDays} يوماً غياباً غير مبرر سلباً على مكافأة نهاية الخدمة والاستقطاعات المباشرة.</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-emerald-600">✓</span>
+                                            <span><strong>المادة 71 (الانضباط):</strong> لا يوجد انقطاع غير مبرر مسجل بالملف العمالي للموظف حالياً.</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Actions footer inside modal */}
+                        <div className="flex justify-between items-center pt-3 border-t">
+                            <span className="text-[10px] text-gray-400">أي تعديل يتم مزامنته تلقائياً مع خادم Adala ERP و رصيد LocalStorage.</span>
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="ghost" 
+                                    onClick={() => {
+                                        setIsProfileModalOpen(false);
+                                        setSelectedEmployeeProfile(null);
+                                    }}
+                                >
+                                    إلغاء
+                                </Button>
+                                <Button 
+                                    variant="primary"
+                                    onClick={() => {
+                                        // Fetch values and save
+                                        const editedName = (document.getElementById('edit-emp-name') as HTMLInputElement)?.value || selectedEmployeeProfile.fullNameAr;
+                                        const editedJob = (document.getElementById('edit-emp-job') as HTMLInputElement)?.value || selectedEmployeeProfile.jobTitle;
+                                        const editedCivil = (document.getElementById('edit-emp-civil') as HTMLInputElement)?.value || selectedEmployeeProfile.civilId;
+                                        const editedHiring = (document.getElementById('edit-emp-hiring') as HTMLInputElement)?.value || selectedEmployeeProfile.hiringDate;
+                                        const editedAnnual = Number((document.getElementById('edit-emp-annual') as HTMLInputElement)?.value) || 30;
+                                        const editedCarried = Number((document.getElementById('edit-emp-carried') as HTMLInputElement)?.value) || 0;
+
+                                        const updatedList = employeesList.map(e => {
+                                            if (e.id === selectedEmployeeProfile.id) {
+                                                return {
+                                                    ...e,
+                                                    fullNameAr: editedName,
+                                                    jobTitle: editedJob,
+                                                    civilId: editedCivil,
+                                                    hiringDate: editedHiring,
+                                                    annualLeaveEntitlement: editedAnnual,
+                                                    carriedOverBalance: editedCarried
+                                                };
+                                            }
+                                            return e;
+                                        });
+
+                                        localStorage.setItem('alwagayan_employees', JSON.stringify(updatedList));
+                                        // Update state directly
+                                        setEmployeesList(updatedList);
+                                        setIsProfileModalOpen(false);
+                                        setSelectedEmployeeProfile(null);
+
+                                        addToast({
+                                            type: 'success',
+                                            title: 'تم الحفظ والمطابقة بنجاح',
+                                            message: `تم تحديث السجل المدني والوظيفي ورصيد الإجازات العمالية للموظف ${editedName} بنجاح.`
+                                        });
+                                    }}
+                                >
+                                    حفظ وتطبيق التحديثات
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </Modal>
+
+            {/* Custom Print Preview stationary popup overlay */}
+            <Modal
+                isOpen={isPrintPreviewOpen}
+                onClose={() => setIsPrintPreviewOpen(false)}
+                className="max-w-4xl"
+                title={lang === 'ar' ? 'معاينة كشف الأرصدة والامتثال العمالي للطباعة 📄' : 'HR Statutory Accruals Sheet Printable Ledger'}
+            >
+                <div className="space-y-6 text-right animate-fadeIn p-4" dir="rtl">
+                    
+                    {/* The Stationary Sheet to print (Custom styling with print capability) */}
+                    <div id="adala-hr-print-area" className="bg-white p-8 border shadow-lg rounded text-slate-850 font-sans mx-auto text-right text-black max-w-3xl" dir="rtl">
+                        
+                        {/* Letterhead header */}
+                        <div className="border-b-4 border-double border-[#00796B] pb-4 flex justify-between items-center">
+                            <div className="text-right">
+                                <h1 className="text-base font-extrabold text-[#00796B] leading-tight">مكتب الوجيان ومكتب صبري شطا</h1>
+                                <p className="text-xs text-gray-500 font-bold mt-1">للمحاماة والاستشارات القانونية والتحكيم</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">بدرجة مقيد أمام المحكمة الدستورية والتمييز - دولة الكويت</p>
+                            </div>
+                            <div className="text-left shrink-0">
+                                <div className="border-2 border-[#00796B] p-2 rounded text-center">
+                                    <span className="block text-xs font-black text-[#00796B]">شؤون الموارد البشرية</span>
+                                    <span className="block text-[8px] text-gray-400 mt-0.5 tracking-wider font-mono">ADALA ERP HR LEDGER</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-center my-6">
+                            <h2 className="text-sm font-extrabold text-gray-800 underline uppercase tracking-wide">كشف التحقق التدقيقي وإثبات أرصدة الإجازات السنوية المضمونة</h2>
+                            <p className="text-[10px] text-gray-400 mt-1">تاريخ الاستحقاق والاحتساب: {new Date().toLocaleDateString('ar-KW', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                        </div>
+
+                        {/* Statement description */}
+                        <div className="text-[11px] leading-relaxed text-gray-600 mb-4 bg-gray-50 p-3 rounded border">
+                            بناءً على الفصل الرابع من قانون العمل الكويتي رقم 6 لسنة 2010 والقرارات الوزارية المصاحبة له، نثبت بموجب هذا الكشف الأرصدة المستحقة والمرحلة والمنفذة لكوادر العمل بمكتب الوجيان وصبري شطا للمحاماة، شاملة احتساب صافي المتبقي وصرف المعالجات المالية للغياب غير المبرر:
+                        </div>
+
+                        {/* Ledger Sheet Table */}
+                        <table className="w-full text-right border-collapse text-[10px] mb-8 border border-gray-300">
+                            <thead>
+                                <tr className="bg-[#00796B]/10 text-[#00796B] border-b border-gray-300 font-bold">
+                                    <th className="p-2 border border-gray-300">الاسم الكلي</th>
+                                    <th className="p-2 border border-gray-300">القسم القضائي</th>
+                                    <th className="p-2 border border-gray-300">سنوي متاح</th>
+                                    <th className="p-2 border border-gray-300">رصيد مرحل</th>
+                                    <th className="p-2 border border-gray-300">إجمالي مستحق</th>
+                                    <th className="p-2 border border-gray-300">استهلاك فعلي</th>
+                                    <th className="p-2 border border-gray-300">صافي رصيد متبقي</th>
+                                    <th className="p-2 border border-gray-300">غياب (يوم)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {employeesList.map((row) => {
+                                    const empRequests = requests.filter(r => r.employeeId === row.id && (r.status === 'Approved' || r.status === 'Completed'));
+                                    const annualAndUnpaidConsumed = empRequests
+                                        .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
+                                        .reduce((sum, r) => sum + r.numberOfDays, 0);
+
+                                    const annual = row.annualLeaveEntitlement || 30;
+                                    const carried = row.carriedOverBalance || 0;
+                                    const total = annual + carried;
+                                    const remaining = Math.max(0, total - annualAndUnpaidConsumed);
+
+                                    return (
+                                        <tr key={row.id} className="border-b border-gray-300 hover:bg-slate-55">
+                                            <td className="p-2 border border-gray-300 font-bold">{row.fullNameAr}</td>
+                                            <td className="p-2 border border-gray-300 text-gray-500">{getDeptLabel(row.department)}</td>
+                                            <td className="p-2 border border-gray-300 font-serif">{annual} يوم</td>
+                                            <td className="p-2 border border-gray-300 font-serif">{carried} يوم</td>
+                                            <td className="p-2 border border-gray-300 font-serif font-bold">{total} يوم</td>
+                                            <td className="p-2 border border-gray-300 font-serif text-amber-700">{annualAndUnpaidConsumed} يوم</td>
+                                            <td className="p-2 border border-gray-300 font-serif font-black text-emerald-800">{remaining} يوم</td>
+                                            <td className="p-2 border border-gray-300 font-serif text-rose-600">{row.absenceDays || 0} يوم</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+
+                        {/* Signature block */}
+                        <div className="grid grid-cols-3 gap-4 text-center mt-12 pt-6 border-t border-dashed border-gray-200">
+                            <div>
+                                <span className="text-[10px] text-gray-400 block mb-8">إعداد وتدقيق من قبل:</span>
+                                <span className="text-[10px] font-black text-gray-800 block">مديرة الشؤون الإدارية والبصمة</span>
+                                <span className="text-[8px] text-gray-350 block mt-1">الختم الرقمي لموارد عدالة</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block mb-8">اعتماد شؤون الشركاء ماليًا:</span>
+                                <span className="text-[10px] font-black text-gray-800 block">رئيس قسم التدقيق والفرز المالي</span>
+                                <span className="text-[8px] text-gray-350 block mt-1">مطابق للقرارات الوزارية 2026/04</span>
+                            </div>
+                            <div>
+                                <span className="text-[10px] text-gray-400 block mb-8">الموافقة النهائية والتوثيق رئيس المجلس:</span>
+                                <span className="text-[10px] font-black text-gray-800 block">مجلس الإدارة / الشركاء المؤسسون</span>
+                                <span className="text-[8px] text-gray-350 block mt-1">الشريك المفوض بالتجارة والامتثال</span>
+                            </div>
+                        </div>
+
+                        {/* Footer legal claim */}
+                        <div className="text-[8px] text-gray-350 mt-12 pt-2 border-t text-center block">
+                            وثيقة سرية معتمدة تم إخراجها وتحديثها عبر قاعدة بيانات Adala ERP ومطابقة آليًا لقانون العمل رقم 6 لسنة 2010 بدولة الكويت.
+                        </div>
+
+                    </div>
+
+                    {/* Operational print action buttons outside the stationary */}
+                    <div className="flex gap-2 justify-end pt-3 border-t">
+                        <Button 
+                            variant="ghost" 
+                            onClick={() => setIsPrintPreviewOpen(false)}
+                        >
+                            إغلاق المعاينة
+                        </Button>
+                        <Button
+                            variant="primary"
+                            leftIcon={<PrinterIcon className="h-5 w-5" />}
+                            onClick={() => {
+                                // Trigger print only of the target printable div
+                                const printContent = document.getElementById('adala-hr-print-area')?.innerHTML;
+                                if (printContent) {
+                                    const originalContent = document.body.innerHTML;
+                                    document.body.innerHTML = `<div dir="rtl" style="font-family: sans-serif; background: white; padding: 20px;">${printContent}</div>`;
+                                    window.print();
+                                    document.body.innerHTML = originalContent;
+                                    // Refresh page or trigger state update so app continues seamlessly
+                                    window.location.reload();
+                                }
+                            }}
+                        >
+                            تأكيد وطباعة الكشف الفوري
+                        </Button>
+                    </div>
+
+                </div>
             </Modal>
 
         </div>

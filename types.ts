@@ -1876,6 +1876,8 @@ export interface AdminTask {
     updatedAt?: string;
     completedAt?: string;
     assignerSignature?: string;
+    subtasks?: { id: string; title: string; completed: boolean }[];
+    courtVenue?: string;
 }
 
 // Contacts

@@ -78,6 +78,7 @@ import PartyTrackingPage from './pages/PartyTrackingPage'; // New Party Tracking
 import DebtSettlementPage from './pages/DebtSettlementPage'; // New Debt Settlement Page
 import AutomatedDocketPage from './pages/AutomatedDocketPage'; // New Automated Docket Page
 import MojSearchPage from './pages/MojSearchPage'; // New MOJ Search Page
+import GlobalSearchPage from './pages/GlobalSearchPage'; // New Global System-wide Search Page
 import LitigationToolsPage from './pages/LitigationToolsPage';
 
 
@@ -272,7 +273,8 @@ const AppContent: React.FC = () => {
                 {/* Automation & Integrations Routes */}
                 <Route path="/automated-docket" element={<AutomatedDocketPage />} />
                 <Route path="/moj-search" element={<MojSearchPage />} />
-                <Route path="/party-tracking" element={<PartyTrackingPage />} /> 
+                <Route path="/search" element={<GlobalSearchPage />} />
+                <Route path="/party-tracking" element={<PartyTrackingPage />} />
 
                 <Route path="/admin-tools" element={<AdminToolsPage />} />
                 <Route path="/admin-tools/tasks" element={<TaskManagementPage />} />

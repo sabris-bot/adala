@@ -24,8 +24,11 @@ export interface ExtendedEmployee extends Employee {
     id: string;
     violationDate: string;
     violationType: string;
+    violationTypeEn?: string;
     violationDetails: string;
+    violationDetailsEn?: string;
     penalty: string;
+    penaltyEn?: string;
     authorityDeciding: string;
     status: 'Pending' | 'Approved' | 'Appealed';
     penaltyAmount?: number;

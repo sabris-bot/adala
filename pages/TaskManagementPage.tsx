@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend,
@@ -56,6 +57,17 @@ const mockLegalActionTypes = [
     'عمل منع سفر ضد مدين',
     'دراسة عقد استثماري',
     'أرشفة مستندات حكم قطعي'
+];
+
+const mockCourtVenues = [
+    'بدون مقر محدد (عمل من المكتب)',
+    'قصر العدل (محافظة العاصمة)',
+    'مجمع محاكم الرقعي (محافظة الفروانية)',
+    'مجمع محاكم حولي',
+    'مجمع محاكم الجهراء',
+    'مجمع محاكم الأحمدي والمنطقة الجنوبية',
+    'مقر جمعية المحامين الكويتية',
+    'إدارة التنفيذ بوزارة العدل'
 ];
 
 // Progress Ring Helper Component
@@ -136,7 +148,9 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
       clientName: '',
       legalActionType: '',
       attachmentsList: [],
-      historyLog: []
+      historyLog: [],
+      courtVenue: 'بدون مقر محدد (عمل من المكتب)',
+      subtasks: []
   });
 
   useEffect(() => {
@@ -147,6 +161,8 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
           ...initialData,
           progress: initialData.progress || 0,
           startDate: initialData.startDate || new Date().toISOString().split('T')[0],
+          courtVenue: initialData.courtVenue || 'بدون مقر محدد (عمل من المكتب)',
+          subtasks: initialData.subtasks || []
         });
         setAssignerSignature(initialData.assignerSignature || '');
       } else {
@@ -167,7 +183,9 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
           clientName: mockClients[0],
           legalActionType: mockLegalActionTypes[0],
           attachmentsList: [],
-          historyLog: []
+          historyLog: [],
+          courtVenue: 'بدون مقر محدد (عمل من المكتب)',
+          subtasks: []
         });
         setAssignerSignature('');
       }
@@ -222,6 +240,7 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
   const assigneeOptions = mockAssignees.map(assignee => ({value: assignee, label: assignee}));
   const clientOptions = mockClients.map(client => ({value: client, label: client}));
   const actionTypeOptions = mockLegalActionTypes.map(act => ({value: act, label: act}));
+  const venueOptions = mockCourtVenues.map(venue => ({ value: venue, label: venue }));
   const caseOptions = [
       { value: '', label: 'بدون ارتباط بقضية' },
       ...initialCases.map(c => ({ value: c.id, label: `القضية رقم ${c.caseNumber} - ${c.title}` }))
@@ -281,6 +300,16 @@ const TaskFormModal: React.FC<TaskFormModalProps> = ({ isOpen, onClose, onSubmit
             />
         </div>
         
+        <div className="grid grid-cols-1 gap-4">
+            <Select 
+                name="courtVenue" 
+                label="المقر / الدائرة / المحكمة المستهدفة للتنفيذ" 
+                value={formData.courtVenue || 'بدون مقر محدد (عمل من المكتب)'} 
+                options={venueOptions} 
+                onChange={handleChange} 
+            />
+        </div>
+        
         <TextArea name="description" label="وصف المهمة وخارطة الطريق للتنفيذ" value={formData.description || ''} onChange={handleChange} rows={3} placeholder="يرجى كتابة خطوات العمل الواجب اتخاذها بالتفصيل..." />
         <TextArea name="notes" label="ملاحظات وتوجيهات المدير الخاص" value={formData.notes || ''} onChange={handleChange} rows={2} placeholder="تنبيهات عاجلة للالتزام بها..." />
         
@@ -315,6 +344,130 @@ export const TaskManagementPage: React.FC = () => {
     const { tasks, setTasks, addTask, updateTask, deleteTask } = useCaseTask();
     const { addToast } = useToast();
     
+    const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+
+    const handleToggleSubtask = (taskId: string, subtaskId: string) => {
+        const taskObj = processedTasks.find(t => t.id === taskId);
+        if (!taskObj) return;
+
+        const updatedSubtasks = (taskObj.subtasks || []).map(st => {
+            if (st.id === subtaskId) {
+                return { ...st, completed: !st.completed };
+            }
+            return st;
+        });
+
+        const completedCount = updatedSubtasks.filter(s => s.completed).length;
+        const totalCount = updatedSubtasks.length;
+        const newProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : taskObj.progress;
+
+        const currentUserName = 'أستاذ صبري شطا (مدير ومقيّم)';
+        const toggledSubtask = updatedSubtasks.find(s => s.id === subtaskId);
+        const logAction = `تعديل بند المهام الفرعية ليكون [${toggledSubtask?.completed ? 'مكتمل' : 'قيد المباشرة'}]: "${toggledSubtask?.title}" - نسبة إنجاز كلية ${newProgress}%`;
+
+        const newLog = {
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user: currentUserName,
+            action: logAction
+        };
+
+        const updatedTask = {
+            ...taskObj,
+            subtasks: updatedSubtasks,
+            progress: newProgress,
+            status: newProgress === 100 ? AdminTaskStatus.COMPLETED : taskObj.status,
+            historyLog: [...(taskObj.historyLog || []), newLog],
+            updatedAt: new Date().toISOString().split('T')[0]
+        };
+
+        updateTask(updatedTask);
+        setViewingTask(updatedTask);
+        addToast({
+            type: 'success',
+            title: 'تم تحديث جزء المهمة',
+            message: logAction
+        });
+    };
+
+    const handleAddSubtask = (taskId: string) => {
+        if (!newSubtaskTitle.trim()) return;
+        const taskObj = processedTasks.find(t => t.id === taskId);
+        if (!taskObj) return;
+
+        const newSub = {
+            id: `st-${Date.now()}`,
+            title: newSubtaskTitle.trim(),
+            completed: false
+        };
+
+        const updatedSubtasks = [...(taskObj.subtasks || []), newSub];
+        
+        const completedCount = updatedSubtasks.filter(s => s.completed).length;
+        const totalCount = updatedSubtasks.length;
+        const newProgress = Math.round((completedCount / totalCount) * 100);
+
+        const currentUserName = 'أستاذ صبري شطا (المدير الإداري)';
+        const newLog = {
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user: currentUserName,
+            action: `إضافة بند فرعي جديد: "${newSub.title}"`
+        };
+
+        const updatedTask = {
+            ...taskObj,
+            subtasks: updatedSubtasks,
+            progress: newProgress,
+            historyLog: [...(taskObj.historyLog || []), newLog],
+            updatedAt: new Date().toISOString().split('T')[0]
+        };
+
+        updateTask(updatedTask);
+        setViewingTask(updatedTask);
+        setNewSubtaskTitle('');
+        addToast({
+            type: 'success',
+            title: 'تم إضافة البند',
+            message: 'تم جدولته ضمن المسار الفعلي التكتيكي للمهمة.'
+        });
+    };
+
+    const handleDeleteSubtask = (taskId: string, subtaskId: string) => {
+        const taskObj = processedTasks.find(t => t.id === taskId);
+        if (!taskObj) return;
+
+        const updatedSubtasks = (taskObj.subtasks || []).filter(s => s.id !== subtaskId);
+        
+        const totalCount = updatedSubtasks.length;
+        const completedCount = updatedSubtasks.filter(s => s.completed).length;
+        const newProgress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+        const currentUserName = 'أستاذ صبري شطا';
+        const newLog = {
+            id: `log-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            user: currentUserName,
+            action: `حذف بند مهام فرعي من أرشيف التكليف`
+        };
+
+        const updatedTask = {
+            ...taskObj,
+            subtasks: updatedSubtasks,
+            progress: newProgress,
+            historyLog: [...(taskObj.historyLog || []), newLog],
+            updatedAt: new Date().toISOString().split('T')[0]
+        };
+
+        updateTask(updatedTask);
+        setViewingTask(updatedTask);
+        addToast({
+            type: 'info',
+            title: 'تم مسح البند الفرعي',
+            message: 'تم تصفية وإعادة حساب نسبة الإنجاز الشاملة.'
+        });
+    };
+
     // UI state
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<AdminTaskStatus | 'OVERDUE' | ''>('');
@@ -349,6 +502,23 @@ export const TaskManagementPage: React.FC = () => {
     const processedTasks = useMemo(() => {
         return tasks.map((task: any, index) => {
             const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== AdminTaskStatus.COMPLETED;
+            
+            // Build fallback subtasks based on category if empty
+            const defaultSubtasks = [
+                { id: `st-${task.id}-1`, title: 'صياغة المسودة والدراسة الفنية للملف الإداري لقضية العمل', completed: (task.progress || 0) >= 25 },
+                { id: `st-${task.id}-2`, title: 'مراجعة الملاحظات واعتمادها مع المستشار المسؤول ورئيس القسم بالمكتب', completed: (task.progress || 0) >= 50 },
+                { id: `st-${task.id}-3`, title: 'الطباعة والتدقيق الثنائي والمطابقة مع متطلبات محاكم الكويت', completed: (task.progress || 0) >= 75 },
+                { id: `st-${task.id}-4`, title: 'المثول وتقديم الطلب / المستند في الدائرة وتسجيله في السجل العام ورقي وإلكتروني الكلي', completed: (task.progress || 0) === 100 }
+            ];
+
+            const taskCourtVenue = task.courtVenue || (
+                index % 6 === 0 ? 'قصر العدل (محافظة العاصمة)' :
+                index % 6 === 1 ? 'مجمع محاكم الرقعي (محافظة الفروانية)' :
+                index % 6 === 2 ? 'مجمع محاكم حولي' :
+                index % 6 === 3 ? 'مجمع محاكم الجهراء' :
+                index % 6 === 4 ? 'مجمع محاكم الأحمدي والمنطقة الجنوبية' : 'بدون مقر محدد (عمل من المكتب)'
+            );
+
             return {
                 ...task,
                 startDate: task.startDate || task.createdAt || new Date().toISOString().split('T')[0],
@@ -361,6 +531,8 @@ export const TaskManagementPage: React.FC = () => {
                     { id: 'h-1', timestamp: task.createdAt + "T09:00:00Z", user: 'صبري شطا (المدير)', action: 'إنشاء التكليف الإداري والربط بالملف القضائي' },
                     { id: 'h-2', timestamp: task.updatedAt ? task.updatedAt + "T11:45:00Z" : task.createdAt + "T11:00:00Z", user: task.assignedTo, action: `تحديث نسبة التقدم وتأكيد المباشرة` }
                 ],
+                subtasks: task.subtasks && task.subtasks.length > 0 ? task.subtasks : defaultSubtasks,
+                courtVenue: taskCourtVenue,
                 isOverdue
             };
         });
@@ -561,6 +733,47 @@ export const TaskManagementPage: React.FC = () => {
         }
     };
 
+    const handleConvertPlanToTask = () => {
+        if (!aiQuery.trim() || !aiResponse) return;
+        
+        const newAIId = `task-ai-${Date.now()}`;
+        
+        const generatedTask: AdminTask = {
+            id: newAIId,
+            title: `خطة مستنبطة ذاتياً: ${aiQuery.trim()}`,
+            description: `الخطة القانونية المعتمدة بواسطة التحليل الميداني الاصطناعي للملف:\n\n${aiResponse}`,
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split('T')[0],
+            assignedTo: 'أحمد محمود المحمد الصباح', // Default to leading lawyer
+            status: AdminTaskStatus.TODO,
+            priority: AdminTaskPriority.HIGH,
+            category: AdminTaskCategory.LEGAL_ADMIN,
+            progress: 0,
+            createdAt: new Date().toISOString().split('T')[0],
+            courtVenue: aiQuery.includes('الرقعي') ? 'مجمع محاكم الرقعي (محافظة الفروانية)' :
+                        aiQuery.includes('حولي') ? 'مجمع محاكم حولي' :
+                        aiQuery.includes('العدل') ? 'قصر العدل (محافظة العاصمة)' :
+                        aiQuery.includes('الأحمدي') ? 'مجمع محاكم الأحمدي والمنطقة الجنوبية' :
+                        aiQuery.includes('الجهراء') ? 'مجمع محاكم الجهراء' : 'بدون مقر محدد (عمل من المكتب)',
+            subtasks: [
+                { id: `${newAIId}-st-1`, title: 'المرحلة 1: دراسة وصياغة البنود والدفوع الاستشارية الفنية', completed: false },
+                { id: `${newAIId}-st-2`, title: 'المرحلة 2: المراجعة الثنائية للملف مع المستشار وتوقيع المسؤول', completed: false },
+                { id: `${newAIId}-st-3`, title: 'المرحلة 3: الطباعة وتوجه وتوطيد وتجهيز الحافظة والمستندات الورقية والطلب', completed: false },
+                { id: `${newAIId}-st-4`, title: 'المرحلة 4: المثول وتسجيل الإيداع رسمياً بالمقر القضائي المعني بالكويت', completed: false }
+            ]
+        };
+
+        addTask(generatedTask);
+        
+        addToast({
+            type: 'success',
+            title: 'تم تشييد التكليف الذكي',
+            message: 'تم توليد المهمة الميدانية وحقنها بجدول القضايا قيد المباشرة بنجاح!'
+        });
+
+        // Switch back to "current" tab
+        setActiveTab('current');
+    };
+
     const handlePrintAction = () => {
         window.print();
     };
@@ -611,10 +824,19 @@ export const TaskManagementPage: React.FC = () => {
                                 <td className="p-5 px-8">
                                     <div className="flex flex-col">
                                         <span className="font-black text-gray-900 dark:text-white group-hover:text-primary transition-colors cursor-pointer" onClick={() => setViewingTask(task)}>{task.title}</span>
-                                        <div className="flex items-center gap-2 mt-1">
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                                             <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">{task.category}</span>
                                             <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
                                             <span className="text-[10px] font-bold text-primary">{task.legalActionType}</span>
+                                            {task.courtVenue && task.courtVenue !== 'بدون مقر محدد (عمل من المكتب)' && (
+                                                <>
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+                                                    <span className="text-[10px] font-black text-violet-650 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/20 px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                                        <MapPin className="w-3 h-3 text-violet-55" />
+                                                        {task.courtVenue}
+                                                    </span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </td>
@@ -684,6 +906,13 @@ export const TaskManagementPage: React.FC = () => {
                                             <UserCircleIcon className="w-3.5 h-3.5" />
                                             <span className="font-bold truncate">{task.assignedTo}</span>
                                         </div>
+
+                                        {task.courtVenue && task.courtVenue !== 'بدون مقر محدد (عمل من المكتب)' && (
+                                            <div className="flex items-center gap-1 text-[10px] text-violet-600 dark:text-violet-400 mb-2">
+                                                <MapPin className="w-3.5 h-3.5 shrink-0 text-violet-500 opacity-80" />
+                                                <span className="font-black truncate" title={task.courtVenue}>{task.courtVenue}</span>
+                                            </div>
+                                        )}
 
                                         <div className="flex items-center justify-between pt-3 border-t border-gray-50 dark:border-gray-850 mt-3 text-[10px] text-gray-500">
                                             <span className="font-medium font-mono">{task.dueDate}</span>
@@ -1006,6 +1235,18 @@ export const TaskManagementPage: React.FC = () => {
                                                                 </div>
                                                             </div>
 
+                                                            {task.courtVenue && task.courtVenue !== 'بدون مقر محدد (عمل من المكتب)' && (
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className="w-8 h-8 rounded-xl bg-violet-505/5 flex items-center justify-center border border-violet-500/10 animate-pulse">
+                                                                        <MapPin className="w-4 h-4 text-violet-500 opacity-75" />
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">المحكمة ومقر تنفيذ الإجراء</p>
+                                                                        <p className="text-xs font-black text-violet-750 dark:text-violet-400 truncate max-w-[180px]" title={task.courtVenue}>{task.courtVenue}</p>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
                                                             <div className="flex items-center gap-3">
                                                                 <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${task.isOverdue ? 'bg-rose-50 border-rose-100' : 'bg-gray-50 dark:bg-dm-background border-gray-100 dark:border-gray-800'}`}>
                                                                     <CalendarDaysIcon className={`w-5 h-5 ${task.isOverdue ? 'text-rose-55' : 'text-gray-400'}`} />
@@ -1306,12 +1547,21 @@ export const TaskManagementPage: React.FC = () => {
 
                             {aiResponse && (
                                 <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="p-8 bg-indigo-50/30 dark:bg-dm-background/50 rounded-3xl border border-indigo-100 dark:border-indigo-900/40">
-                                    <div className="flex justify-between items-center mb-6">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 pb-4 border-b dark:border-indigo-900/20">
                                         <span className="flex items-center gap-2 text-indigo-900 dark:text-indigo-400 font-extrabold text-sm tracking-wide">
                                             <div className="w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping" />
                                             دراسة التخطيط المقترحة للمستشار صبري شطا
                                         </span>
-                                        <Button variant="ghost" size="sm" onClick={() => setAiResponse(null)} className="text-gray-400 hover:text-rose-500">حذف كلي</Button>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                onClick={handleConvertPlanToTask}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-lg shadow-indigo-600/10 rounded-xl"
+                                            >
+                                                تحويل الخطة لمهمة رسمية مميكنة وبنود فرعية
+                                            </Button>
+                                            <Button variant="ghost" size="sm" onClick={() => setAiResponse(null)} className="text-gray-400 hover:text-rose-500 rounded-xl text-xs">حذف كلي</Button>
+                                        </div>
                                     </div>
                                     <div className="markdown-body text-indigo-950 dark:text-gray-200 leading-relaxed text-sm max-w-none">
                                         <ReactMarkdown>{aiResponse}</ReactMarkdown>
@@ -1401,6 +1651,65 @@ export const TaskManagementPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
+
+                        {/* Subtasks Section */}
+                        <div className="space-y-3 p-5 bg-gray-50 dark:bg-dm-background rounded-3xl border dark:border-gray-800">
+                            <h4 className="text-xs font-black text-gray-700 dark:text-gray-300 uppercase tracking-widest flex items-center justify-between">
+                                <span className="flex items-center gap-2">
+                                    <ListBulletIcon className="w-4.5 h-4.5 text-primary" />
+                                    بنود المهام الفرعية وقائمة التحقق الحقلية ({viewingTask.subtasks?.length || 0})
+                                </span>
+                                <span className="text-[10px] font-bold text-primary">تحكم تفاعلي مباشر</span>
+                            </h4>
+
+                            {/* Checklist */}
+                            <div className="space-y-2 mt-2 max-h-48 overflow-y-auto">
+                                {viewingTask.subtasks && viewingTask.subtasks.map((st: any) => (
+                                    <div key={st.id} className="flex justify-between items-center bg-white dark:bg-dm-card p-2.5 rounded-xl border dark:border-gray-850 hover:bg-gray-50/50 dark:hover:bg-dm-background/50 transition-all select-none group">
+                                        <label className="flex items-center gap-2.5 cursor-pointer text-xs font-bold w-full">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={st.completed} 
+                                                onChange={() => handleToggleSubtask(viewingTask.id, st.id)}
+                                                className="w-4 h-4 rounded text-primary focus:ring-primary accent-primary cursor-pointer"
+                                            />
+                                            <span className={`${st.completed ? 'line-through text-gray-400 dark:text-gray-505 font-medium' : 'text-gray-700 dark:text-gray-200'}`}>
+                                                {st.title}
+                                            </span>
+                                        </label>
+                                        <button 
+                                            onClick={() => handleDeleteSubtask(viewingTask.id, st.id)} 
+                                            className="p-1 text-gray-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                                            title="حذف البند الفرعي"
+                                        >
+                                            <TrashIcon className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {(!viewingTask.subtasks || viewingTask.subtasks.length === 0) && (
+                                    <p className="text-center py-4 text-[11px] text-gray-400 font-bold">لا يوجد قائمة بنود فرعية مسجلة حالياً لهذه المهمة.</p>
+                                )}
+                            </div>
+
+                            {/* Add new subtask form */}
+                            <div className="flex gap-2 items-center mt-3 pt-2 border-t dark:border-gray-800">
+                                <input 
+                                    type="text" 
+                                    value={newSubtaskTitle}
+                                    onChange={(e) => setNewSubtaskTitle(e.target.value)}
+                                    placeholder="إضافة بند فرعي لتتبع الإنجاز..."
+                                    className="flex-grow text-xs font-bold p-2.5 px-4 bg-white dark:bg-dm-card border border-gray-100 dark:border-gray-800 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+                                />
+                                <Button 
+                                    size="sm" 
+                                    onClick={() => handleAddSubtask(viewingTask.id)}
+                                    className="rounded-xl font-bold px-4 hover:scale-105 transform transition-all text-xs"
+                                >
+                                    إضافة بند
+                                </Button>
+                            </div>
+                        </div>
 
                         {/* PDF Printable & Documents Section with Simulated upload */}
                         <div className="space-y-3">

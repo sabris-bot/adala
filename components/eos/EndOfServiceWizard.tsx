@@ -2,11 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   X, Scale, Coins, Calendar, ShieldAlert, Laptop, 
   CheckSquare, Check, Sparkles, HelpCircle, ArrowRight, ArrowLeft,
-  AlertOctagon, Key, UserCheck, Award
+  AlertOctagon, Key, UserCheck, Award, Briefcase, FileText, Printer, ShieldCheck
 } from 'lucide-react';
 import { TerminationReasonKuwait, ContractTypeKuwait, EOS_Settlement } from '../../types';
 import { initialExtendedEmployees, ExtendedEmployee } from '../../data/employeeExtendedData';
 import { calculateKuwaitEOS } from '../../services/eosService';
+import { useLanguage } from '../i18n/LanguageProvider';
 
 interface EndOfServiceWizardProps {
   onClose: () => void;
@@ -16,22 +17,84 @@ interface EndOfServiceWizardProps {
 
 // 16 Detailed Kuwaiti Labor Law Termination Scenarios
 const TERMINATION_SCENARIOS = [
-  { id: 'resignation_standard', label: 'استقالة رسمية بموجب المادة 53', enumValue: TerminationReasonKuwait.RESIGNATION, category: 'employee', gratuity: 'مقياس الخدمة', lawArticle: 'المادة (٥٣)', desc: 'تخضع لسنوات الخدمة: أقل من ٣ (لا تستحق)، ٣-٥ (نصف)، ٥-١٠ (ثلثين)، ١٠+ (كامل)' },
-  { id: 'dismissal_notice', label: 'إنهاء من قبل صاحب العمل مع إخطار', enumValue: TerminationReasonKuwait.DISMISSAL_WITH_NOTICE, category: 'employer', gratuity: '١٠0% كاملة', lawArticle: 'المادة (٤٤) و(٥١)', desc: 'إنهاء فردي أو جماعي بقرار المنشأة مع الوفاء بمهلة إنذار عمالي ٣ أشهر' },
-  { id: 'dismissal_art41', label: 'فصل تأديبي بسبب خطأ مادة 41', enumValue: TerminationReasonKuwait.DISMISSAL_WITHOUT_NOTICE_ART_41, category: 'employer', gratuity: 'حرمان تام (0%)', lawArticle: 'المادة (٤١)', desc: 'فصل تسبيبي لغياب مستمر، إفشاء أسرار، خسارة مادية جسيمة أو اعتداء عمالي' },
-  { id: 'contract_expiry_lim', label: 'انتهاء العقد محدد المدة دون تجديد', enumValue: TerminationReasonKuwait.CONTRACT_EXPIRY, category: 'contract', gratuity: '١00% كاملة', lawArticle: 'مستحقات العقد', desc: 'انقضاء الأجل القانوني للعلاقة العمالية المبرمة للمدة دون رغبة بتجديده' },
-  { id: 'consensual_settlement', label: 'إنهاء الخدمة بالتراضي والاتفاق المتساوي', enumValue: TerminationReasonKuwait.CONSENSUAL_TERMINATION, category: 'contract', gratuity: '١00% توافقية', lawArticle: 'التراضي العمالي', desc: 'حل العلاقة ودياً بالتراضي وحوسبة صافي المستحقات رضائياً خارج ساحة الخلاف' },
-  { id: 'retirement_active', label: 'التقاعد الذاتي المعمول به قانوناً', enumValue: TerminationReasonKuwait.RETIREMENT, category: 'employee', gratuity: '١00% كاملة', lawArticle: 'مادة بلوغ السن', desc: 'صرف المستحقات لبلوغ السن القانونية عمالياً أو الاستحقاق للتقاعد الوطني التأميني' },
-  { id: 'death_indemnity', label: 'وفاة الموظف (المكافأة للورثة الشرعيين)', enumValue: TerminationReasonKuwait.DEATH, category: 'legal_event', gratuity: '١00% للورثة', lawArticle: 'الشرع وقانون العمل', desc: 'وفاة طبيعية أو أثناء أداء الواجب العمالي، تصرف المستحقات لصالح الأنصبة الشرعية' },
-  { id: 'health_disability', label: 'عجز صحي كلي أو جزئي مانع للعمل', enumValue: TerminationReasonKuwait.TOTAL_DISABILITY, category: 'legal_event', gratuity: '١00% كاملة', lawArticle: 'اللجنة الطبية العامة', desc: 'ثبوت عدم القدرة الصحية على أداء مهام الكادر بتقرير رسمي مبرم' },
-  { id: 'probation_dismissal_active', label: 'إنهاء الخدمة بقرار الشركة خلال التجربة', enumValue: TerminationReasonKuwait.PROBATION_TERMINATION, category: 'employer', gratuity: 'لا مكافأة (0%)', lawArticle: 'فترة المية يوم', desc: 'الفصل خلال أول ١٠٠ يوم للعمل بتقرير لعدم كفاءة العامل وصلاحيته' },
-  { id: 'probation_resignation_active', label: 'انسحاب واستقالة العامل خلال فترة التجربة', enumValue: TerminationReasonKuwait.PROBATION_RESIGNATION, category: 'employee', gratuity: 'لا مكافأة', lawArticle: 'المرحلة العقدية الأولى', desc: 'ترك العمل برغبة الكادر طوعياً خلال مئة اليوم الأولى من الارتباط والالتحاق' },
-  { id: 'leaving_work_art48', label: 'ترك العمل طوعياً لخطأ صاحب العمل مادة 48', enumValue: TerminationReasonKuwait.RESIGNATION_ART_48_EMPLOYER_FAULT, category: 'employee', gratuity: '١00% كاملة', lawArticle: 'المادة (٤٨)', desc: 'ترك العمل لتعرض الموظف لاعتداء، تزوير الشروط، أو مهددات السلامة بالمنشأة' },
-  { id: 'absence_breach_42', label: 'إنهاء المباشرة للانقطاع والغياب عشوائياً مادة 42', enumValue: TerminationReasonKuwait.TERMINATION_FOR_ABSENCE, category: 'employer', gratuity: 'بلا مكافأة مادة 41', lawArticle: 'المادة (٤٢)', desc: 'الانقطاع دون إبلاغ لأكثر من ٧ أيام متصلة أو ١٥ يوماً منفصلة خلال العام العمالي' },
-  { id: 'visa_transfer_cancel', label: 'إلغاء الإقامة أو نقل الكفالة القانونية', enumValue: TerminationReasonKuwait.DISMISSAL_WITH_NOTICE, category: 'legal_event', gratuity: 'كاملة عمالياً', lawArticle: 'شؤون الإقامة والهيئة', desc: 'تعذر تجديد وتوثيق الإقامة أو طلب النقل لظروف نظامية متعلقة بضوابط شؤون الإقامة' },
-  { id: 'redundancy_shutdown', label: 'إعادة الهيكلة وتصفية فرع أو إغلاق المنشأة', enumValue: TerminationReasonKuwait.CLOSURE_OR_BANKRUPTCY, category: 'employer', gratuity: '١00% كاملة', lawArticle: 'إنهاء نظامي جماعي', desc: 'التسريح المبرر لإفلاس الكيان القانوني أو تسييل الأصول لظروف استثنائية معتمدة' },
-  { id: 'arbitration_conflict', label: 'تسوية نزاع عمالي ودي بوزارة القوى العاملة', enumValue: TerminationReasonKuwait.CONSENSUAL_TERMINATION, category: 'legal_event', gratuity: 'مقطوع / متصالح', lawArticle: 'الصلح والتراضي الموثق', desc: 'عقد تسوية ودية موحدة لإنهاء النزاع وتسجيل مخالصة مديونية قبل الذهاب للمحاكم' },
-  { id: 'marriage_res_woman', label: 'استقالة عمالية بسبب الزواج للمرأة مادة 54', enumValue: TerminationReasonKuwait.MARRIAGE_RESIGNATION_WOMEN, category: 'employee', gratuity: '١00% كاملة', lawArticle: 'المادة (٥٤)', desc: 'استقالة الموظفة بسبب عقد زواجها المثبت خلال سنة من إبرام الزواج عمالياً' }
+  {
+    id: 'resignation_standard',
+    labelAr: 'استقالة رسمية بموجب المادة 53',
+    labelEn: 'Formal Resignation under Article 53',
+    enumValue: TerminationReasonKuwait.RESIGNATION,
+    category: 'employee',
+    gratuityAr: 'مقياس الخدمة',
+    gratuityEn: 'Service Scale',
+    lawArticleAr: 'المادة (٥٣)',
+    lawArticleEn: 'Article (53)',
+    descAr: 'تخضع لسنوات الخدمة: أقل من ٣ (لا تستحق)، ٣-٥ (نصف)، ٥-١٠ (ثلثين)، ١٠+ (كامل)',
+    descEn: 'Subject to service years: <3 (none), 3-5 (half), 5-10 (two-thirds), 10+ (full)'
+  },
+  {
+    id: 'dismissal_notice',
+    labelAr: 'إنهاء من قبل صاحب العمل مع إخطار',
+    labelEn: 'Dismissal by Employer with Notice',
+    enumValue: TerminationReasonKuwait.DISMISSAL_WITH_NOTICE,
+    category: 'employer',
+    gratuityAr: '١٠0% كاملة',
+    gratuityEn: '100% Full',
+    lawArticleAr: 'المادة (٤٤) و(٥١)',
+    lawArticleEn: 'Articles (44) & (51)',
+    descAr: 'إنهاء فردي أو جماعي بقرار المنشأة مع الوفاء بمهلة إنذار عمالي ٣ أشهر',
+    descEn: 'Individual or collective termination by employer with 3-month legal notice met'
+  },
+  {
+    id: 'dismissal_art41',
+    labelAr: 'فصل تأديبي بسبب خطأ مادة 41',
+    labelEn: 'Disciplinary Dismissal without Notice (Art. 41)',
+    enumValue: TerminationReasonKuwait.DISMISSAL_WITHOUT_NOTICE_ART_41,
+    category: 'employer',
+    gratuityAr: 'حرمان تام (0%)',
+    gratuityEn: 'Total Forfeiture (0%)',
+    lawArticleAr: 'المادة (٤١)',
+    lawArticleEn: 'Article (41)',
+    descAr: 'فصل تسبيبي لغياب مستمر، إفشاء أسرار، خسارة مادية جسيمة أو اعتداء عمالي',
+    descEn: 'Cause-based dismissal for continuous absence, disclosing secrets, gross material loss, or assault'
+  },
+  {
+    id: 'contract_expiry_lim',
+    labelAr: 'انتهاء العقد محدد المدة دون تجديد',
+    labelEn: 'Expiry of Limited-Term Contract without Renewal',
+    enumValue: TerminationReasonKuwait.CONTRACT_EXPIRY,
+    category: 'contract',
+    gratuityAr: '١00% كاملة',
+    gratuityEn: '100% Full',
+    lawArticleAr: 'مستحقات العقد',
+    lawArticleEn: 'Contractual Dues',
+    descAr: 'انقضاء الأجل القانوني للعلاقة العمالية المبرمة للمدة دون رغبة بتجديده',
+    descEn: 'Expiration of the legal duration of the employment relation with no intent to renew'
+  },
+  {
+    id: 'consensual_settlement',
+    labelAr: 'إنهاء الخدمة بالتراضي والاتفاق المتساوي',
+    labelEn: 'Mutual and Consensual Settlement Agreement',
+    enumValue: TerminationReasonKuwait.CONSENSUAL_TERMINATION,
+    category: 'contract',
+    gratuityAr: '١00% توافقية',
+    gratuityEn: '100% Amicable',
+    lawArticleAr: 'التراضي العمالي',
+    lawArticleEn: 'Mutual Agreement',
+    descAr: 'حل العلاقة ودياً بالتراضي وحوسبة صافي المستحقات رضائياً خارج ساحة الخلاف',
+    descEn: 'Friendly dissolution of relationship by consent and calculating net dues amicably outside dispute'
+  },
+  {
+    id: 'retirement_active',
+    labelAr: 'التقاعد الذاتي المعمول به قانوناً',
+    labelEn: 'Statutory Retirement at Legal Age',
+    enumValue: TerminationReasonKuwait.RETIREMENT,
+    category: 'employee',
+    gratuityAr: '١00% كاملة',
+    gratuityEn: '100% Full',
+    lawArticleAr: 'مادة بلوغ السن',
+    lawArticleEn: 'Retirement Age',
+    descAr: 'صرف المستحقات لبلوغ السن القانونية عمالياً أو الاستحقاق للتقاعد الوطني التأميني',
+    descEn: 'Disbursement of dues for reaching the legal labor age or eligibility for national pension'
+  }
 ];
 
 export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
@@ -39,6 +102,9 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
   onSave,
   editCase
 }) => {
+  const { language } = useLanguage();
+  const isAr = language === 'ar';
+
   const [activeStep, setActiveStep] = useState<number>(1);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('');
   
@@ -139,7 +205,7 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
 
     setFormFields(prev => ({
       ...prev,
-      employeeName: emp.fullNameAr,
+      employeeName: isAr ? emp.fullNameAr : (emp.fullNameEn || emp.fullNameAr),
       employeeCivilId: emp.civilId,
       jobTitle: emp.jobTitle,
       department: emp.department || 'إداري',
@@ -150,11 +216,13 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
       loansDeduction: activeLoansSum,
       joiningDate: emp.joiningDate || '2022-01-01',
       disciplinaryDeductions: disciplinaryPenaltySum,
-      notes: `تم ربط التصفية الشاملة تلقائياً بسجل الموظف رقم الكادر (${emp.employeeId}).`
+      notes: isAr 
+        ? `تم ربط التصفية الشاملة تلقائياً بسجل الموظف رقم الكادر (${emp.employeeId}).`
+        : `Dossier bound automatically to employee staff record ID (${emp.employeeId}).`
     }));
   };
 
-  // Perform live EOS benefit calculations using existing services
+  // Perform live EOS benefit calculations
   const liveCalculationResult = useMemo(() => {
     try {
       const basic = Number(formFields.basicSalary) || 0;
@@ -191,13 +259,13 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
   // Dispatch fully prepared case to parent state
   const handleSaveLocal = () => {
     if (!formFields.employeeName || !formFields.employeeCivilId) {
-      alert('يجب ملء اسم الموظف ورقمه المدني أولاً للمباشرة بالاعتماد.');
+      alert(isAr ? 'يجب ملء اسم الموظف ورقمه المدني أولاً للمباشرة بالاعتماد.' : 'Employee Name and Civil ID must be filled first.');
       return;
     }
 
-    const calculated = liveCalculationResult;
-    if (!calculated) {
-      alert('حدث خطأ أثناء رصد العمليات الحسابية للمكافأة، يرجى التحقق من أرقام المدخلات.');
+    const compiled = liveCalculationResult;
+    if (!compiled) {
+      alert(isAr ? 'حدث خطأ أثناء رصد العمليات الحسابية للمكافأة، يرجى التحقق من أرقام المدخلات.' : 'An error occurred during calculation. Please check numeric inputs.');
       return;
     }
 
@@ -216,558 +284,461 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({
       basicSalary: Number(formFields.basicSalary),
       allowances: Number(formFields.allowances),
       grossSalary: Number(formFields.basicSalary) + Number(formFields.allowances),
-      serviceYears: calculated.serviceYears,
-      serviceMonths: calculated.serviceMonths,
-      serviceDays: calculated.serviceDays,
-      indemnityAmount: calculated.indemnityAmount,
-      leaveBalanceAmount: calculated.leavePayAmount,
-      accruedSalaryAmount: calculated.accruedSalaryAmount || 0,
-      noticePeriodAmount: calculated.noticePeriodPay,
+      serviceYears: compiled.serviceYears,
+      serviceMonths: compiled.serviceMonths,
+      serviceDays: compiled.serviceDays,
+      indemnityAmount: compiled.indemnityAmount,
+      leaveBalanceAmount: compiled.leavePayAmount,
+      accruedSalaryAmount: compiled.accruedSalaryAmount || 0,
+      noticePeriodAmount: compiled.noticePeriodPay,
       otherBonuses: Number(formFields.otherBonuses),
       loansDeduction: Number(formFields.loansDeduction),
       absenceDeduction: Number(formFields.absenceDays) * ((Number(formFields.basicSalary) + Number(formFields.allowances)) / 26),
       otherDeductions: 0,
-      netPayable: calculated.netAmount,
-      legalArticles: calculated.legalArticles.map(a => `المادة (${a.article}): ${a.text.slice(0, 110)}...`),
-      preparedBy: editCase?.preparedBy || 'شؤون الموظفين - الوجيان',
-      notes: formFields.notes || 'تسوية صادر آلياً عن عدالة سيستم.',
-      approvals: editCase?.approvals || { hr: 'مكتمل', legal: 'معلق', finance: 'معلق', gm: 'معلق' },
-      signatures: editCase?.signatures || { employee: '', hr: 'شيرين النجار', fin: '', legal: '' },
-      nationality: formFields.nationality,
-      contractType: formFields.contractType,
-      leaveBalanceDays: calculated.leaveBalanceDays,
-      disciplinaryDeductions: Number(formFields.disciplinaryDeductions),
-      finalMonthWorkedDays: Number(formFields.finalMonthWorkedDays),
-      unpaidLeaveDays: Number(formFields.unpaidLeaveDays),
-      absenceDays: Number(formFields.absenceDays),
-      timeline: editCase?.timeline || [
-        { date: new Date().toISOString().split('T')[0], actionAr: 'تأسيس وبدء معالجة ملف براءة الذمة الشاملة', actionEn: 'Profile registered under audits', user: 'عدالة سيستم' }
-      ]
+      netPayable: compiled.netAmount,
+      legalArticles: compiled.legalArticles.map(a => isAr ? `المادة (${a.article}): ${a.text.slice(0, 110)}...` : `Article ${a.article}: ${a.text.slice(0, 110)}...`),
+      preparedBy: editCase?.preparedBy || (isAr ? 'شؤون الموظفين - الوجيان' : 'HR Personnel - Al-Wajayan'),
+      notes: formFields.notes,
+      approvals: editCase?.approvals || { hr: 'مكتمل', legal: 'بانتظار', finance: 'بانتظار', gm: 'معلق' },
+      signatures: editCase?.signatures || { employee: '', hr: '', legal: '', fin: '' }
     };
 
     onSave(compiledCase);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      {/* Dark backdrop element */}
-      <div 
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50 backdrop-blur-xs transition-opacity"
-      />
+  const stepsList = [
+    { num: 1, title: 'بيانات الكادر' },
+    { num: 2, title: 'الظرف القانوني' },
+    { num: 3, title: 'مرتبات وبدلات' },
+    { num: 4, title: 'تصفية الإجازات' },
+    { num: 5, title: 'الخصومات والعهد' },
+    { num: 6, title: 'مكافأة مادة 51' },
+    { num: 7, title: 'مراجعة الموازنة' },
+    { num: 8, title: 'الاعتماد والمستندات' }
+  ];
 
-      {/* Slide-out Sheet drawer */}
-      <div className="relative w-full max-w-xl bg-white dark:bg-dm-card h-full shadow-2xl flex flex-col z-10 text-right p-6 overflow-hidden">
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-white border border-slate-200 rounded-3xl shadow-xl w-full max-w-4xl overflow-hidden text-right font-sans my-8" dir={isAr ? 'rtl' : 'ltr'}>
         
-        {/* Draw Header */}
-        <div className="flex justify-between items-center border-b border-gray-100 dark:border-gray-800 pb-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <Scale className="w-5 h-5 text-primary" />
-            <h3 className="text-sm font-extrabold text-gray-900 dark:text-white">
-              {editCase ? `تحديث ومراجعة تصفية عمالية (${editCase.settlementNumber})` : 'معالج احتساب تصفية عمالية ومخالصة جديدة'}
-            </h3>
-          </div>
+        {/* Header bar */}
+        <div className="bg-slate-50 border-b border-slate-100 p-5 flex items-center justify-between select-none">
           <button 
             onClick={onClose}
-            className="w-8 h-8 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-lg cursor-pointer border-none bg-transparent focus:outline-none"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
+          <span className="text-xs sm:text-sm font-black text-slate-800 flex items-center gap-1">
+            <Briefcase className="w-4 h-4 text-[#00796B]" />
+            <span>{editCase ? 'تعديل ملف تصفية الخدمة' : 'مساعد إعداد وتوثيق براءة الذمة العمالية'}</span>
+          </span>
         </div>
 
-        {/* Wizard Stepper bar */}
-        <div className="flex justify-between items-center my-4 p-2 bg-gray-50 dark:bg-slate-950/60 rounded-xl border border-gray-150 dark:border-gray-800 shrink-0 select-none">
-          {[
-            { step: 1, label: 'البيانات الأساسية' },
-            { step: 2, label: 'سبب التصفية' },
-            { step: 3, label: 'رصيد الإجازات' },
-            { step: 4, label: 'دائن ومدين' },
-            { step: 5, label: 'العهد والاعتمادات' }
-          ].map(s => (
-            <button
-              key={s.step}
-              onClick={() => setActiveStep(s.step)}
-              className={`flex-1 text-center py-2 rounded-lg text-[9px] sm:text-[10px] font-black transition-all cursor-pointer ${activeStep === s.step ? 'bg-primary text-white shadow-sm font-black' : 'text-gray-450 hover:text-gray-700 dark:hover:text-gray-300'}`}
-            >
-              <span>{s.step}. {s.label}</span>
-            </button>
-          ))}
+        {/* 8 Step flow indicators */}
+        <div className="bg-slate-50/50 px-6 py-4 border-b border-slate-100 overflow-x-auto">
+          <div className="flex items-center justify-between min-w-[700px] select-none">
+            {stepsList.map((st, idx) => (
+              <React.Fragment key={st.num}>
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black border transition-all ${activeStep === st.num ? 'bg-[#00796B] text-white border-[#00796B]' : activeStep > st.num ? 'bg-emerald-100 text-[#00796B] border-[#00796B]' : 'bg-white text-slate-400 border-slate-200'}`}>
+                    {activeStep > st.num ? <Check className="w-3.5 h-3.5" /> : st.num}
+                  </div>
+                  <span className={`text-[10px] font-black ${activeStep === st.num ? 'text-slate-900 underline' : 'text-slate-400'}`}>{st.title}</span>
+                </div>
+                {idx < stepsList.length - 1 && (
+                  <div className={`flex-1 h-[2px] mx-2 transition-colors ${activeStep > st.num ? 'bg-[#00796B]' : 'bg-slate-200'}`} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
         </div>
 
-        {/* ACTIVE MODULE CONTAINER SENSITIVELY */}
-        <div className="flex-1 overflow-y-auto px-1 py-1 space-y-4">
+        {/* Main Step content inputs */}
+        <div className="p-6 sm:p-8 max-h-[480px] overflow-y-auto">
           
-          {/* STEP 1: Basic Info & DB Connection */}
+          {/* STEP 1: EMPLOYEE DATA LINK */}
           {activeStep === 1 && (
-            <div className="space-y-4 text-xs font-semibold text-gray-700 dark:text-gray-300">
-              
-              <div className="p-4 bg-primary/5 dark:bg-primary-dark/20 border border-primary/20 rounded-xl space-y-2">
-                <label className="block text-[11px] font-extrabold text-primary dark:text-primary-light">
-                  ربط السند ببطاقة الموظف بقاعدة كادر الوجيان (Kader Link):
-                </label>
+            <div className="space-y-4">
+              <div className="p-4 bg-emerald-500/5 text-[#00796B] border border-emerald-100 rounded-2xl text-xs font-bold leading-normal">
+                اختر الموظف من قاعدة الكوادر والملفات المدمجة لإدراج الراتب الأساسي، التواقيع المسبقة، الإجازات المستعملة والأرصدة العينية لفض تضارب البيانات تلقائياً.
+              </div>
+
+              <div className="space-y-1.5 select-none font-bold text-xs">
+                <label className="text-[10px] font-extrabold text-slate-400 block">ربط بسجل الموظفين المعينين</label>
                 <select
                   value={selectedEmployeeId}
-                  onChange={e => handleEmployeeSelection(e.target.value)}
-                  className="w-full h-10 px-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-bold outline-none text-gray-800 dark:text-white cursor-pointer"
+                  onChange={(e) => handleEmployeeSelection(e.target.value)}
+                  className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-Tajawal font-bold"
                 >
-                  <option value="">-- اختر موظفاً لسحب موازنة الأجور والعهد تلقائياً --</option>
+                  <option value="">-- إدراج يدوي غير مربوط بالملف --</option>
                   {initialExtendedEmployees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.jobTitle})</option>
+                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.employeeId})</option>
                   ))}
                 </select>
-                <p className="text-[9.5px] text-gray-400">عند اختيار ملف، تسحب تصفية الراتب والخصومات للأيام الماضية والمكافآت آلياً وبدقة.</p>
               </div>
 
-              {/* Warnings and profile indicators showing DB linkage */}
-              {linkedEmployee && (
-                <div className="p-3.5 bg-amber-500/5 border border-amber-500/10 rounded-xl space-y-2 text-[10px] leading-relaxed">
-                  <p className="font-extrabold text-amber-500 flex items-center gap-1">
-                    <ShieldAlert className="w-4 h-4" />
-                    <span>ملاحظات نظام الامتثال لسجل الموظف ({linkedEmployee.fullNameAr}):</span>
-                  </p>
-                  <ul className="list-disc pr-4 space-y-1 text-gray-600 dark:text-gray-400 font-bold">
-                    <li>ديون السلف النشطة: <span className="font-mono text-gray-900 dark:text-white font-black">{linkedEmployee.loans?.filter(l => l.status === 'Active').reduce((sum, l) => sum + l.balanceAmount, 0) || 0} د.ك</span></li>
-                    <li>العقوبات والإنذارات: <span className="font-mono text-red-500 font-black">{linkedEmployee.disciplinaryActions?.length || 0} إنذارات إدارية</span></li>
-                    <li>مؤشر التقييم الفني: <span className="font-sans text-emerald-600 font-black flex items-center gap-1 text-[9.5px]"><Award className="w-3.5 h-3.5 inline" /> {linkedEmployee.evaluations?.[0]?.overallScore || 'لا يوجد تقييم'} / 100</span></li>
-                  </ul>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 focus-within:border-[#00796B]">
+                  <label className="text-[10px] font-bold text-slate-450 block">اسم الموظف الثلاثي</label>
+                  <input
+                    type="text"
+                    value={formFields.employeeName}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, employeeName: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs"
+                    placeholder="الأسم المعتمد بوزارة الشؤون"
+                  />
                 </div>
-              )}
 
-              <div className="space-y-1">
-                <label className="block text-[10px] font-bold text-gray-400">اسم الموظف الثلاثي (بالبطاقة المدنية)</label>
-                <input 
-                  type="text" 
-                  value={formFields.employeeName}
-                  onChange={e => setFormFields({...formFields, employeeName: e.target.value})}
-                  className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white font-bold rounded-lg border border-gray-200 dark:border-gray-800 outline-none focus:border-primary"
-                  placeholder="محمد عبدالرحمن المطيري"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">البطاقة المدنية (١٢ خانة)</label>
-                  <input 
-                    type="text" 
-                    maxLength={12}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-450 block">الرقم المدني الكويتي</label>
+                  <input
+                    type="text"
                     value={formFields.employeeCivilId}
-                    onChange={e => setFormFields({...formFields, employeeCivilId: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white font-mono rounded-lg border border-gray-200 outline-none"
-                    placeholder="286010212345"
+                    onChange={(e) => setFormFields(prev => ({ ...prev, employeeCivilId: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-left"
+                    placeholder="290000000000"
                   />
                 </div>
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">المسمى الوظيفي والصفة</label>
-                  <input 
-                    type="text" 
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 text-right font-bold text-xs select-none">
+                  <label className="text-[10px] text-slate-450 block">المسمى والوظيفة</label>
+                  <input
+                    type="text"
                     value={formFields.jobTitle}
-                    onChange={e => setFormFields({...formFields, jobTitle: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white font-bold rounded-lg border border-gray-200 outline-none"
-                    placeholder="مدير مبيعات أول"
+                    onChange={(e) => setFormFields(prev => ({ ...prev, jobTitle: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">تاريخ بدء العمل (التعيين)</label>
-                  <input 
-                    type="date" 
-                    value={formFields.joiningDate}
-                    onChange={e => setFormFields({...formFields, joiningDate: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white rounded-lg border border-gray-200 outline-none"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">تاريخ المباشرة الأخير (الخروج)</label>
-                  <input 
-                    type="date" 
-                    value={formFields.lastWorkingDay}
-                    onChange={e => setFormFields({...formFields, lastWorkingDay: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white rounded-lg border border-gray-200 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">القطاع العمالي القانوني</label>
-                  <select
-                    value={formFields.sector}
-                    onChange={e => setFormFields({...formFields, sector: e.target.value as any})}
-                    className="w-full h-10 px-2 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white rounded-lg border border-gray-200 outline-none cursor-pointer"
-                  >
-                    <option value="private">💼 القطاع الأهلي (قانون عمل 6/2010)</option>
-                    <option value="oil">🏭 القطاع النفطي والمصارف (قانون 28/1969)</option>
-                    <option value="government">🏛️ ديوان الخدمة (csc لغير الكويتيين)</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">طبيعة صك عقد العمل المبرم</label>
-                  <select
-                    value={formFields.contractType}
-                    onChange={e => setFormFields({...formFields, contractType: e.target.value as any})}
-                    className="w-full h-10 px-2 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white rounded-lg border border-gray-200 outline-none cursor-pointer"
-                  >
-                    <option value={ContractTypeKuwait.UNLIMITED}>غير محدد المدة (Unlimited)</option>
-                    <option value={ContractTypeKuwait.LIMITED}>محدد المدة (Limited)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">الجنسية والتبعية</label>
-                  <input 
-                    type="text" 
-                    value={formFields.nationality}
-                    onChange={e => setFormFields({...formFields, nationality: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white font-bold rounded-lg border border-gray-200 outline-none"
-                    placeholder="كويتي"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-bold text-gray-400">الشعبة / الإدارة والفرع</label>
-                  <input 
-                    type="text" 
+                <div className="space-y-1.5 text-right font-bold text-xs select-none">
+                  <label className="text-[10px] text-slate-450 block">القسم والقطاع الإداري</label>
+                  <input
+                    type="text"
                     value={formFields.department}
-                    onChange={e => setFormFields({...formFields, department: e.target.value})}
-                    className="w-full h-10 px-3 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white font-bold rounded-lg border border-gray-200 outline-none"
+                    onChange={(e) => setFormFields(prev => ({ ...prev, department: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs"
                   />
                 </div>
               </div>
-
             </div>
           )}
 
-          {/* STEP 2: Kuwait Law 16 Termination Reason Details */}
+          {/* STEP 2: LEGAL TERMINATION SCENARIO */}
           {activeStep === 2 && (
-            <div className="space-y-3">
-              <p className="text-[11px] font-black text-gray-400 text-right">رصد وتكييف سبب انتهاء خدمة الكادر طبقاً للأحكام (16 سيناريو):</p>
+            <div className="space-y-4">
+              <span className="text-[10.5px] font-extrabold uppercase tracking-widest text-[#00796B] bg-[#00796B]/5 px-2 py-0.5 rounded">تصنيف الظروف والبنود القانونية</span>
+              <p className="text-xs text-slate-400 font-semibold mt-1">تؤثر أسباب ونسب المغادرة العمالية على مكافأة مادة 51 والتدقيق الإبرائي للمحاكم تلقائياً:</p>
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[380px] overflow-y-auto pr-1">
-                {TERMINATION_SCENARIOS.map(sc => {
-                  const isSelected = formFields.terminationReason === sc.enumValue;
-                  return (
-                    <div
-                      key={sc.id}
-                      onClick={() => setFormFields({...formFields, terminationReason: sc.enumValue})}
-                      className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${isSelected ? 'bg-primary/10 border-primary text-primary-dark dark:text-primary-light' : 'bg-gray-50 dark:bg-slate-900/40 border-gray-150 dark:border-gray-800 hover:bg-gray-100'}`}
-                    >
-                      <div className="flex justify-between items-start text-right">
-                        <span className="text-xs font-black">{sc.label}</span>
-                        <span className="text-[8px] bg-primary/20 text-primary-dark dark:text-primary-light font-bold px-1 py-0.5 rounded font-mono shrink-0 select-none">{sc.lawArticle}</span>
-                      </div>
-                      <p className="text-[9.5px] text-gray-400 dark:text-gray-450 mt-1 leading-normal font-bold">{sc.desc}</p>
-                      <div className="flex justify-between items-center mt-2.5 border-t border-gray-250/20 pt-1 text-[8px] font-bold opacity-80">
-                        <span>الامتياز المالي للمغادرة:</span>
-                        <span className="font-mono text-primary font-bold">{sc.gratuity}</span>
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {TERMINATION_SCENARIOS.map(sc => (
+                  <div
+                    key={sc.id}
+                    onClick={() => setFormFields(prev => ({ ...prev, terminationReason: sc.enumValue }))}
+                    className={`p-4 border rounded-2xl cursor-pointer text-right space-y-2 select-none hover:border-[#00796B] transition-colors ${formFields.terminationReason === sc.enumValue ? 'bg-[#00796B]/5 border-[#00796B]' : 'bg-slate-50 border-slate-200'}`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[9.5px] bg-[#00796B] text-white px-2 py-0.5 rounded font-bold font-serif">{sc.lawArticleAr}</span>
+                      <h4 className="text-xs font-black text-slate-800">{sc.labelAr}</h4>
                     </div>
-                  );
-                })}
+                    <p className="text-[10px] text-slate-500 leading-relaxed font-bold">{sc.descAr}</p>
+                    <span className="text-[9px] text-[#00796B] block font-black">المكافأة المقدرة: {sc.gratuityAr}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* STEP 3: Annual Leaves Liquidation */}
+          {/* STEP 3: CONTRACT & SALARIES */}
           {activeStep === 3 && (
-            <div className="space-y-4 font-semibold text-gray-750 dark:text-gray-300">
-              <div className="p-4 bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/10 rounded-2xl space-y-3">
-                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 flex items-center gap-1 leading-none pb-2 border-b border-emerald-500/10 mb-1">
-                  <Calendar className="w-4 h-4" />
-                  <span>تسييل كاش رصيد الإجازات السنوية (مادة 70 عمالي)</span>
-                </span>
-                
-                <div className="grid grid-cols-3 gap-2 text-xs font-bold">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">رصيد الإجازات الكلي</label>
-                    <input 
-                      type="number" 
-                      value={formFields.leaveEntitlement}
-                      onChange={e => setFormFields({...formFields, leaveEntitlement: Math.max(0, Number(e.target.value))})}
-                      className="w-full h-10 px-2 bg-white dark:bg-slate-900 rounded-lg border text-center font-mono font-bold outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">الإجازات المستهلكة (Used)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.leaveTaken}
-                      onChange={e => setFormFields({...formFields, leaveTaken: Math.max(0, Number(e.target.value))})}
-                      className="w-full h-10 px-2 bg-white dark:bg-slate-900 rounded-lg border text-center font-mono font-bold outline-none"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">تعديلات الرصيد (+/-)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.leaveAdjustment}
-                      onChange={e => setFormFields({...formFields, leaveAdjustment: Number(e.target.value)})}
-                      className="w-full h-10 px-2 bg-white dark:bg-slate-900 rounded-lg border text-center font-mono font-bold outline-none"
-                    />
-                  </div>
+            <div className="space-y-4">
+              <div className="p-3.5 bg-slate-50 border border-slate-150 rounded-xl text-xs font-medium text-slate-500 leading-normal">
+                الراتب الإجمالي الأخير يعتبر الأساس الشرعي لأمور تسييل مكافأة مادة 51، حيث يشتمل على الراتب الأساسي مضافاً إليه البدلات الثابتة شهرياً.
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 font-sans text-xs">
+                <div className="space-y-1.5 focus-within:border-[#00796B]">
+                  <label className="text-[10px] font-black text-slate-450 block">الراتب الأساسي الأخير (د.ك)</label>
+                  <input
+                    type="number"
+                    value={formFields.basicSalary}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, basicSalary: Number(e.target.value) }))}
+                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-left"
+                  />
                 </div>
 
-                {liveCalculationResult && liveCalculationResult.leaveBalanceDays < 0 && (
-                  <div className="p-2.5 bg-danger/10 text-danger border border-danger/20 rounded-lg text-[9.5px] font-bold leading-relaxed flex gap-1">
-                    <AlertOctagon className="w-4 h-4 shrink-0 mt-0.5" />
-                    <span>تنبيه خطوة 3: الأيام المستهلكة المرفوعة لتسييل رصيد الموظف تتعدى موازنة حسابه عمالياً ليرجى تصفير الأيام المتبقية.</span>
-                  </div>
-                )}
-
-                <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-gray-150 dark:border-gray-800 flex justify-between leading-snug">
-                  <div>
-                    <p className="text-[10px] text-gray-400 font-bold">رصيد الأيام المتبقية آلياً للتعويض:</p>
-                    <span className="text-sm font-mono font-extrabold text-[#00796B]">
-                      {liveCalculationResult ? liveCalculationResult.leaveBalanceDays : 0} يوماً عمالياً
-                    </span>
-                  </div>
-                  <div className="text-left">
-                    <p className="text-[10px] text-gray-400 font-bold">قيمة تعويض الكاش التعادلي:</p>
-                    <span className="text-sm font-mono font-extrabold text-success">
-                      {liveCalculationResult ? liveCalculationResult.leavePayAmount.toLocaleString(undefined, { minimumFractionDigits: 3 }) : '0.000'} د.ك
-                    </span>
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-[#00796B] block">البدلات الثابتة المعتمدة (د.ك)</label>
+                  <input
+                    type="number"
+                    value={formFields.allowances}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, allowances: Number(e.target.value) }))}
+                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-left"
+                  />
                 </div>
               </div>
 
-              <div className="p-4 bg-gray-50 dark:bg-slate-900/40 border rounded-2xl space-y-2 text-xs font-semibold">
-                <span className="text-gray-900 dark:text-white font-extrabold block">قاعدة احتساب الإجازات بدولة الكويت:</span>
-                <p className="text-gray-400 leading-normal text-[10.5px]">
-                  موافق لقانون العمل الكويتي رقم 6 لسنة 2010، يُمنح العامل تعويضاً نقدياً عن رصيد إجازاته السنوية غير المستنفذة يُحسب على أساس آخر راتب إجمالي تقاضاه العامل مقسوماً على 26.
-                </p>
-              </div>
+              <div className="grid grid-cols-2 gap-4 font-sans text-xs select-none font-bold">
+                <div className="space-y-1.5 text-right">
+                  <label className="text-[10px] text-slate-450 block">تاريخ مباشرة العمل بالملف</label>
+                  <input
+                    type="date"
+                    value={formFields.joiningDate}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, joiningDate: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-left"
+                  />
+                </div>
 
+                <div className="space-y-1.5 text-right">
+                  <label className="text-[10px] text-slate-450 block">تاريخ التوقف والنهو الفعلي</label>
+                  <input
+                    type="date"
+                    value={formFields.lastWorkingDay}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, lastWorkingDay: e.target.value }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-left"
+                  />
+                </div>
+              </div>
             </div>
           )}
 
-          {/* STEP 4: Ledger Additions & Deductions */}
+          {/* STEP 4: LEAVE REVIEW */}
           {activeStep === 4 && (
-            <div className="space-y-4 font-semibold text-gray-700 dark:text-gray-300">
-              
-              {/* COMP COMP ASSETS */}
-              <div className="bg-success/5 dark:bg-success/15 p-4 rounded-xl border border-success/10 space-y-3">
-                <span className="text-xs font-black text-success border-b pb-1 flex items-center gap-1 leading-none select-none">
-                  <Coins className="w-3.5 h-3.5" />
-                  <span>عناصر الأجور والمستحقات المباشرة (+)</span>
-                </span>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">الراتب الأساسي (KWD)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.basicSalary}
-                      onChange={e => setFormFields({...formFields, basicSalary: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono font-bold text-center rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">البدلات (Allowances)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.allowances}
-                      onChange={e => setFormFields({...formFields, allowances: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono font-bold text-center rounded-lg"
-                    />
-                  </div>
+            <div className="space-y-4">
+              <span className="text-[10px] bg-emerald-500/10 text-[#00796B] rounded px-2 py-0.5 font-bold">تصفية وحوسبة كسر الإجازات السنوية مادة 70</span>
+              <p className="text-xs text-slate-500 leading-normal font-bold">يستحق الموظف عند المغادرة تعويضاً نقدياً على أساس رصيد الإجازات السنوية المتبقية مقسوماً على 26 يوماً عمل بالشرق الكويتي:</p>
+
+              <div className="grid grid-cols-3 gap-4 text-xs font-sans">
+                <div className="space-y-1 text-right font-bold select-none">
+                  <label className="text-[10px] text-slate-400 block">رصيد الاستحقاق السنوي الأقصى</label>
+                  <input
+                    type="number"
+                    value={formFields.leaveEntitlement}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, leaveEntitlement: Number(e.target.value) }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-left"
+                  />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">ساعات الإضافي (Overtime)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.overtimeHours}
-                      onChange={e => setFormFields({...formFields, overtimeHours: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">أيام عمل فعلية في الشهر الأخير</label>
-                    <input 
-                      type="number" 
-                      value={formFields.finalMonthWorkedDays}
-                      onChange={e => setFormFields({...formFields, finalMonthWorkedDays: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono font-bold text-center rounded-lg"
-                    />
-                  </div>
+                <div className="space-y-1 text-right font-bold select-none">
+                  <label className="text-[10px] text-slate-400 block">أيام الإجازة المستغلة سلفاً</label>
+                  <input
+                    type="number"
+                    value={formFields.leaveTaken}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, leaveTaken: Number(e.target.value) }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-left"
+                  />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-[10px] text-gray-400">بونص ومكافآت تعاقدية إضافية أخرى</label>
-                  <input 
-                    type="number" 
-                    value={formFields.otherBonuses}
-                    onChange={e => setFormFields({...formFields, otherBonuses: Number(e.target.value)})}
-                    className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg"
+                <div className="space-y-1 text-right font-bold select-none">
+                  <label className="text-[10px] text-slate-400 block">معدل أيام التسوية المتبقية كاش</label>
+                  <input
+                    type="number"
+                    value={formFields.leaveAdjustment}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, leaveAdjustment: Number(e.target.value) }))}
+                    className="w-full h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-left text-emerald-800"
                   />
                 </div>
               </div>
-
-              {/* DEDUCTIONS COMP */}
-              <div className="bg-danger/5 dark:bg-danger/15 p-4 rounded-xl border border-danger/10 space-y-3">
-                <span className="text-xs font-black text-danger border-b pb-1 flex items-center gap-1 leading-none select-none">
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  <span>الخصومات والذمم المترتبة للمؤسسة (-)</span>
-                </span>
-                
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">مقاصة قروض متبقية / سلف</label>
-                    <input 
-                      type="number" 
-                      value={formFields.loansDeduction}
-                      onChange={e => setFormFields({...formFields, loansDeduction: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg text-danger"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">الخصومات الادارية اللائحية / الجزاءات</label>
-                    <input 
-                      type="number" 
-                      value={formFields.disciplinaryDeductions}
-                      onChange={e => setFormFields({...formFields, disciplinaryDeductions: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg text-danger"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">أيام غياب عشوائي غيرة مستند</label>
-                    <input 
-                      type="number" 
-                      value={formFields.absenceDays}
-                      onChange={e => setFormFields({...formFields, absenceDays: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="block text-[10px] text-gray-400">أيام انقطاع/إجازات بلا راتب (Unpaid)</label>
-                    <input 
-                      type="number" 
-                      value={formFields.unpaidLeaveDays}
-                      onChange={e => setFormFields({...formFields, unpaidLeaveDays: Number(e.target.value)})}
-                      className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[10px] text-gray-400">اقتطاع اشتراك التأمينات والتقاعد الوطنية (PIFSS)</label>
-                  <input 
-                    type="number" 
-                    value={formFields.socialInsuranceDeduction}
-                    onChange={e => setFormFields({...formFields, socialInsuranceDeduction: Number(e.target.value)})}
-                    className="w-full h-10 px-3 bg-white dark:bg-slate-900 border font-mono text-center rounded-lg"
-                  />
-                </div>
-              </div>
-
             </div>
           )}
 
-          {/* STEP 5: Asset handover checkpoint */}
+          {/* STEP 5: LOANS & DEDUCTIONS CUSTODY */}
           {activeStep === 5 && (
-            <div className="space-y-4 font-semibold text-gray-750 dark:text-gray-300">
-              
-              <div className="p-4 bg-gray-50 dark:bg-slate-900/60 border rounded-xl space-y-3">
-                <span className="text-xs font-black text-gray-900 dark:text-white flex items-center gap-1 leading-none border-b pb-1.5"><Laptop className="w-3.5 h-3.5"/> تصفية وتسليم العهد العينية:</span>
-                
-                <div className="grid grid-cols-2 gap-3 text-xs font-bold font-sans">
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-900 hover:bg-emerald-500/10 p-2 border border-slate-200 dark:border-slate-800 rounded-lg">
-                    <input type="checkbox" checked={formFields.companyLaptopReturned} onChange={e => setFormFields({...formFields, companyLaptopReturned: e.target.checked})} className="cursor-pointer" />
-                    <span>لابتوب المكتب والملحقات</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-900 hover:bg-emerald-500/10 p-2 border border-slate-200 dark:border-slate-800 rounded-lg">
-                    <input type="checkbox" checked={formFields.companyPhoneReturned} onChange={e => setFormFields({...formFields, companyPhoneReturned: e.target.checked})} className="cursor-pointer" />
-                    <span>جهاز الموبايل وخط الاتصال</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-900 hover:bg-emerald-500/10 p-2 border border-slate-200 dark:border-slate-800 rounded-lg">
-                    <input type="checkbox" checked={formFields.companyKeysReturned} onChange={e => setFormFields({...formFields, companyKeysReturned: e.target.checked})} className="cursor-pointer" />
-                    <span>مفاتيح المكاتب والملفات</span>
-                  </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-900 hover:bg-emerald-500/10 p-2 border border-slate-200 dark:border-slate-800 rounded-lg">
-                    <input type="checkbox" checked={formFields.accessBadgesReturned} onChange={e => setFormFields({...formFields, accessBadgesReturned: e.target.checked})} className="cursor-pointer" />
-                    <span>كروت دخول غرف السيرفرات</span>
-                  </label>
+            <div className="space-y-4">
+              <span className="text-[10px] bg-red-50 text-red-650 px-2 py-0.5 rounded font-bold border border-red-100">سجل استقطاع العجوزات والعهد العينية</span>
+              <p className="text-xs text-slate-550 font-bold leading-normal">
+                برجاء رصد مبالغ القروض الشخصية وغرامات السلوك وتسييل قيمة العجز العيني بالخصم من شيك الموظف النهائي:
+              </p>
+
+              <div className="grid grid-cols-2 gap-4 font-sans text-xs">
+                <div className="space-y-1 text-right font-bold select-none">
+                  <label className="text-[10px] text-rose-650 block">القروض الشخصية والسلف الطويلة المتبقية (د.ك)</label>
+                  <input
+                    type="number"
+                    value={formFields.loansDeduction}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, loansDeduction: Number(e.target.value) }))}
+                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-left text-red-800"
+                  />
+                </div>
+
+                <div className="space-y-1 text-right font-bold select-none">
+                  <label className="text-[10px] text-rose-650 block">غرامات الخصومات والإنقاص اللائحي للجزاءات (د.ك)</label>
+                  <input
+                    type="number"
+                    value={formFields.disciplinaryDeductions}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, disciplinaryDeductions: Number(e.target.value) }))}
+                    className="w-full h-11 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-left text-red-800"
+                  />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-[10px] text-gray-400">ملاحظات وحواشي صياغة براءة الذمة</label>
-                <textarea 
-                  rows={3}
+              <div className="p-4 bg-slate-50 border rounded-2xl grid grid-cols-2 gap-3 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">لابتوب عيني مسترد:</span>
+                  <input
+                    type="checkbox"
+                    checked={formFields.companyLaptopReturned}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, companyLaptopReturned: e.target.checked }))}
+                    className="accent-[#00796B]"
+                  />
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-400">مفاتيح وهواتف مسددة:</span>
+                  <input
+                    type="checkbox"
+                    checked={formFields.companyPhoneReturned}
+                    onChange={(e) => setFormFields(prev => ({ ...prev, companyPhoneReturned: e.target.checked }))}
+                    className="accent-[#00796B]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 6: INDEMNITY MATH */}
+          {activeStep === 6 && (
+            <div className="space-y-4">
+              <span className="text-xs font-black text-slate-800 block">فهرس العملية الحسابية المؤتمتة مادة 51</span>
+              <p className="text-[10.5px] text-slate-500 font-bold leading-relaxed">
+                تقوم منظومة "عدالة" بحوسبة مدة الخدمة الطولية لكسور الأيام بدقة عشارية تامة وطبقاً للتعديل القانوني لعام 2026.
+              </p>
+
+              {liveCalculationResult ? (
+                <div className="p-4 bg-emerald-500/5 border border-emerald-100 rounded-2xl space-y-4">
+                  <div className="grid grid-cols-3 gap-4 text-center font-Tajawal font-bold text-slate-800">
+                    <div className="bg-white p-3 border rounded-xl">
+                      <span className="text-[9.5px] text-slate-400 block">أعوام دقيقة</span>
+                      <span className="text-lg font-black text-[#00796B] block font-mono">{liveCalculationResult.serviceYears}</span>
+                    </div>
+                    <div className="bg-white p-3 border rounded-xl">
+                      <span className="text-[9.5px] text-slate-400 block">أشهر دقيقة</span>
+                      <span className="text-lg font-black text-[#00796B] block font-mono">{liveCalculationResult.serviceMonths}</span>
+                    </div>
+                    <div className="bg-white p-3 border rounded-xl">
+                      <span className="text-[9.5px] text-slate-400 block">أيام عمالية</span>
+                      <span className="text-lg font-black text-[#00796B] block font-mono">{liveCalculationResult.serviceDays}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center text-xs font-bold font-sans">
+                    <span className="text-slate-550">الحاصل الحسابي لمكافأة مادة 51 الإجمالية:</span>
+                    <span className="font-mono text-[#00796B] font-black text-base">{liveCalculationResult.indemnityAmount.toLocaleString(undefined, { minimumFractionDigits: 3 })} د.ك</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-6 text-center text-slate-400">جاري احتساب التسوية العمالية...</div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 7: NET SETTLEMENT REVIEW */}
+          {activeStep === 7 && (
+            <div className="space-y-4">
+              <span className="text-xs font-black text-slate-800 block">تفاصيل توازن ميزان الخدمة الموحد (Net Settlement)</span>
+              
+              {liveCalculationResult ? (
+                <div className="space-y-4 text-xs">
+                  <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-3 font-sans font-bold select-none">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">(+) مكافأة الخدمة:</span>
+                      <span className="font-mono">{liveCalculationResult.indemnityAmount.toLocaleString(undefined, { minimumFractionDigits: 3 })} KWD</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">(+) تعويض الإجازات كاش:</span>
+                      <span className="font-mono">{liveCalculationResult.leavePayAmount.toLocaleString(undefined, { minimumFractionDigits: 3 })} KWD</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">(-) القروض المستحقة للمنشأة:</span>
+                      <span className="font-mono text-rose-400">-{formFields.loansDeduction.toLocaleString(undefined, { minimumFractionDigits: 3 })} KWD</span>
+                    </div>
+                    <hr className="border-white/10" />
+                    <div className="flex justify-between text-emerald-300 font-extrabold text-sm select-none leading-none">
+                      <span>الصافي الودي المعتمد المعد للصرف:</span>
+                      <span className="font-mono">{liveCalculationResult.netAmount.toLocaleString(undefined, { minimumFractionDigits: 3 })} د.ك</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-slate-400">جاري استيراد الحسبة بنجاح...</div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 8: DOCUMENT ISSUANCE */}
+          {activeStep === 8 && (
+            <div className="space-y-4">
+              <span className="text-xs font-black text-[#00796B] block">طابعة الصك والمستند مروّساً لجهة التوقيع</span>
+              <p className="text-[10.5px] text-slate-400 leading-normal font-bold">
+                تم التحقق من كافة أرقام الموازنة الحسابية بنجاح. أضف أي ملاحظات إجرائية ختامية لإدراجها في مذكر صبري شطا:
+              </p>
+
+              <div className="space-y-1.5 font-bold font-sans text-xs">
+                <label className="text-[10px] text-slate-450 block">ملاحظات وقيود براءة الذمة الهامة</label>
+                <textarea
                   value={formFields.notes}
-                  onChange={e => setFormFields({...formFields, notes: e.target.value})}
-                  className="w-full text-[11px] p-2 bg-gray-50 dark:bg-slate-900 text-gray-800 dark:text-white rounded-lg border border-gray-200 outline-none font-bold"
-                  placeholder="وثق أي تفاصيل تسوية، مقاصة مالي، أو مجالس تحقيق استثنائية..."
+                  onChange={(e) => setFormFields(prev => ({ ...prev, notes: e.target.value }))}
+                  rows={3}
+                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-sans text-slate-700 text-right focus:outline-none focus:border-[#00796B] font-semibold leading-relaxed"
+                  placeholder="مثال: تم تسييل الحساب ومقاصة السيارة وتسوية الهامش الودي"
                 />
               </div>
 
+              <div className="p-4 bg-[#00796B]/5 border border-[#00796B]/15 rounded-2xl flex items-center gap-3">
+                <ShieldCheck className="w-8 h-8 text-[#00796B] shrink-0 animate-bounce" />
+                <div className="space-y-0.5 text-right font-Tajawal font-bold text-[#004D40] text-xs leading-tight">
+                  <h4>اعتماد المطابقة للقانون 6/2010</h4>
+                  <p className="text-[9.5px] text-slate-500 mt-0.5">جاهز للتصدير والتوقيع.</p>
+                </div>
+              </div>
             </div>
           )}
 
         </div>
 
-        {/* DRAW BOTTOM LIVE PREVIEW ACCURED SCALE */}
-        {liveCalculationResult && (
-          <div className="p-3 bg-gray-50 dark:bg-slate-950/65 rounded-xl border border-gray-200 dark:border-gray-800 shrink-0 text-right mt-2 space-y-1.5 select-none text-[10.5px]">
-            <span className="text-[9.5px] font-black text-primary flex items-center gap-1 leading-none border-b border-primary/20 pb-1 mr-1">
-              <Sparkles className="w-3.5 h-3.5 shrink-0" />
-              <span>معاينة مخصص نهاية الخدمة الفوري (Live EOS Gratuity):</span>
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-[10px] text-gray-500 font-bold font-sans">
-              <div>أعوام الخدمة الصافية: <span className="font-mono text-gray-850 dark:text-white font-extrabold">{liveCalculationResult.serviceYears} سنة / {liveCalculationResult.serviceMonths} شهر</span></div>
-              <div>مكافأة الاندمنتي: <span className="font-mono text-[#00796B] font-extrabold bg-slate-200/50 dark:bg-slate-900/60 px-1 rounded">{liveCalculationResult.indemnityAmount.toLocaleString()} د.ك</span></div>
-              <div className="col-span-2 pt-1 border-t border-gray-150 dark:border-gray-800 flex justify-between items-center text-xs font-extrabold text-[#00796B]">
-                <span>صافي الحصاد المالي المستحق للصرف البنكي:</span>
-                <span className="font-mono text-success text-sm font-black text-left">
-                  {liveCalculationResult.netAmount.toLocaleString(undefined, { minimumFractionDigits: 3 })} د.ك
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* BOTTOM STEP WORK CONTROLS */}
-        <div className="pt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-gray-800 shrink-0 select-none">
+        {/* Wizard Footer Navigations */}
+        <div className="bg-slate-50 border-t border-slate-100 p-5 flex items-center justify-between font-sans">
+          
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={onClose}
-              className="px-3 h-10 rounded-xl bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-xs font-bold text-gray-500 dark:text-gray-300 transition-all border outline-none cursor-pointer"
+              className="h-10 px-5 rounded-xl text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 cursor-pointer focus:outline-none"
             >
-              إلغاء المعالج
+              إلغاء الأمر
             </button>
+          </div>
+
+          <div className="flex gap-2 font-black select-none text-xs">
             {activeStep > 1 && (
-              <button 
+              <button
                 onClick={() => setActiveStep(prev => prev - 1)}
-                className="w-10 h-10 rounded-xl bg-gray-50 hover:bg-gray-100 border text-gray-400 cursor-pointer flex items-center justify-center transition-all"
+                className="h-10 px-5 rounded-xl text-xs font-black bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer flex items-center gap-1.5 focus:outline-none"
               >
                 <ArrowRight className="w-4 h-4" />
+                <span>الخطوة السابقة</span>
               </button>
             )}
-          </div>
-          <div className="flex gap-2 justify-end">
-            {activeStep < 5 ? (
-              <button 
+
+            {activeStep < 8 ? (
+              <button
                 onClick={() => setActiveStep(prev => prev + 1)}
-                className="w-full h-10 rounded-xl bg-primary hover:bg-primary-dark text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 shadow-sm shadow-primary/20"
+                className="h-10 px-5 rounded-xl text-xs font-black bg-[#E0F2F1] text-[#004D40] border border-[#B2DFDB] hover:bg-[#B2DFDB] transition-all cursor-pointer flex items-center gap-1.5 focus:outline-none"
               >
                 <span>الخطوة التالية</span>
-                <ArrowLeft className="w-3.5 h-3.5" />
+                <ArrowLeft className="w-4 h-4" />
               </button>
             ) : (
-              <button 
+              <button
                 onClick={handleSaveLocal}
-                className="w-full h-10 rounded-xl bg-[#00796B] hover:bg-[#004D40] text-white text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-primary/25"
+                className="h-10 px-5 rounded-xl text-xs font-black bg-[#00796B] text-white hover:bg-[#004D40] cursor-pointer border-none shadow-md flex items-center gap-1.5 focus:outline-none"
               >
-                تحديث وحفظ التصفية
+                <Check className="w-4 h-4 font-black" />
+                <span>حفظ مستند براءة الذمة</span>
               </button>
             )}
           </div>
+
         </div>
 
       </div>

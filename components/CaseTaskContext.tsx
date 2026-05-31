@@ -15,6 +15,9 @@ interface CaseTaskContextType {
   updateTask: (task: AdminTask) => void;
   deleteTask: (taskId: string) => void;
   setTasks: React.Dispatch<React.SetStateAction<AdminTask[]>>;
+  addHearing: (hearing: Hearing) => void;
+  updateHearing: (hearing: Hearing) => void;
+  deleteHearing: (hearingId: string) => void;
 }
 
 const CaseTaskContext = createContext<CaseTaskContextType | undefined>(undefined);
@@ -67,7 +70,7 @@ export const CaseTaskProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return task;
       }));
     }
-  }, []);
+  }, [cases]);
 
   const updateHearingStatus = useCallback((hearingId: string, newStatus: Hearing['status']) => {
     setHearings(prev => prev.map(h => {
@@ -81,6 +84,18 @@ export const CaseTaskProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return h;
     }));
   }, [runAutomationRules]);
+
+  const addHearing = useCallback((hearing: Hearing) => {
+    setHearings(prev => [hearing, ...prev]);
+  }, []);
+
+  const updateHearing = useCallback((hearing: Hearing) => {
+    setHearings(prev => prev.map(h => h.id === hearing.id ? hearing : h));
+  }, []);
+
+  const deleteHearing = useCallback((hearingId: string) => {
+    setHearings(prev => prev.filter(h => h.id !== hearingId));
+  }, []);
 
   const updateTaskStatus = useCallback((taskId: string, newStatus: AdminTaskStatus) => {
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus, updatedAt: new Date().toISOString().split('T')[0] } : t));
@@ -108,7 +123,10 @@ export const CaseTaskProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     updateTask,
     deleteTask,
     setTasks,
-  }), [cases, tasks, hearings, updateHearingStatus, updateTaskStatus, addTask, updateTask, deleteTask]);
+    addHearing,
+    updateHearing,
+    deleteHearing
+  }), [cases, tasks, hearings, updateHearingStatus, updateTaskStatus, addTask, updateTask, deleteTask, addHearing, updateHearing, deleteHearing]);
 
   return (
     <CaseTaskContext.Provider value={value}>

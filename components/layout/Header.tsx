@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import Logo from '../ui/Logo';
 import NotificationDropdown from './NotificationDropdown';
 import { notificationService } from '../../services/notificationService';
+import { useLanguage } from '../i18n/LanguageProvider';
+import { GlobalSearchEngine, SearchItem } from '../../services/globalSearchService';
 import { 
     Globe, 
     Bell, 
@@ -25,7 +27,8 @@ import {
     FolderPlus,
     UserPlus,
     Moon,
-    Sun
+    Sun,
+    ExternalLink
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -35,6 +38,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
   const { t, i18n } = useTranslation();
+  const { toggleLanguage } = useLanguage();
   const navigate = useNavigate();
   const searchInputRef = useRef<HTMLInputElement>(null);
   
@@ -42,6 +46,47 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Unified global search states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [liveSearchResults, setLiveSearchResults] = useState<SearchItem[]>([]);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+  // Live query matching
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      const { items } = GlobalSearchEngine.search({ searchTerm: searchQuery });
+      setLiveSearchResults(items.slice(0, 6)); // Top 6 hits in real time
+    } else {
+      setLiveSearchResults([]);
+    }
+  }, [searchQuery]);
+
+  // Hook command/ctrl + K and Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        setIsSearchFocused(true);
+      }
+      if (e.key === 'Escape') {
+        setIsSearchFocused(false);
+        searchInputRef.current?.blur();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setIsSearchFocused(false);
+      searchInputRef.current?.blur();
+    }
+  };
 
   // Dynamic user and office data, synced via event listeners
   const [userInfo, setUserInfo] = useState({
@@ -100,18 +145,6 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
     navigate(-1);
   };
 
-  const toggleLanguage = () => {
-    const currentLang = i18n.language;
-    const nextLang = currentLang === 'ar' ? 'en' : 'ar';
-    i18n.changeLanguage(nextLang);
-    
-    // Save to preferences storage
-    const savedPrefs = localStorage.getItem('profile_preferences');
-    const parsed = savedPrefs ? JSON.parse(savedPrefs) : {};
-    parsed.lang = nextLang;
-    localStorage.setItem('profile_preferences', JSON.stringify(parsed));
-  };
-
   return (
     <header className="bg-white dark:bg-dm-card shadow-sm h-16 sm:h-20 flex items-center justify-between px-4 sm:px-6 print:hidden border-b border-gray-100 dark:border-gray-800 transition-all duration-300 z-30 relative">
       {/* Right Section: Brand, Sidebar Toggle, Back Button */}
@@ -156,29 +189,104 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
       </div>
 
       {/* Middle Section: Global Search */}
-      <div className="flex-1 max-w-sm mx-4 hidden lg:block">
-        <div className="relative group">
-          <button 
-            type="button"
-            onClick={() => searchInputRef.current?.focus()}
-            className="absolute inset-y-0 start-0 flex items-center ps-4 text-gray-400 group-focus-within:text-primary transition-colors hover:text-gray-600 dark:hover:text-dm-text"
-          >
-             <Search className="w-4 h-4" />
-          </button>
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder={t('search_placeholder', { defaultValue: "ابحث في النظام..." })}
-            className="w-full ps-11 pe-12 py-2.5 bg-gray-50 dark:bg-dm-background border border-gray-100 dark:border-gray-700 rounded-2xl 
-                       text-xs text-gray-700 dark:text-dm-text placeholder-gray-400
-                       focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all text-right font-bold"
-          />
-          <div className="absolute inset-y-0 end-3 flex items-center select-none pointer-events-none">
-             <div className="px-1.5 py-0.5 bg-white dark:bg-dm-card border border-gray-100 dark:border-gray-800 rounded-md shadow-sm">
-                <span className="text-[9px] font-black text-gray-300 font-mono tracking-tighter">⌘K</span>
-             </div>
+      <div className="flex-1 max-w-sm mx-4 hidden lg:block relative">
+        <form onSubmit={handleSearchSubmit}>
+          <div className="relative group">
+            <button 
+              type="submit"
+              className="absolute inset-y-0 start-0 flex items-center ps-4 text-gray-400 group-focus-within:text-primary transition-colors hover:text-gray-600 dark:hover:text-dm-text"
+            >
+               <Search className="w-4 h-4" />
+            </button>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onBlur={() => setTimeout(() => setIsSearchFocused(false), 250)}
+              placeholder={t('search_placeholder', { defaultValue: "ابحث في النظام..." })}
+              className="w-full ps-11 pe-12 py-2.5 bg-gray-50 dark:bg-dm-background border border-gray-100 dark:border-gray-700 rounded-2xl 
+                         text-xs text-gray-700 dark:text-dm-text placeholder-gray-400
+                         focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all text-right font-bold"
+            />
+            <div className="absolute inset-y-0 end-3 flex items-center select-none pointer-events-none">
+               <div className="px-1.5 py-0.5 bg-white dark:bg-dm-card border border-gray-100 dark:border-gray-800 rounded-md shadow-sm">
+                  <span className="text-[9px] font-black text-gray-300 font-mono tracking-tighter">⌘K</span>
+               </div>
+            </div>
           </div>
-        </div>
+        </form>
+
+        {/* Live Search Floating List */}
+        <AnimatePresence>
+          {isSearchFocused && searchQuery.trim().length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              transition={{ duration: 0.15 }}
+              className="absolute left-0 right-0 mt-2 bg-white dark:bg-dm-card border border-gray-100 dark:border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden text-right"
+            >
+              <div className="px-4 py-2 bg-gray-50 dark:bg-dm-background/60 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <span className="text-[10px] font-black text-gray-400">البحث الفوري الذكي</span>
+                <span className="text-[9px] font-bold text-primary dark:text-accent bg-primary/5 dark:bg-accent/10 px-1.5 py-0.5 rounded-md">
+                  {liveSearchResults.length} نتائج
+                </span>
+              </div>
+
+              {liveSearchResults.length === 0 ? (
+                <div className="p-6 text-center text-gray-400 text-xs font-bold">
+                  لم يتم العثور على سجلات مطابقة لـ <span className="text-secondary font-black truncate max-w-[120px] inline-block align-middle">"{searchQuery}"</span>
+                </div>
+              ) : (
+                <div className="max-h-80 overflow-y-auto p-1.5 space-y-1">
+                  {liveSearchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        navigate(item.link);
+                        setIsSearchFocused(false);
+                      }}
+                      className="w-full text-right p-2.5 hover:bg-gray-50 dark:hover:bg-dm-background rounded-xl transition-all cursor-pointer block border border-transparent hover:border-gray-100"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] font-black text-gray-300 dark:text-gray-500 font-mono">
+                          {item.number}
+                        </span>
+                        <span className="text-[9px] font-black px-1.5 py-0.5 bg-gray-100 dark:bg-dm-background text-gray-500 rounded-md">
+                          {item.type}
+                        </span>
+                      </div>
+                      
+                      <div className="text-xs font-black text-gray-800 dark:text-dm-text truncate mt-1">
+                        {item.name}
+                      </div>
+                      
+                      <div className="text-[10px] text-gray-400 mt-1 truncate hover:text-clip">
+                        {item.description}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="p-2 bg-gray-50 dark:bg-dm-background/50 border-t border-gray-100 dark:border-gray-800 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+                    setIsSearchFocused(false);
+                  }}
+                  className="w-full py-2 hover:bg-primary hover:text-white bg-primary/5 dark:bg-accent/10 text-primary dark:text-accent font-black text-xs rounded-xl flex items-center justify-center gap-2 transition-all"
+                >
+                  عرض كافة النتائج بالتفصيل <ExternalLink className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Left Section: User Control Panel */}
