@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Investigation } from '../../types';
 import { OFFICE_NAME } from '../../constants';
 import Button from '../../components/ui/Button';
@@ -12,6 +12,20 @@ interface InvestigationPrintModalProps {
 
 export const InvestigationPrintModal: React.FC<InvestigationPrintModalProps> = ({ investigation, onClose }) => {
     if (!investigation) return null;
+
+    // Load dynamic office name to keep it synchronized with the rest of any printable items
+    const officeNameAr = useMemo(() => {
+        try {
+            const savedOffice = localStorage.getItem('profile_office_info');
+            if (savedOffice) {
+                const parsed = JSON.parse(savedOffice);
+                if (parsed.name) return parsed.name;
+            }
+        } catch (e) {
+            console.error('Failed to load dynamic office name in InvestigationPrintModal', e);
+        }
+        return OFFICE_NAME;
+    }, []);
 
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return 'غير محدد';
@@ -60,8 +74,8 @@ export const InvestigationPrintModal: React.FC<InvestigationPrintModalProps> = (
                         {/* Legal Header */}
                         <div className="header-flex flex justify-between items-start border-b-2 border-slate-950 pb-4 mb-6 text-sm">
                             <div className="space-y-1">
-                                <h2 className="text-xl font-black">{OFFICE_NAME}</h2>
-                                <p className="text-xs font-bold text-slate-500">الإدارة القانونية - قطاع التفتيش والتحقيقات العمالية</p>
+                                <h2 className="text-xl font-black">{officeNameAr}</h2>
+                                <p className="text-xs font-bold text-[#134D41]">عدالة - منظومة الإدارة القانونية المتكاملة v3 | الإدارة القانونية</p>
                                 <p className="text-[10px] text-slate-400">موطد بأحكام المرسوم بقانون رقم 6 لسنة 2010</p>
                             </div>
                             <div className="text-left font-mono text-xs">

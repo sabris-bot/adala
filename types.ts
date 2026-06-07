@@ -844,8 +844,8 @@ export interface EOS_Settlement {
   finalMonthWorkedDays?: number;
   unpaidLeaveDays?: number;
   timeline?: { date: string; actionAr: string; actionEn: string; user: string }[];
-  approvals?: { hr: string; legal: string; finance: string; gm: string };
-  signatures?: { employee: string; hr: string; fin: string; legal: string };
+  approvals?: { hr: string; legal: string; finance: string; gm: string; manager?: string; executive?: string };
+  signatures?: { employee: string; hr: string; fin: string; legal: string; gm?: string; manager?: string; executive?: string };
 }
 
 export interface EndOfServiceInputs {

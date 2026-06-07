@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
     ZoomIn, ZoomOut, Search, Printer, BookOpen, Clock, 
     MessageSquare, AlertTriangle, CheckCircle, ShieldAlert,
-    X, Sparkles, Plus, Clipboard, Landmark, Scale, Share2, CornerDownLeft
+    X, Sparkles, Plus, Clipboard, Landmark, Scale, Share2, CornerDownLeft, Download, Copy
 } from 'lucide-react';
 import { useToast } from '../ui/Toast';
 import { AnalyzedContract, RiskLevel } from '../../types';
@@ -177,7 +177,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 بند 3: تسوية المنازعات وموقع التقاضي
 تخضع جميع الخلافات الناشئة عن هذا المستند لأحكام محكمة الرقعي للأمور المستعجلة وبموجب القانون المدني الكويتي وقانون التجارة.`;
             } else if (ext === 'png' || ext === 'jpg' || ext === 'jpeg') {
-                extractedText = `[التعرف الضوئي الضوئي المتقدم للصور OCR]
+                extractedText = `[التعرف الضوئي المتقدم للصور OCR]
 عقد عمل نموذجي موثق
 التاريخ: 2025-05-15 (مستخلص من صورة ضوئية)
 
@@ -215,12 +215,13 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
     return (
         <div id="smart-document-viewer-container" className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+            
             {/* Left Controls & Import Area */}
             <div className="xl:col-span-4 space-y-6">
                 <div className="bg-white dark:bg-dm-card p-6 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800/80 space-y-5">
                     <div>
-                        <h3 className="text-md font-black text-slate-800 dark:text-white flex items-center gap-2">
-                            <Plus className="w-5 h-5 text-indigo-600" /> مجمع جلب واستيراد المستندات
+                        <h3 className="text-md font-black text-[#134D41] flex items-center gap-2">
+                            <Plus className="w-5 h-5" /> مجمع جلب واستيراد المستندات
                         </h3>
                         <p className="text-[11px] text-slate-500 font-bold mt-1">
                             نظام كويتي ذكي يمنهج ويحول جميع الصيغ لعقد ذكي معياري
@@ -231,19 +232,19 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                     <div className="flex bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
                         <button 
                             onClick={() => setAnalysisSource('text')}
-                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'text' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'text' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-750 dark:hover:text-slate-350'}`}
                         >
                             تحرير حر
                         </button>
                         <button 
                             onClick={() => setAnalysisSource('file')}
-                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'file' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'file' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-750 dark:hover:text-slate-350'}`}
                         >
                             رفع ملف ذكي
                         </button>
                         <button 
                             onClick={() => setAnalysisSource('import')}
-                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'import' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                            className={`flex-1 py-2 text-[10px] font-black rounded-xl transition-all ${analysisSource === 'import' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-750 dark:hover:text-slate-350'}`}
                         >
                             استيراد من النظام
                         </button>
@@ -262,7 +263,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                     value={viewerText}
                                     onChange={(e) => setViewerText(e.target.value)}
                                     rows={8}
-                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 text-xs font-semibold leading-relaxed focus:ring-2 focus:ring-indigo-600 transition-colors text-right"
+                                    className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl p-4 text-xs font-semibold leading-relaxed focus:ring-2 focus:ring-[#134D41] transition-colors text-right"
                                     placeholder="يرجى إدخال أو تحرير نصوص العقد وبنوده هنا للمطابقة وقراءة الامتثال..."
                                 />
                             </motion.div>
@@ -283,8 +284,8 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                     onClick={() => fileInputRef.current?.click()}
                                     className={`border-2 border-dashed rounded-[2rem] p-8 text-center transition-all cursor-pointer group flex flex-col items-center justify-center space-y-4 ${
                                         isDragOver 
-                                        ? 'border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 shadow-inner' 
-                                        : 'border-slate-200 dark:border-slate-800 hover:border-indigo-400 bg-slate-50/50 dark:bg-slate-900/30'
+                                        ? 'border-[#134D41] bg-[#134D41]/5 dark:bg-[#134D41]/10 shadow-inner' 
+                                        : 'border-slate-200 dark:border-slate-800 hover:border-[#134D41] bg-slate-50/50 dark:bg-slate-900/30'
                                     }`}
                                 >
                                     <input 
@@ -295,32 +296,32 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                         accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
                                     />
                                     <div className="p-4 bg-white dark:bg-dm-card rounded-2xl shadow-md group-hover:scale-110 transition-transform">
-                                        <Clipboard className="w-8 h-8 text-indigo-600" />
+                                        <Clipboard className="w-8 h-8 text-[#134D41]" />
                                     </div>
                                     <div>
                                         <h5 className="text-xs font-black text-slate-700 dark:text-slate-300">
                                             اسحب وارمِ أي عقد هنا للمعالجة
                                         </h5>
                                         <p className="text-[10px] text-slate-400 font-bold mt-1 max-w-[220px] mx-auto leading-relaxed">
-                                            تحسين فوري وقرار فك ضوئي للروابط الممسوحة ضوئياً وصور الموبايل والملفات بجميع أنواعها
+                                            دعم كامل لكافة الصيغ: PDF, Word (.docx), صور الهواتف, والملفات النصية مع استيراد فوري ذكي
                                         </p>
                                     </div>
-                                    <span className="inline-block px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black rounded-lg">
+                                    <span className="inline-block px-3 py-1 bg-[#134D41]/10 text-[#134D41] text-[10px] font-black rounded-lg">
                                         تصفح ملفات الجهاز
                                     </span>
                                 </div>
 
                                 {selectedFile && (
-                                    <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border-r-4 border-indigo-600 rounded-2xl flex items-center justify-between">
+                                    <div className="p-3 bg-emerald-50/50 dark:bg-slate-900/40 border-r-4 border-[#134D41] rounded-2xl flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-lg">
+                                            <div className="p-2 bg-[#134D41]/10 text-[#134D41] rounded-lg">
                                                 <BookOpen className="w-4 h-4" />
                                             </div>
                                             <div>
-                                                <p className="text-xs font-black text-indigo-950 dark:text-indigo-300 leading-none truncate max-w-[150px]">
+                                                <p className="text-xs font-black text-slate-900 dark:text-slate-300 leading-none truncate max-w-[150px]">
                                                     {selectedFile.name}
                                                 </p>
-                                                <span className="text-[10px] text-indigo-600/70 font-semibold font-sans mt-0.5 block">
+                                                <span className="text-[10px] text-[#134D41]/80 font-semibold font-sans mt-0.5 block">
                                                     {(selectedFile.size / 1024).toFixed(1)} KB
                                                 </span>
                                             </div>
@@ -354,7 +355,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                             قاعدة بيانات الموظفين (HR)
                                         </label>
                                         <select
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-indigo-600"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-[#134D41]"
                                             onChange={(e) => {
                                                 if(e.target.value) handleImportFromSystem('employee', e.target.value);
                                             }}
@@ -372,7 +373,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                             الممتلكات والعقارات وإيجارات الأملاك
                                         </label>
                                         <select
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-indigo-600"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-[#134D41]"
                                             onChange={(e) => {
                                                 if(e.target.value) handleImportFromSystem('property', e.target.value);
                                             }}
@@ -390,7 +391,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                             ملفات النزاعات والقضايا العمالية
                                         </label>
                                         <select
-                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-indigo-600"
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-3 rounded-xl focus:ring-2 focus:ring-[#134D41]"
                                             onChange={(e) => {
                                                 if(e.target.value) handleImportFromSystem('litigation', e.target.value);
                                             }}
@@ -409,14 +410,14 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
                     <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
                         <button 
-                            className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl h-11 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-650/15 transition-all"
+                            className="w-full bg-[#134D41] hover:bg-[#0f2d25] disabled:opacity-50 text-white rounded-xl h-11 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
                             onClick={onRunAI}
                             disabled={isLoading || !viewerText.trim()}
                         >
                             {isLoading ? (
                                 <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                             ) : (
-                                <Sparkles className="w-4 h-4 text-indigo-200" />
+                                <Sparkles className="w-4 h-4 text-emerald-300" />
                             )}
                             تفعيل الفحص والتحليل القانوني للبنود (AI)
                         </button>
@@ -427,20 +428,20 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                 </div>
 
                 {/* Left Live compliance metrics card */}
-                <div className="bg-slate-950 text-white p-6 rounded-[2.5rem] shadow-xl border border-slate-900 space-y-4">
+                <div className="bg-[#134D41] text-white p-6 rounded-[2.5rem] shadow-xl border border-emerald-900 space-y-4">
                     <div className="flex justify-between items-center">
-                        <span className="text-xs font-black text-indigo-400 flex items-center gap-1.5 leading-none">
+                        <span className="text-xs font-black text-emerald-300 flex items-center gap-1.5 leading-none">
                             <Scale className="w-4 h-4" /> فحص الامتثال الكويتي الفوري
                         </span>
-                        <span className="text-[10px] font-black bg-indigo-950/80 text-indigo-300 px-2.5 py-0.5 rounded-full">
+                        <span className="text-[10px] font-black bg-emerald-950/80 text-emerald-200 px-2.5 py-0.5 rounded-full">
                             أمان: {contractStrengthScore}%
                         </span>
                     </div>
 
-                    <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-1.5 bg-emerald-950 rounded-full overflow-hidden">
                         <div 
                             className={`h-full rounded-full transition-all duration-500 ${
-                                contractStrengthScore > 80 ? 'bg-emerald-500' : contractStrengthScore > 50 ? 'bg-amber-500' : 'bg-rose-500'
+                                contractStrengthScore > 80 ? 'bg-emerald-400' : contractStrengthScore > 50 ? 'bg-amber-400' : 'bg-rose-450'
                             }`}
                             style={{ width: `${contractStrengthScore}%` }}
                         />
@@ -448,23 +449,23 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
                     {/* Quick indicator checklists of the active text content */}
                     <div className="space-y-3 pt-2">
-                        <div className="text-[10px] font-semibold text-slate-400 border-b border-slate-800 pb-2">سجل نقاط فحص المحتوى الحركي:</div>
+                        <div className="text-[10px] font-semibold text-emerald-200 border-b border-emerald-800 pb-2">سجل نقاط فحص المحتوى الحركي:</div>
                         
                         <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl text-[10px] font-bold">
-                            <span className="text-slate-300">أيام فترة التجربة (الحد الأقصى ١٠٠ يوم)</span>
-                            <span className={viewerText.includes('١٢٠') || viewerText.includes('120') ? 'text-rose-450' : 'text-emerald-450'}>
+                            <span className="text-slate-200">أيام فترة التجربة (الحد الأقصى ١٠٠ يوم)</span>
+                            <span className={viewerText.includes('١٢٠') || viewerText.includes('120') ? 'text-rose-400' : 'text-emerald-300'}>
                                 {viewerText.includes('١٢٠') || viewerText.includes('120') ? 'مخالف (١٢٠ يوم)' : 'آمن (<= ١٠٠)'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl text-[10px] font-bold">
-                            <span className="text-slate-300">ساعات العمل الأسبوعية (الأقصى ٤٨ ساعة)</span>
-                            <span className={viewerText.includes('٥٠') || viewerText.includes('50') || viewerText.includes('٦٠') || viewerText.includes('60') ? 'text-rose-450' : 'text-emerald-450'}>
+                            <span className="text-slate-200">ساعات العمل الأسبوعية (الأقصى ٤٨ ساعة)</span>
+                            <span className={viewerText.includes('٥٠') || viewerText.includes('50') || viewerText.includes('٦٠') || viewerText.includes('60') ? 'text-rose-400' : 'text-emerald-300'}>
                                 {viewerText.includes('٥٠') || viewerText.includes('50') || viewerText.includes('٦٠') || viewerText.includes('60') ? 'مخالف (>٤٨ ساعة)' : 'آمن (٤٥-٤٨)'}
                             </span>
                         </div>
                         <div className="flex justify-between items-center bg-white/5 p-2 rounded-xl text-[10px] font-bold">
-                            <span className="text-slate-300">الحد الأدنى للإجازة السنوية (٣٠ يوماً)</span>
-                            <span className={viewerText.includes('١٥') || viewerText.includes('15') || viewerText.includes('٢٠') || viewerText.includes('20') ? 'text-rose-450' : 'text-emerald-450'}>
+                            <span className="text-slate-200">الحد الأدنى للإجازة السنوية (٣٠ يوماً)</span>
+                            <span className={viewerText.includes('١٥') || viewerText.includes('15') || viewerText.includes('٢٠') || viewerText.includes('20') ? 'text-rose-400' : 'text-emerald-300'}>
                                 {viewerText.includes('١٥') || viewerText.includes('15') || viewerText.includes('٢٠') || viewerText.includes('20') ? 'مخالف (أقل من ٣٠ يوم)' : 'آمن (٣٠ يوماً فأكثر)'}
                             </span>
                         </div>
@@ -474,49 +475,128 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
             {/* Right Interactive Legal Document Viewer Panel */}
             <div className="xl:col-span-8 space-y-6">
-                <div className="bg-white dark:bg-dm-card p-6 lg:p-8 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800/80 relative">
+                <div className="bg-white dark:bg-dm-card p-6 lg:p-8 rounded-[2.5rem] shadow-xl border border-slate-150 dark:border-slate-800/85 relative">
                     
                     {/* Professional Document Viewer Toolbar */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800/70">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800/70">
                         <div className="flex items-center gap-3">
-                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/10 text-indigo-600 rounded-2xl">
+                            <div className="p-3 bg-[#134D41]/10 text-[#134D41] rounded-2xl">
                                 <BookOpen className="w-5 h-5" />
                             </div>
                             <div>
-                                <h4 className="text-sm font-black text-slate-800 dark:text-white">المخطوط والشاش عارض الوثائق القانونية</h4>
+                                <h4 className="text-sm font-black text-[#134D41]">المخطوط والشاش عارض الوثائق القانونية</h4>
                                 <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                                    اضغط على أي بند أو فقرة لربط توجيه تدقيق، أو مراجعة الهوامش المشتركة
+                                    أدوات سريعة للنسخ واللصق والنقل والتحميل الفوري بدعم كلي لكافة الأجهزة
                                 </p>
                             </div>
                         </div>
 
                         {/* Interactive tool widgets inside document viewer */}
-                        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            
+                            {/* Copy button */}
+                            <button 
+                                onClick={() => {
+                                    navigator.clipboard.writeText(viewerText);
+                                    addToast({
+                                        type: 'success',
+                                        title: 'تم نسخ نص العقد',
+                                        message: 'تم بنجاح نسخ النص الكامل للعقد في الحافظة لسهولة نقله أو صياغته.'
+                                    });
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#134D41]/5 hover:bg-[#134D41]/10 text-[#134D41] hover:text-[#134D41] border border-[#134D41]/20 rounded-xl transition-all font-black text-[10px]"
+                                title="نسخ نص العقد بالكامل"
+                            >
+                                <Copy className="w-3.5 h-3.5 ml-1" />
+                                <span>نسخ العقد</span>
+                            </button>
+
+                            {/* Paste button */}
+                            <button 
+                                onClick={async () => {
+                                    try {
+                                        const text = await navigator.clipboard.readText();
+                                        if (text) {
+                                            setViewerText(text);
+                                            addToast({
+                                                type: 'success',
+                                                title: 'تم لصق النص',
+                                                message: 'تم استبدال نص العقد بالنص المنسوخ من الحافظة.'
+                                            });
+                                        } else {
+                                            addToast({
+                                                type: 'info',
+                                                title: 'الحافظة فارغة',
+                                                message: 'لم يتم العثور على نصوص قابلة للصق في حافظة الجهاز.'
+                                            });
+                                        }
+                                    } catch (err) {
+                                        const userInput = prompt("يرجى لصق نص العقد هنا مباشرة:");
+                                        if (userInput) {
+                                            setViewerText(userInput);
+                                            addToast({
+                                                type: 'success',
+                                                title: 'تم إدخال النص المنسوخ',
+                                                message: 'تم تحديث عارض العقود بالنص المدخل بنجاح.'
+                                            });
+                                        }
+                                    }
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100/70 text-emerald-800 border border-emerald-250 rounded-xl transition-all font-black text-[10px]"
+                                title="لصق نص من الحافظة"
+                            >
+                                <Plus className="w-3.5 h-3.5 ml-1" />
+                                <span>لصق سريع</span>
+                            </button>
+
+                            {/* Download button */}
+                            <button 
+                                onClick={() => {
+                                    const blob = new Blob([viewerText], { type: 'text/plain;charset=utf-8' });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `مسودة_عقد_معالج_${new Date().toISOString().slice(0,10)}.txt`;
+                                    link.click();
+                                    URL.revokeObjectURL(url);
+                                    addToast({
+                                        type: 'success',
+                                        title: 'تم تحميل المستند',
+                                        message: 'تم حفظ وتنزيل نص العقد كمسودة نصية قابلة للفتح على أي جهاز.'
+                                    });
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#134D41] hover:bg-[#0f2d25] text-white rounded-xl transition-all font-black text-[10px]"
+                                title="تحميل العقد كملف نصي"
+                            >
+                                <Download className="w-3.5 h-3.5 ml-1" />
+                                <span>تحميل العقد</span>
+                            </button>
+
                             {/* Live document internal search box */}
-                            <div className="relative flex-1 sm:flex-none">
-                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <div className="relative">
+                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                                 <input
                                     type="text"
-                                    placeholder="بحث فوري في نصوص الوثيقة..."
+                                    placeholder="بحث فوري..."
                                     value={searchText}
                                     onChange={(e) => setSearchText(e.target.value)}
-                                    className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-[11px] font-bold h-9 w-full sm:w-44 pr-9 pl-3 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:bg-white text-right"
+                                    className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-[10px] font-bold h-8 w-28 pr-8 pl-2 rounded-xl focus:ring-1 focus:ring-[#134D41] focus:bg-white text-right"
                                 />
                             </div>
 
-                            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-1 rounded-xl">
+                            <div className="flex items-center bg-slate-100 dark:bg-slate-900 p-0.5 rounded-xl">
                                 <button 
                                     onClick={() => setZoomScale(Math.max(70, zoomScale - 10))} 
-                                    className="w-8 h-8 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-white dark:hover:bg-dm-card rounded-lg"
+                                    className="w-7 h-7 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-white dark:hover:bg-dm-card rounded-lg"
                                 >
                                     -
                                 </button>
-                                <span className="text-[10px] font-black w-12 text-center font-sans">
+                                <span className="text-[9px] font-black w-8 text-center font-sans">
                                     {zoomScale}%
                                 </span>
                                 <button 
                                     onClick={() => setZoomScale(Math.min(150, zoomScale + 10))} 
-                                    className="w-8 h-8 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-white dark:hover:bg-dm-card rounded-lg"
+                                    className="w-7 h-7 flex items-center justify-center text-xs font-black text-slate-500 hover:bg-white dark:hover:bg-dm-card rounded-lg"
                                 >
                                     +
                                 </button>
@@ -524,10 +604,10 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
                             <button 
                                 onClick={() => window.print()}
-                                className="p-2.5 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/40 dark:hover:bg-slate-900 text-slate-500 border border-slate-100 dark:border-slate-800 rounded-xl transition-all"
+                                className="p-2 bg-slate-50 hover:bg-slate-100 dark:bg-slate-950/40 dark:hover:bg-slate-900 text-slate-500 border border-slate-200 dark:border-slate-800 rounded-xl transition-all"
                                 title="طباعة مسودة التحليل"
                             >
-                                <Printer className="w-4 h-4" />
+                                <Printer className="w-3.5 h-3.5" />
                             </button>
                         </div>
                     </div>
@@ -537,7 +617,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                         
                         {/* Smooth index outline checklist */}
                         <div className="lg:col-span-1 bg-slate-50/50 dark:bg-slate-900/30 p-3 rounded-2xl border border-slate-150/40 dark:border-slate-800/50 space-y-2 max-h-[500px] overflow-y-auto">
-                            <span className="text-[10px] font-black text-slate-400 px-1 uppercase tracking-wider block mb-2">
+                            <span className="text-[10px] font-black text-slate-400 px-1 uppercase tracking-wider block mb-2 font-sans">
                                 فهرس بنود العقد المعالجة
                             </span>
                             <div className="space-y-1.5">
@@ -554,7 +634,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                         }}
                                         className={`w-full text-right p-2.5 rounded-xl transition-all text-[11px] font-bold block ${
                                             selectedParagraph === clause.index
-                                                ? 'bg-indigo-650 text-white shadow-md shadow-indigo-600/10'
+                                                ? 'bg-[#134D41] text-white shadow-md'
                                                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900/40'
                                         }`}
                                     >
@@ -567,15 +647,19 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                             </div>
                         </div>
 
-                        {/* Interactive Court Document Visual Design Screen */}
-                        <div className="lg:col-span-2 space-y-4 relative border-l border-slate-50 dark:border-slate-800/80 pl-4">
-                            
+                        {/* Interactive Court Document Visual Design Screen - Parchment Double-Bordered Style */}
+                        <div className="lg:col-span-2 space-y-4 relative border-[3px] border-[#134D41] bg-[#fcfbf7] dark:bg-slate-950 rounded-3xl p-6 shadow-md overflow-hidden min-h-[550px]">
+                            {/* Subtle water-marked legal scales of justice in background */}
+                            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] dark:opacity-[0.05] pointer-events-none select-none">
+                                <Scale className="w-[300px] h-[300px] text-[#134D41]" />
+                            </div>
+
                             {/* Kuwaiti Royal/Notary Traditional Double Dashed Margins Style Visualized Overlay */}
-                            <div className="absolute top-0 right-10 bottom-0 w-0.5 bg-rose-500/25 border-r border-dashed border-rose-500/20 pointer-events-none" />
-                            <div className="absolute top-0 right-11 bottom-0 w-0.5 bg-rose-500/15 border-r border-dashed border-rose-500/10 pointer-events-none" />
+                            <div className="absolute top-0 right-10 bottom-0 w-px bg-rose-500/15 pointer-events-none" />
+                            <div className="absolute top-0 right-11 bottom-0 w-px bg-[#134D41]/10 pointer-events-none" />
 
                             <div 
-                                className="text-slate-800 dark:text-slate-200 transition-all leading-relaxed font-semibold pr-12 pl-2 space-y-5"
+                                className="text-slate-800 dark:text-slate-200 transition-all leading-relaxed font-semibold pr-10 pl-2 space-y-5"
                                 style={{ fontSize: `${(zoomScale / 100) * 12.5}px` }}
                             >
                                 {viewerText.split('\n\n').map((para, idx) => {
@@ -588,13 +672,13 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                             onClick={() => setSelectedParagraph(idx)}
                                             className={`p-3.5 rounded-2xl cursor-pointer relative transition-all ${
                                                 isSelected 
-                                                ? 'bg-indigo-50/70 border-r-4 border-indigo-600 text-indigo-950 dark:bg-indigo-950/20 dark:text-indigo-100 shadow-sm'
-                                                : 'hover:bg-slate-50/80 dark:hover:bg-slate-900/40'
+                                                ? 'bg-[#134D41]/5 border-r-4 border-[#134D41] text-slate-950 dark:bg-[#134D41]/20 dark:text-indigo-100 shadow-sm'
+                                                : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/40'
                                             }`}
                                         >
                                             {/* Scroll check indicators */}
                                             {isSelected && (
-                                                <span className="absolute left-3 top-2.5 bg-indigo-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full select-none">
+                                                <span className="absolute left-3 top-2.5 bg-[#134D41] text-white text-[8px] font-black px-1.5 py-0.5 rounded-full select-none">
                                                     نشط للتعليق
                                                 </span>
                                             )}
@@ -603,7 +687,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                                 <span dangerouslySetInnerHTML={{
                                                     __html: para.replace(
                                                         new RegExp(`(${searchText})`, 'gi'),
-                                                        `<mark class="bg-yellow-250 border-b-2 border-yellow-500 text-slate-950 font-bold">$1</mark>`
+                                                        `<mark class="bg-yellow-200 border-b-2 border-yellow-500 text-slate-950 font-bold">$1</mark>`
                                                     )
                                                 }} />
                                             ) : (
@@ -619,19 +703,19 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                 <motion.div
                                     initial={{ scale: 2.5, rotate: 45, opacity: 0 }}
                                     animate={{ scale: 1, rotate: -15, opacity: 0.85 }}
-                                    className="absolute bottom-12 left-12 border-4 border-double border-indigo-800 rounded-full w-36 h-36 flex flex-col items-center justify-center p-3 text-center text-indigo-800 select-none cursor-not-allowed uppercase font-black tracking-tight"
+                                    className="absolute bottom-12 left-12 border-4 border-double border-[#134D41] rounded-full w-36 h-36 flex flex-col items-center justify-center p-3 text-center text-[#134D41] select-none cursor-not-allowed uppercase font-black tracking-tight"
                                 >
-                                    <div className="text-[10px]">مجموعة الصناعات</div>
+                                    <div className="text-[10px]">مكتب المحاماة</div>
                                     <div className="text-sm font-black text-rose-600">ختم الامتثال</div>
                                     <div className="text-[8px]">٢٥ مايو ٢٠٢٦</div>
-                                    <div className="text-[7px] tracking-widest font-mono text-indigo-700">Digital Approved</div>
+                                    <div className="text-[7px] tracking-widest font-mono text-[#134D41]">Digital Approved</div>
                                 </motion.div>
                             )}
                         </div>
 
                         {/* Annotations Margin Log & Input Forms */}
                         <div className="lg:col-span-1 space-y-5">
-                            <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-2">
+                            <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider mb-2 font-sans">
                                 هوامش التعليقات والملحوظات ({annotations.length})
                             </span>
 
@@ -641,18 +725,18 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                         key={comment.id}
                                         className={`p-3.5 rounded-2xl border text-[10px] space-y-2 shadow-sm ${
                                             comment.type === 'legal'
-                                            ? 'bg-indigo-50/50 dark:bg-indigo-950/15 border-indigo-100/60 dark:border-indigo-900/30 text-indigo-950 dark:text-indigo-200'
+                                            ? 'bg-emerald-50/50 dark:bg-[#134D41]/10 border-[#134D41]/20 text-emerald-950 dark:text-emerald-200'
                                             : comment.type === 'hr'
                                             ? 'bg-amber-50/60 dark:bg-amber-950/15 border-amber-100/60 text-amber-950 dark:text-amber-200'
-                                            : 'bg-emerald-50/50 dark:bg-emerald-950/15 border-emerald-100 text-emerald-950 dark:text-emerald-200'
+                                            : 'bg-teal-50/50 dark:bg-teal-950/15 border-teal-150 text-teal-950 dark:text-teal-200'
                                         }`}
                                     >
                                         <div className="flex justify-between items-center border-b border-black/5 pb-1">
-                                            <span className="font-black text-slate-700 dark:text-slate-350">
+                                            <span className="font-black text-slate-700 dark:text-slate-355">
                                                 البند {comment.clauseIndex + 1}
                                             </span>
                                             <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${
-                                                comment.type === 'legal' ? 'bg-indigo-600 text-white' : comment.type === 'hr' ? 'bg-amber-500 text-slate-900' : 'bg-emerald-600 text-white'
+                                                comment.type === 'legal' ? 'bg-[#134D41] text-white' : comment.type === 'hr' ? 'bg-amber-550 text-slate-900' : 'bg-teal-650 text-white'
                                             }`}>
                                                 {comment.type.toUpperCase()}
                                             </span>
@@ -667,7 +751,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                 ))}
 
                                 {annotations.length === 0 && (
-                                    <div className="text-center py-6 text-slate-400 text-[10px] font-medium">
+                                    <div className="text-center py-6 text-slate-400 text-[10px] font-medium font-sans">
                                         لا توجد تعليقات إدارية على مسودة العقد حتى الآن
                                     </div>
                                 )}
@@ -675,21 +759,21 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
 
                             {/* New annotation insertion console */}
                             <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-3xl border border-slate-150/50 dark:border-slate-850 space-y-3">
-                                <span className="text-[10px] font-black text-slate-500 block">
+                                <span className="text-[10px] font-black text-slate-500 block font-sans">
                                     أضف تعليقاً على البند {selectedParagraph + 1}
                                 </span>
                                 <textarea
                                     value={newAnnotation}
                                     onChange={(e) => setNewAnnotation(e.target.value)}
                                     placeholder={`اكتب رأيك المهني بخصوص البند ${selectedParagraph + 1} المظلل...`}
-                                    className="w-full bg-white dark:bg-dm-card border border-slate-100 dark:border-slate-800 text-[11px] font-bold rounded-2xl p-3 leading-normal focus:ring-1 focus:ring-indigo-605"
+                                    className="w-full bg-white dark:bg-dm-card border border-slate-200 dark:border-slate-800 text-[11px] font-bold rounded-2xl p-3 leading-normal focus:ring-1 focus:ring-[#134D41] text-right"
                                     rows={3}
                                 />
                                 <div className="space-y-2">
                                     <select
                                         value={newAnnotationType}
                                         onChange={(e) => setNewAnnotationType(e.target.value as any)}
-                                        className="w-full bg-white dark:bg-dm-card border border-slate-100 dark:border-slate-800 text-[10px] font-black h-8 px-2 rounded-xl"
+                                        className="w-full bg-white dark:bg-dm-card border border-slate-200 dark:border-slate-800 text-[10px] font-black h-8 px-2 rounded-xl"
                                     >
                                         <option value="legal">تدقيق المستشار المستعان به</option>
                                         <option value="hr">إمضاء الشؤون والموظفين</option>
@@ -698,7 +782,7 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                                     <button
                                         onClick={handleAddAnnotation}
                                         disabled={!newAnnotation.trim()}
-                                        className="w-full bg-indigo-650 hover:bg-slate-900 disabled:opacity-50 text-white text-[10px] font-black h-8 rounded-xl transition-all"
+                                        className="w-full bg-[#134D41] hover:bg-[#0f2d25] disabled:opacity-50 text-white text-[10px] font-black h-8 rounded-xl transition-all"
                                     >
                                         حفظ التعليق بالهامش
                                     </button>

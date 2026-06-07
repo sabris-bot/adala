@@ -2753,6 +2753,32 @@ const CaseListPage: React.FC = () => {
                 </div>
 
                 <AnimatePresence mode="wait">
+                    {cases.length === 0 ? (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center my-6 flex flex-col items-center justify-center max-w-xl mx-auto shadow-sm"
+                        >
+                            <div className="w-16 h-16 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                                <PlusCircleIcon className="w-8 h-8" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-2">منظومة القضايا والملفات فارغة حالياً</h3>
+                            <p className="text-sm text-gray-500 mb-6 max-w-sm font-sans">
+                                أهلاً بك في نظام عدالة لإدارة القضايا. يمكنك البدء في إضافة أول قضية يدوياً عبر النموذج المخصص لتعبئة الملاك، الأطراف، وتفاصيل المواعيد والجلسات.
+                            </p>
+                            <Button 
+                                onClick={() => {
+                                    setSelectedCase(null);
+                                    setIsFormModalOpen(true);
+                                }}
+                                className="flex items-center gap-2 bg-primary text-white"
+                            >
+                                <PlusCircleIcon className="w-5 h-5" />
+                                إضافة قضية جديدة
+                            </Button>
+                        </motion.div>
+                    ) : (
                     <motion.div
                         key={viewType}
                         initial={{ opacity: 0, y: 10 }}
@@ -2885,6 +2911,7 @@ const CaseListPage: React.FC = () => {
                             </div>
                         ) : renderBoardView() }
                     </motion.div>
+                    )}
                 </AnimatePresence>
                 
                 {filteredCases.length > 0 && <p className="pt-6 text-[9px] text-gray-400 text-center uppercase tracking-[0.2em] font-bold opacity-60">إجمالي القضايا النشطة: {filteredCases.length}</p>}

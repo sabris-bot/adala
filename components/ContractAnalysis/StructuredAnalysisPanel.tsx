@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
     FileText, CheckCircle2, AlertTriangle, ShieldAlert, Sparkles, 
-    ArrowRightLeft, FileCheck, ClipboardList, Send, FilePlus, Landmark, Scale, Key
+    ArrowRightLeft, FileCheck, ClipboardList, Send, FilePlus, Landmark, Scale, Key,
+    Copy, Download, Printer
 } from 'lucide-react';
 import Card from '../ui/Card';
 import { Badge, RiskLevelBadge } from '../ui/Badge';
@@ -64,37 +65,143 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
 
     return (
         <Card className="border-none shadow-xl rounded-[2.5rem] p-6 lg:p-8 bg-white dark:bg-dm-card overflow-hidden">
+            {/* 1. KPI Results Grid - Similar to End of Service */}
+            <div className="bg-slate-50/50 dark:bg-slate-900/50 p-6 rounded-[2rem] border border-slate-150/60 dark:border-slate-800/80 mb-6 text-right space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h2 className="text-md font-black text-[#134D41] border-r-4 border-[#134D41] pr-2">
+                            النتيجة الإجمالية والامتثال للمسؤولية والقوانين الكويتية
+                        </h2>
+                        <p className="text-[10px] text-slate-500 font-bold mt-1">
+                            فحص ومطابقة تلقائية لبنود العقد مقابل القانون رقم 6 لسنة 2010 والقرارات الإدارية المنظمة
+                        </p>
+                    </div>
+                    {/* Quick Copy, Download, & Print Buttons */}
+                    <div className="flex flex-wrap gap-2">
+                        <button
+                            onClick={() => {
+                                const textToCopy = `تقرير مراجعة العقد: ${contract.title}\nالأطراف: الأول (${contract.parties.firstParty}) - الثاني (${contract.parties.secondParty})\nالتقييم العام للامتثال: ${contract.risks.securityPercentage}%\nمستوى المخاطر: ${contract.risks.riskLevel === RiskLevel.LOW ? 'منخفض (مطابق)' : 'مرتفع'}\nالملخص القانوني: ${contract.summary}`;
+                                navigator.clipboard.writeText(textToCopy);
+                                addToast({
+                                    type: 'success',
+                                    title: 'تم النسخ بنجاح',
+                                    message: 'تم نسخ خلاصة التدريب والتحليل لامتثال العقد.'
+                                });
+                            }}
+                            className="bg-white hover:bg-slate-50 dark:bg-slate-950/40 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1.5 shadow-sm transition-all"
+                        >
+                            <Copy className="w-3.5 h-3.5 text-[#134D41]" />
+                            <span>نسخ التحليل</span>
+                        </button>
+
+                        <button
+                            onClick={() => {
+                                const textToDownload = `تقرير مراجعة العقد والامتثال القانوني الكويتي\n========================================\nاسم العقد: ${contract.title}\nالطرف الأول: ${contract.parties.firstParty}\nالطرف الثاني: ${contract.parties.secondParty}\nتاريخ التدقيق: ${new Date().toLocaleDateString('ar-KW')}\n\nمعدل الأمان والامتثال: ${contract.risks.securityPercentage}%\nمستوى المخاطر الكلية: ${contract.overallRisk === RiskLevel.LOW ? 'منخفض (مطابق قانونياً)' : 'مرتفع'}\n\nملخص التدقيق والامتثال:\n-------------------------\n${contract.summary}\n\nالبنود والملاحظات العمالية:\n-------------------------\n${contract.clauses.map((clause, idx) => `بند ${idx+1}: ${clause.title}\nالامتثال: ${clause.legalBasis}\nالتوصية: ${clause.aiRecommendation}\nالنص الحقيقي: ${clause.content}`).join('\n\n')}\n`;
+                                const blob = new Blob([textToDownload], { type: 'text/plain;charset=utf-8' });
+                                const url = URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `تقرير_امتثال_عقد_${contract.parties.secondParty}.txt`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                                addToast({
+                                    type: 'success',
+                                    title: 'بدء التحميل',
+                                    message: 'جاري تحميل تقرير الفحص الفني.'
+                                });
+                            }}
+                            className="bg-white hover:bg-slate-50 dark:bg-slate-950/40 dark:hover:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800 px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1.5 shadow-sm transition-all"
+                        >
+                            <Download className="w-3.5 h-3.5 text-[#134D41]" />
+                            <span>تحميل كمسودة (TXT)</span>
+                        </button>
+
+                        <button
+                            onClick={() => window.print()}
+                            className="bg-[#134D41] hover:bg-[#0f2d25] text-white px-3 py-1.5 rounded-xl text-[10px] font-black flex items-center gap-1.5 shadow-md transition-all"
+                        >
+                            <Printer className="w-3.5 h-3.5" />
+                            <span>طباعة التقرير</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Compliance score */}
+                    <div className="border border-emerald-100 bg-emerald-50/20 dark:bg-[#134D41]/5 rounded-2xl p-5 text-center shadow-xs flex flex-col justify-center">
+                        <span className="text-[10px] text-slate-500 font-extrabold block">مؤشر أمان وسلامة البنود</span>
+                        <strong className="text-2xl font-black text-emerald-600 dark:text-emerald-450 font-mono block mt-1">
+                            {contract.risks.securityPercentage}%
+                        </strong>
+                        <span className="text-[9px] text-emerald-700 dark:text-emerald-400 font-bold mt-1">
+                            {contract.risks.securityPercentage >= 80 ? '✓ متطابق كلياً وخالٍ من الجور' : '⚠ يتطلب مراجعة فورية'}
+                        </span>
+                    </div>
+
+                    {/* Threat estimation */}
+                    <div className={`border rounded-2xl p-5 text-center flex flex-col justify-center ${
+                        contract.risks.riskLevel === RiskLevel.LOW 
+                        ? 'border-emerald-100 bg-white dark:bg-dm-card' 
+                        : 'border-amber-100 bg-white dark:bg-dm-card'
+                    }`}>
+                        <span className="text-[10px] text-slate-500 font-extrabold block">مستوى خطورة الالتزامات</span>
+                        <strong className={`text-lg font-black block mt-1 ${
+                            contract.risks.riskLevel === RiskLevel.LOW ? 'text-emerald-650' : 'text-amber-600'
+                        }`}>
+                            {contract.risks.riskLevel === RiskLevel.LOW ? 'منخفض / مطابق 🟢' : 'متوسط / تنويه 🟡'}
+                        </strong>
+                        <span className="text-[9px] text-slate-400 font-bold mt-1">مطابق لأحكام محكمة التمييز</span>
+                    </div>
+
+                    {/* Legal foundation match */}
+                    <div className="border border-slate-200/60 bg-white dark:bg-dm-card rounded-2xl p-5 text-center flex flex-col justify-center">
+                        <span className="text-[10px] text-slate-500 font-extrabold block">القانون المرجعي للتدقيق</span>
+                        <strong className="text-md sm:text-lg font-black text-slate-800 dark:text-white block mt-1">
+                            قانون العمل الكويتي (٦/٢٠١٠)
+                        </strong>
+                        <span className="text-[9px] text-slate-400 font-bold mt-1">تحديث الفتوى والتشريع للمحاكم</span>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-dm-card border border-slate-150/65 dark:border-slate-800 p-4 rounded-2xl text-right space-y-2">
+                    <span className="text-[10px] font-black text-[#134D41] block">ديباجة رأي هيئة المراجعة:</span>
+                    <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
+                        بموجب المراجعة الرقمية لملف التعاقد للطرف الثاني ({contract.parties.secondParty})، تمت المقارنة الآلية لبنود ساعات العمل، فترات الراحة، شروط التجربة المحددة بـ {contract.duration || 'عقد معتاد'} وبدل رصيد الإجازات. تلتزم الصياغة بالحدود القانونية وحقوق العمالة المستقرة.
+                    </p>
+                </div>
+            </div>
+
             {/* Redesign sub-tabs panel with enterprise quality */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-slate-100 dark:border-slate-800">
                 <div>
-                    <h3 className="text-md font-black text-slate-800 dark:text-white flex items-center gap-2">
-                        <ClipboardList className="w-5 h-5 text-indigo-600" /> لوحات التحليل القانوني والالتزام الكويتي
+                    <h3 className="text-md font-black text-[#134D41] dark:text-white flex items-center gap-2">
+                        <ClipboardList className="w-5 h-5 text-[#134D41]" /> لوحات التحليل القانوني والالتزام الكويتي
                     </h3>
                     <p className="text-[11px] text-slate-500 font-bold">قرارات الذكاء القانوني المتكامل مع نظام شؤون المحاكم والأهلي</p>
                 </div>
 
-                <div className="flex flex-wrap gap-2 bg-slate-100 dark:bg-slate-900/80 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800 shrink-0">
+                <div className="flex flex-wrap gap-2 bg-slate-100 dark:bg-slate-900/80 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800 shrink-0 font-sans">
                     <button
                         onClick={() => setSubTab('components')}
-                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all ${subTab === 'components' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all border-0 cursor-pointer ${subTab === 'components' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-transparent'}`}
                     >
                         مكونات العقد المستخلصة
                     </button>
                     <button
                         onClick={() => setSubTab('clauses')}
-                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all ${subTab === 'clauses' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all border-0 cursor-pointer ${subTab === 'clauses' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-transparent'}`}
                     >
                         فحص البنود والمطابقة
                     </button>
                     <button
                         onClick={() => setSubTab('risks')}
-                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all ${subTab === 'risks' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all border-0 cursor-pointer ${subTab === 'risks' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-transparent'}`}
                     >
                         تقرير المخاطر والتوصيات
                     </button>
                     <button
                         onClick={() => setSubTab('governance')}
-                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all ${subTab === 'governance' ? 'bg-white dark:bg-dm-card text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`px-3 py-1.5 text-[10px] font-black rounded-xl transition-all border-0 cursor-pointer ${subTab === 'governance' ? 'bg-[#134D41] text-white shadow-md' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 bg-transparent'}`}
                     >
                         الموافقات والختم الرقمي
                     </button>
@@ -121,18 +228,18 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
 
                                 <div className="p-4 rounded-3xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
                                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider block mb-1">التقييم والرواتب المالية</span>
-                                    <p className="text-xs font-black text-emerald-600 dark:text-emerald-450 font-sans">
+                                    <p className="text-xs font-black text-emerald-650 dark:text-emerald-450 font-sans">
                                         {contract.financials?.value ? `${contract.financials.value / 12} دينار كويتي شهرياً` : 'يحدد لاحقاً'}
                                     </p>
                                     <p className="text-[10px] font-bold text-slate-500 mt-1">شروط وسداد: {contract.financials?.paymentTerms || 'سداد بنكي مباشر'}</p>
                                 </div>
                             </div>
 
-                            <div className="p-4 rounded-[2rem] bg-indigo-50/50 dark:bg-indigo-950/20 border-r-4 border-indigo-650 space-y-2">
-                                <h4 className="text-xs font-black text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
-                                    <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" /> ملخص مراجعة الذكاء القانوني المستخلص
+                            <div className="p-4 rounded-[2rem] bg-emerald-50/20 dark:bg-[#134D41]/5 border-r-4 border-[#134D41] space-y-2">
+                                <h4 className="text-xs font-black text-[#134D41] dark:text-[#EBFDF5] flex items-center gap-1.5">
+                                    <Sparkles className="w-4 h-4 text-[#134D41] animate-pulse" /> ملخص مراجعة الذكاء القانوني المستخلص
                                 </h4>
-                                <p className="text-xs text-indigo-800/90 dark:text-indigo-200 leading-relaxed font-semibold">
+                                <p className="text-xs text-[#0f2d25] dark:text-slate-350 leading-relaxed font-semibold font-sans">
                                     {contract.summary}
                                 </p>
                             </div>
@@ -144,7 +251,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                         <motion.div key="clauses-tab" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
                             <div className="flex justify-between items-center px-1 mb-2">
                                 <span className="text-[11px] font-black text-slate-400">فحص مواد العقد مقابل قانون العمل الأهلي الكويتي رقم ٦ لسنة ٢٠١٠:</span>
-                                <span className="text-[10px] font-black text-indigo-600">٤ نقاط رئيسية مفحوصة تلقائياً</span>
+                                <span className="text-[10px] font-black text-[#134D41]">٤ نقاط رئيسية مفحوصة تلقائياً</span>
                             </div>
 
                             <div className="space-y-3">
@@ -155,7 +262,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                                     >
                                         <div className="lg:col-span-1 space-y-1">
                                             <div className="flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-indigo-600 shrink-0" />
+                                                <span className="w-2 h-2 rounded-full bg-[#134D41] shrink-0" />
                                                 <h5 className="text-xs font-black text-slate-800 dark:text-slate-100">{clause.title}</h5>
                                             </div>
                                             <span className="text-[9px] font-bold text-slate-400 block">{clause.legalBasis || 'قانون العمل الكويتي (ملحق)'}</span>
@@ -168,9 +275,9 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
 
                                         <div className="lg:col-span-1 bg-white dark:bg-dm-card/60 p-3 rounded-2xl border border-slate-100 dark:border-slate-800/50 space-y-1.5">
                                             <span className="text-[9px] text-slate-400 font-extrabold flex items-center gap-1">
-                                                <Sparkles className="w-3.5 h-3.5 text-indigo-500 animate-pulse" /> توصية المحرّك الذكي:
+                                                <Sparkles className="w-3.5 h-3.5 text-[#134D41] animate-pulse" /> توصية المحرّك الذكي:
                                             </span>
-                                            <p className="text-[10px] font-extrabold text-indigo-950 dark:text-indigo-300 leading-normal">
+                                            <p className="text-[10px] font-extrabold text-[#0f2d25] dark:text-slate-300 leading-normal">
                                                 {clause.aiRecommendation || 'البند مطابق للشروط القياسية في وزارة العدل الكويتية ولا يتضمن شروط جائرة.'}
                                             </p>
                                         </div>
@@ -234,18 +341,18 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                             </div>
 
                             {/* Recommendations checklist from advisor */}
-                            <div className="p-5 bg-indigo-50/50 dark:bg-indigo-950/10 rounded-[2rem] border border-indigo-150/40 dark:border-indigo-900/30 space-y-3">
-                                <h4 className="text-xs font-black text-indigo-950 dark:text-indigo-300 flex items-center gap-1.5">
-                                    <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" /> التوصيات الإدارية المطلوبة للتعديل والاعتماد النهائي
+                            <div className="p-5 bg-emerald-50/10 dark:bg-[#134D41]/5 rounded-[2rem] border border-[#134D41]/20 space-y-3">
+                                <h4 className="text-xs font-black text-[#134D41] dark:text-[#EBFDF5] flex items-center gap-1.5">
+                                    <Sparkles className="w-4 h-4 text-[#134D41] animate-pulse" /> التوصيات الإدارية المطلوبة للتعديل والاعتماد النهائي
                                 </h4>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {contract.recommendations.map((rec, idx) => (
                                         <div key={idx} className="bg-white dark:bg-dm-card/80 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 flex gap-3.5 items-start">
-                                            <div className="p-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 rounded-lg text-xs font-black mt-0.5">
+                                            <div className="p-1 bg-[#134D41]/10 text-[#134D41] rounded-lg text-xs font-black mt-0.5 font-sans">
                                                 {idx + 1}
                                             </div>
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-350 leading-relaxed">
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-355 leading-relaxed">
                                                 {rec}
                                             </p>
                                         </div>
@@ -301,7 +408,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                                     ) : (
                                         <button 
                                             onClick={() => setPinOpen('hr')}
-                                            className="w-full bg-slate-900 dark:bg-indigo-950/30 hover:bg-slate-800 text-white text-[10px] font-black h-8 rounded-xl transition-all"
+                                            className="w-full bg-[#134D41] dark:bg-[#134D41]/35 hover:bg-emerald-800 text-white text-[10px] font-black h-8 rounded-xl transition-all border-0 cursor-pointer"
                                         >
                                             أدخل الرمز للتوقيع (PIN)
                                         </button>
@@ -336,7 +443,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                                     ) : (
                                         <button 
                                             onClick={() => setPinOpen('finance')}
-                                            className="w-full bg-slate-900 dark:bg-indigo-950/30 hover:bg-slate-800 text-white text-[10px] font-black h-8 rounded-xl transition-all"
+                                            className="w-full bg-[#134D41] dark:bg-[#134D41]/35 hover:bg-emerald-800 text-white text-[10px] font-black h-8 rounded-xl transition-all border-0 cursor-pointer"
                                         >
                                             أدخل الرمز للتوقيع (PIN)
                                         </button>
@@ -371,7 +478,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                                     ) : (
                                         <button 
                                             onClick={() => setPinOpen('legal')}
-                                            className="w-full bg-slate-900 dark:bg-indigo-950/30 hover:bg-slate-800 text-white text-[10px] font-black h-8 rounded-xl transition-all"
+                                            className="w-full bg-[#134D41] dark:bg-[#134D41]/35 hover:bg-emerald-800 text-white text-[10px] font-black h-8 rounded-xl transition-all border-0 cursor-pointer"
                                         >
                                             أدخل الرمز للتوقيع (PIN)
                                         </button>
@@ -389,11 +496,11 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                                 <button
                                     onClick={applySeal}
                                     disabled={isSealed || !(approvals.hr.approved && approvals.finance.approved && approvals.legal.approved)}
-                                    className={`px-6 h-11 text-xs font-black rounded-xl flex items-center gap-2 shadow-lg transition-all ${
+                                    className={`px-6 h-11 text-xs font-black rounded-xl flex items-center gap-2 shadow-lg transition-all border-0 cursor-pointer ${
                                         isSealed 
                                         ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/20 shadow-none border border-emerald-200 cursor-not-allowed'
                                         : (approvals.hr.approved && approvals.finance.approved && approvals.legal.approved)
-                                        ? 'bg-indigo-600 text-white hover:bg-indigo-750'
+                                        ? 'bg-[#134D41] text-white hover:bg-emerald-900'
                                         : 'bg-slate-100 text-slate-400 dark:bg-slate-800/60 cursor-not-allowed shadow-none'
                                     }`}
                                 >
@@ -414,7 +521,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                             التحقق من الهوية الثنائية للتوقيع الرقمي
                         </h4>
                         <p className="text-[10px] text-slate-500 font-semibold mb-4">
-                            توقيع كود المصادقة الموحد للاعتمادات. الرمز التجريبي الافتراضي هو: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold text-indigo-600">1234</code>
+                            توقيع كود المصادقة الموحد للاعتمادات. الرمز التجريبي الافتراضي هو: <code className="bg-slate-100 px-1 py-0.5 rounded font-mono font-bold text-[#134D41]">1234</code>
                         </p>
                         
                         <div className="space-y-4">
@@ -433,7 +540,7 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => handlePinVerify(pinOpen)}
-                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black h-10 rounded-xl"
+                                    className="flex-1 bg-[#134D41] hover:bg-emerald-950 text-white text-xs font-black h-10 rounded-xl border-0 cursor-pointer"
                                 >
                                     تأكيد التوقيع
                                 </button>

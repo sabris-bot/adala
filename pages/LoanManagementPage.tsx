@@ -38,7 +38,7 @@ const LoanManagementPage: React.FC = () => {
   // Core State Engines
   const [loans, setLoans] = useState<Loan[]>(initialLoans);
   const [logs, setLogs] = useState<LoanActivityLog[]>(initialLoanLogs);
-  const [employees] = useState<Employee[]>(initialEmployees);
+  const [employees] = useState<Employee[]>(initialEmployees as unknown as Employee[]);
 
   // Search/Filters states
   const [searchTerm, setSearchTerm] = useState<string>('');

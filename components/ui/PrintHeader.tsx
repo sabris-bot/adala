@@ -60,9 +60,10 @@ const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction
                     <div className="bg-white p-2 border-2 border-primary/20 rounded-full shadow-sm mb-1 scale-110 md:scale-120">
                         <Logo variant="dark" showText={false} className="w-10 h-10" />
                     </div>
-                    <div className="flex flex-col items-center leading-none">
-                        <span className="text-[9px] font-black text-primary tracking-[0.2em] uppercase">ADALA</span>
+                    <div className="flex flex-col items-center leading-none text-center">
+                        <span className="text-[9px] font-black text-primary tracking-[0.2em] uppercase">ADALAH</span>
                         <span className="text-lg font-marhey font-bold text-primary">عدالة</span>
+                        <span className="text-[7.5px] font-tajawal font-black text-gray-400 mt-1.5 block">منظومة الإدارة القانونية المتكاملة v3</span>
                     </div>
                 </div>
 

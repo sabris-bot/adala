@@ -102,6 +102,7 @@ import PropertyDocumentsPage from './pages/PropertyDocumentsPage';
 import LegalDeadlinesPage from './pages/LegalDeadlinesPage';
 import LegalFinancialCalculatorPage from './pages/LegalFinancialCalculatorPage';
 import InheritanceCalculatorPage from './pages/InheritanceCalculatorPage';
+import { DeedsPrintingStudioPage } from './pages/DeedsPrintingStudioPage';
 
 
 // Removed old manual toast components
@@ -216,6 +217,15 @@ const AppContent: React.FC = () => {
 
   return (
     <BrowserRouter>
+      {/* Global Print Layout Header & Footer */}
+      <div className="global-print-header">
+        <div className="global-print-header-logo">عدالة</div>
+        <div className="global-print-header-office">مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</div>
+      </div>
+      <div className="global-print-footer">
+        بيانات التواصل: هاتف: 22440099 | واتساب: 99001122 | البريد الإلكتروني: info@shattalaw.com | برج الحمراء، الدور 35، الكويت
+      </div>
+
       <div className="flex h-screen bg-neutral-bg dark:bg-dm-background relative"> 
         <Sidebar isOpen={isSidebarOpen} toggleSidebar={toggleSidebar} />
         <div className="flex-1 flex flex-col overflow-hidden relative">
@@ -256,6 +266,7 @@ const AppContent: React.FC = () => {
                 <Route path="/legal-representation" element={<LegalRepresentationPage />} /> 
                 <Route path="/notifications" element={<NotificationsManagementPage />} /> 
                 <Route path="/legal-forms" element={<LegalFormsPage />} />
+                <Route path="/deeds-print" element={<DeedsPrintingStudioPage />} />
                 <Route path="/resources" element={<LegalResourcesPage />} /> 
                 
                 <Route path="/property-management" element={<PropertyManagementPage />} />

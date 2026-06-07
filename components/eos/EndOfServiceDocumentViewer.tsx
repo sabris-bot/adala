@@ -8,7 +8,7 @@ import { useLanguage } from '../i18n/LanguageProvider';
 
 interface EndOfServiceDocumentViewerProps {
   activeCase: EOS_Settlement;
-  activeRole: 'hr' | 'legal' | 'finance' | 'gm';
+  activeRole: 'hr' | 'legal' | 'finance' | 'manager' | 'gm' | 'executive';
   onSignOff: (updatedSignatures: any, updatedApprovals: any, comment: string) => void;
 }
 
@@ -104,6 +104,35 @@ export const EndOfServiceDocumentViewer: React.FC<EndOfServiceDocumentViewerProp
     return numStr.replace(/[0-9]/g, (w) => easternNumbers[parseInt(w)]);
   };
 
+  // Load dynamic office names to synchronize with user profile preferences
+  const officeNameAr = useMemo(() => {
+    try {
+      const savedOffice = localStorage.getItem('profile_office_info');
+      if (savedOffice) {
+        const parsed = JSON.parse(savedOffice);
+        if (parsed.name) return parsed.name;
+      }
+    } catch (e) {
+      console.error('Error loading dynamic office name in document viewer', e);
+    }
+    return "مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية";
+  }, []);
+
+  const officeNameEn = useMemo(() => {
+    try {
+      const savedOffice = localStorage.getItem('profile_office_info');
+      if (savedOffice) {
+        const parsed = JSON.parse(savedOffice);
+        if (parsed.name && parsed.name !== "مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية") {
+          return parsed.name.replace(/مكتب المحامي/g, "Lawyer").replace(/للمحاماة والاستشارات القانونية/g, "Law Firm & Legal Consultations");
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return "Sabri Shatta Law Firm & Legal Consultations";
+  }, []);
+
   // Generate textual content for the 10 document types dynamically (AR and EN Symmetrical Duality)
   const documentContent = useMemo(() => {
     const isAr = language === 'ar';
@@ -115,7 +144,7 @@ export const EndOfServiceDocumentViewer: React.FC<EndOfServiceDocumentViewerProp
 الرقم المرجعي للسند المعتمد: [ ${toEasternArabicNumerals(String(activeCase.settlementNumber || activeCase.id))} ]
 التاريخ الفعلي للمخالصة الصادرة: ${toEasternArabicNumerals(printDate)}
 
-بموجب حضور الأطراف المعنية، يقرر قسم الشؤون القانونية والموارد البشرية بمكتب المحامي صبري شطا للمحاماة والاستشارات القانونية بأن الموظف المذكور أدناه قد تمت براءة ذمته المالية تجاه المنشأة بصفة نهائية:
+بموجب حضور الأطراف المعنية، يقرر قسم الشؤون القانونية والموارد البشرية بـ [ ${officeNameAr} ] برعاية [ عدالة - منظومة الإدارة القانونية المتكاملة v3 ] بأن الموظف المذكور أدناه قد تمت براءة ذمته المالية تجاه المنشأة بصفة نهائية:
 
 ■ بيانات الموظف المعتمدة:
   • اسم الموظف: السيد/ ${activeCase.employeeName}
@@ -137,7 +166,7 @@ export const EndOfServiceDocumentViewer: React.FC<EndOfServiceDocumentViewerProp
 Reference Verification ID: [ ${activeCase.settlementNumber || activeCase.id} ]
 Date of Clearance Issuance: ${printDate}
 
-By present witness, the Department of HR and Legal Affairs of Sabri Shatta Law Firm & Legal Consultations hereby certifies that the employee listed below has settled all their obligations and custody assets:
+By present witness, the Department of HR and Legal Affairs of [ ${officeNameEn} ] (Powered by Adalah Legal Management System v3) hereby certifies that the employee listed below has settled all their obligations and custody assets:
 
 ■ Employee Profiles & Custody Details:
   • Employee Name: Mr. ${activeCase.employeeName}
@@ -162,7 +191,7 @@ Therefore, this certificate is issued to confirm that the employee has no outsta
 الرقم التسلسلي الصادر: Ref-#-EXP-${toEasternArabicNumerals(String(activeCase.id))}
 تاريخ الطباعة المعتمدة: ${toEasternArabicNumerals(printDate)}
 
-يشهد مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية بدولة الكويت بأن السيد/ ${activeCase.employeeName}، الحامل للرقم المدني [ ${toEasternArabicNumerals(activeCase.employeeId)} ] وبموجب جنسيته [ ${activeCase.nationality || 'غير كويتي'} ]، قد عمل لدينا بانتظام وتفاني تام:
+يشهد [ ${officeNameAr} ] بدولة الكويت (برعاية عدالة - منظومة الإدارة القانونية المتكاملة) بأن السيد/ ${activeCase.employeeName}، الحامل للرقم المدني [ ${toEasternArabicNumerals(activeCase.employeeId)} ] وبموجب جنسيته [ ${activeCase.nationality || 'غير كويتي'} ]، قد عمل لدينا بانتظام وتفاني تام:
 
 • المسمى الوظيفي المعتاد: ${activeCase.jobTitle || 'عضو الكادر التقني والقانوني'}
 • القسم والقطاع المعين به: ${activeCase.department || 'إدارة الشؤون والتشغيل المهني'}
@@ -300,7 +329,7 @@ A special audit committee was formed by the Asset Management division to inspect
 
 أقر أنا الموظف الموقع أدناه بكامل أهليتي الوجوبية العقلية وإرادتي الحرة المستقلة بما يلي:
 
-١. أنني قد استلمت من جهة عملي [ مكتب المحامي صبري شطا ] كافة مستحقاتي ونهاية خدمتي العمالية والراتب المتأخر وتعويض إجازاتي السنوية البالغ صافيها الرقمي: [ ${toEasternArabicNumerals(formattedNet)} دينار كويتي لا غير ]، وذلك بموجب تفويض تحويل بنكي مباشر لصالح حساب الأيبان الخاص بي.
+١. أنني قد استلمت من جهة عملي [ ${officeNameAr} ] كافة مستحقاتي ونهاية خدمتي العمالية والراتب المتأخر وتعويض إجازاتي السنوية البالغ صافيها الرقمي: [ ${toEasternArabicNumerals(formattedNet)} دينار كويتي لا غير ]، وذلك بموجب تفويض تحويل بنكي مباشر لصالح حساب الأيبان الخاص بي.
 
 ٢. أنني بموجب توقيع هذا السند، أعلن براءة طرف جهة عملي براءة تامة، مطلقة، مانعة، ولا رجعة فيها عمالياً وقانونياً أمام المحاكم والهيئات بوزارة القوى العاملة بدولة الكويت من أي علاقة عمالية سابقة أو حالية، سارية أو مستقبلية.
 
@@ -411,7 +440,7 @@ Net Entitlements Eligible for Remittance:
 تاريخ التوثيق للصلح: ${toEasternArabicNumerals(printDate)}
 
 إنه في هذا اليوم المبرم، تم الاتفاق والصلح الرضائي الودي بين كل من:
-• الطرف الأول (صاحب العمل): مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية
+• الطرف الأول (صاحب العمل): ${officeNameAr} (برعاية عدالة - منظومة الإدارة القانونية المتكاملة v3)
 • الطرف الثاني (العامل): السيد/ ${activeCase.employeeName}
 
 تمهيداً للمصالحة، وبموجب نشوء خلاف عمالي حول تصفية نهاية الخدمة وقواعد الخصم، اتفق الطرفان طوعاً وبنية حسنة على فض الخلاف حبياً خارج قاعات المحاكم كالتالي:
@@ -551,8 +580,15 @@ By executing this comprehensive instrument, I, the undersigned employee, in full
       updatedSignatures.fin = `Chief Auditor: ${timestampStr}`;
       updatedApprovals.finance = 'مكتمل';
       finalStatus = 'FinanciallyApproved';
+    } else if (activeRole === 'manager') {
+      updatedSignatures.manager = `Direct Manager: ${timestampStr}`;
+      updatedApprovals.manager = 'معتمد';
     } else if (activeRole === 'gm') {
       updatedApprovals.gm = 'معتمد';
+      finalStatus = 'Completed';
+    } else if (activeRole === 'executive') {
+      updatedSignatures.executive = `Executive CEO: ${timestampStr}`;
+      updatedApprovals.executive = 'معتمد';
       finalStatus = 'Completed';
     }
 
@@ -640,27 +676,216 @@ Net Amount Payable,${activeCase.netPayable},Net approved amount for bank remitta
                 font-size: 11px; 
                 font-weight: 500;
               }
-              .header { 
-                display: flex; 
-                justify-content: space-between; 
-                border-b: 2px solid #00796B; 
-                padding-bottom: 12px; 
-                margin-bottom: 25px; 
-                align-items: center;
+              .legal-print-header {
+                display: flex;
+                flex-direction: column;
+                width: 100%;
+                font-family: inherit;
               }
-              .office-title { 
-                color: #00796B; 
-                font-size: 13px; 
-                font-weight: 900; 
+              .bar-upper {
+                width: 100%;
+                height: 4px;
+                background-color: #00796B;
+                margin-bottom: 2px;
+              }
+              .bar-sub {
+                width: 100%;
+                height: 1.5px;
+                background-color: rgba(0, 121, 107, 0.3);
+                margin-bottom: 20px;
+              }
+              .flex-header {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 20px;
+                padding-bottom: 8px;
+              }
+              .col-right {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+                width: 35%;
+                text-align: right;
+              }
+              .col-center {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex-grow: 1;
+              }
+              .col-left {
+                display: flex;
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: flex-end;
+                gap: 12px;
+                width: 35%;
+              }
+              .office-name-ar {
+                font-size: 15px;
+                font-weight: 900;
+                color: #00796B;
+                margin: 0 0 2px 0;
+                line-height: 1.2;
+              }
+              .office-name-en {
+                font-size: 13px;
+                font-weight: bold;
+                color: #00796B;
+                margin: 0 0 2px 0;
+                line-height: 1.2;
+                font-family: 'Inter', sans-serif;
+                text-align: left;
+              }
+              .subtitle-ar {
+                font-size: 9px;
+                font-weight: 950;
+                color: #475569;
+                margin: 0;
+              }
+              .subtext-ar {
+                font-size: 8px;
+                font-weight: bold;
+                color: #64748b;
+                margin: 2px 0 0 0;
+              }
+              .subtext-mono {
+                font-size: 8px;
+                font-family: monospace;
+                color: #94a3b8;
+                margin: 2px 0 0 0;
+              }
+              .logo-box {
+                background-color: #fff;
+                padding: 6px;
+                border: 2px solid rgba(0, 121, 107, 0.15);
+                border-radius: 50%;
+                margin-bottom: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .logo-badge {
+                width: 34px;
+                height: 34px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #134D41 0%, #00796B 100%);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: #fff;
+                font-weight: 800;
+                font-size: 12px;
+              }
+              .logo-brand-en {
+                font-size: 8px;
+                font-weight: 900;
+                color: #00796B;
+                letter-spacing: 0.15em;
+                margin: 1px 0 0 0;
+              }
+              .logo-brand-ar {
+                font-size: 13px;
+                font-weight: bold;
+                color: #00796B;
+                margin: 0;
+              }
+              .logo-brand-sub {
+                font-size: 7px;
+                font-weight: bold;
+                color: #94a3b8;
+                margin: 2px 0 0 0;
+              }
+              .qr-container {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 4px;
+                background-color: #fff;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                flex-shrink: 0;
+              }
+              .meta-box {
+                background-color: #f8fafc;
+                padding: 4px 6px;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                font-size: 8px;
+                font-family: monospace;
+                color: #475569;
+                text-align: left;
+                white-space: nowrap;
+                align-self: flex-start;
+              }
+              .title-banner {
+                margin-top: 15px;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                width: 100%;
+              }
+              .title-line {
+                position: absolute;
+                top: 50%;
+                left: 0;
+                width: 100%;
+                height: 1px;
+                background-color: #cbd5e1;
+                z-index: 1;
+              }
+              .title-badge {
+                background-color: #ffffff;
+                border: 2px solid rgba(0, 121, 107, 0.2);
+                padding: 8px 24px;
+                border-radius: 12px;
+                text-align: center;
+                z-index: 2;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+              }
+              .title-badge h1 {
+                font-size: 13px;
+                font-weight: 900;
+                color: #00796B;
+                margin: 0;
+              }
+              .title-badge p {
+                font-size: 8px;
+                color: #475569;
+                font-weight: bold;
+                margin: 4px 0 0 0;
+                text-decoration: underline;
+                text-decoration-color: rgba(0, 121, 107, 0.2);
+                text-underline-offset: 3px;
+              }
+              .bar-lower-double {
+                margin-top: 12px;
+                width: 100%;
+                height: 2.5px;
+                background-color: rgba(0, 121, 107, 0.3);
+                margin-bottom: 2px;
+              }
+              .bar-lower-single {
+                width: 100%;
+                height: 0.5px;
+                background-color: rgba(0, 121, 107, 0.15);
+                margin-bottom: 25px;
               }
               .content { 
                 white-space: pre-wrap; 
                 margin-bottom: 30px; 
-                border: 1px solid #e2e8f0; 
-                border-radius: 8px; 
-                background-color: #fafafa; 
+                border: 1px solid #cbd5e1; 
+                border-radius: 10px; 
+                background-color: #f8fafc; 
                 padding: 25px; 
-                box-shadow: inset 0 0 10px rgba(0,0,0,0.02);
+                box-shadow: inset 0 1px 3px rgba(0,0,0,0.02);
+                font-size: 11px;
+                font-weight: 600;
+                color: #334155;
               }
               .signature-title { 
                 font-weight: 900; 
@@ -715,27 +940,71 @@ Net Amount Payable,${activeCase.netPayable},Net approved amount for bank remitta
             </style>
           </head>
           <body onload="window.print()">
-            <div class="header">
-              <!-- Header aligns dynamically to translation layout context rules -->
-              ${isAr ? `
-                <div style="text-align: right;">
-                  <span class="office-title">مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</span>
-                  <div style="font-size: 8.5px; color: #64748b; margin-top: 3px;">منظومة براءة الذمة والتسويات العمالية الموحدة</div>
+            <div class="legal-print-header" dir="rtl">
+              <div class="bar-upper"></div>
+              <div class="bar-sub"></div>
+              
+              <div class="flex-header">
+                <!-- Right Side: Arabic Office Name & Credentials -->
+                <div class="col-right">
+                  <h2 class="office-name-ar">${officeNameAr}</h2>
+                  <p class="subtitle-ar">للمحاماة والاستشارات القانونية والتحكيم</p>
+                  <p class="subtext-ar">المقر الرئيسي: مرخص لدى كافة درجات المحاكم</p>
+                  <p class="subtext-mono">الرقم الموحد: 7766554433</p>
                 </div>
-                <div style="text-align: left; font-size: 9px; font-family: monospace;">
-                  <strong>سند رقم: ${toEasternArabicNumerals(String(activeCase.settlementNumber || activeCase.id))}</strong><br/>
-                  تاريخ الطباعة: ${toEasternArabicNumerals(printDate)}
+                
+                <!-- Center: Logo and Branding -->
+                <div class="col-center">
+                  <div class="logo-box">
+                    <div class="logo-badge">⚖</div>
+                  </div>
+                  <span class="logo-brand-en">ADALAH</span>
+                  <span class="logo-brand-ar">عدالة</span>
+                  <span class="logo-brand-sub">منظومة الإدارة القانونية المتكاملة v3</span>
                 </div>
-              ` : `
-                <div style="text-align: left; font-size: 9px; font-family: monospace;">
-                  <strong>Ref No: #${activeCase.settlementNumber || activeCase.id}</strong><br/>
-                  Date of Issue: ${printDate}
+                
+                <!-- Left Side: English Office Name & Document Metas + QR Code Support -->
+                <div class="col-left" dir="ltr">
+                  <div class="qr-container">
+                    <svg width="42" height="42" viewBox="0 0 100 100" fill="#0f172a">
+                      <rect width="100" height="100" fill="white" />
+                      <path d="M5,5 h30 v30 h-30 z M15,15 h10 v10 h-10 z" />
+                      <path d="M65,5 h30 v30 h-30 z M75,15 h10 v10 h-10 z" />
+                      <path d="M5,65 h30 v30 h-30 z M15,75 h10 v10 h-10 z" />
+                      <rect x="45" y="5" width="10" height="10" />
+                      <rect x="45" y="25" width="10" height="15" />
+                      <rect x="5" y="45" width="15" height="10" />
+                      <rect x="25" y="45" width="10" height="10" />
+                      <rect x="45" y="45" width="20" height="20" />
+                      <rect x="75" y="45" width="10" height="15" />
+                      <rect x="75" y="70" width="20" height="20" />
+                      <rect x="45" y="75" width="15" height="10" />
+                    </svg>
+                    <span style="font-size: 6px; font-family: monospace; font-weight: bold; color: #94a3b8; margin-top: 2px;">سند آمن</span>
+                  </div>
+                  
+                  <div class="header-left-meta">
+                    <h2 class="office-name-en">${officeNameEn}</h2>
+                    <span style="font-size: 8px; color: #64748b; font-weight: 600; text-transform: uppercase;">Law Firm & Legal consultations</span>
+                    <div class="meta-box">
+                      <div>Date: ${printDate}</div>
+                      <div>Ref: EOS-${toEasternArabicNumerals(String(activeCase.settlementNumber || activeCase.id))}</div>
+                    </div>
+                  </div>
                 </div>
-                <div style="text-align: right;">
-                  <span class="office-title">Sabri Shatta Law Firm & Legal Consultations</span>
-                  <div style="font-size: 8.5px; color: #64748b; margin-top: 3px;">Unified End of Service & Labor Settlement System</div>
+              </div>
+              
+              <!-- Document Title Section -->
+              <div class="title-banner">
+                <div class="title-line"></div>
+                <div class="title-badge">
+                  <h1>${activeTitle}</h1>
+                  <p>${isAr ? 'عقد تصفية ومخالصة عمالية معتمدة' : 'Official Mutual Release & Labor Settlement Key'}</p>
                 </div>
-              `}
+              </div>
+              
+              <div class="bar-lower-double"></div>
+              <div class="bar-lower-single"></div>
             </div>
             
             <div class="content">${editableText}</div>
@@ -830,10 +1099,10 @@ Net Amount Payable,${activeCase.netPayable},Net approved amount for bank remitta
           <div className="flex justify-between items-start border-b-2 border-primary pb-4 gap-4">
             <div className="space-y-1 text-start">
               <h3 className="font-extrabold text-sm text-primary tracking-tight font-tajawal">
-                {isAr ? 'مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية' : 'Sabri Shatta Law Firm & Legal Consultations'}
+                {isAr ? officeNameAr : officeNameEn}
               </h3>
               <p className="text-[9px] text-gray-500 font-bold">
-                {isAr ? 'بوابة أتمتة صياغة وصرف مستحقات المباشرة للكادر والعمل القطاع الأهلي' : 'Automation Gateway for Employee Entitlements & Kuwait Private Labor Settlement'}
+                {isAr ? 'عدالة - منظومة الإدارة القانونية المتكاملة v3 | بوابة صياغة وصرف مستحقات نهاية الخدمة والعمل' : 'Adalah - Integrated Legal Management System v3 | Unified Labor Settlement Gateway'}
               </p>
             </div>
             <div className="text-end leading-none font-mono shrink-0 space-y-1.5">

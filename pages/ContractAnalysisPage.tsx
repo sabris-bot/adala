@@ -337,17 +337,17 @@ const ContractAnalysisPage: React.FC = () => {
             {/* Main Premium UI Hub Header with integrated tabs */}
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-dm-card p-6 rounded-[2.5rem] shadow-xl border border-slate-100 dark:border-slate-800/80 print:hidden">
                 <div className="flex items-center gap-4">
-                    <div className="p-4 bg-gradient-to-br from-indigo-505 to-indigo-700 bg-indigo-600 text-white rounded-2xl shadow-xl shadow-indigo-500/10">
+                    <div className="p-4 bg-[#134D41] text-white rounded-2xl shadow-xl">
                         <Scale className="w-8 h-8" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Smart Module v3.5</span>
+                            <span className="bg-[#134D41]/10 text-[#134D41] dark:bg-[#134D41]/20 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Smart Module v3.5</span>
                             <span className="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
                                 ✓ متوافق كلياً مع قوانين العمل الكويتية
                             </span>
                         </div>
-                        <h1 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">مجمع تحليل وحوكمة العقود الذكي</h1>
+                        <h1 className="text-2xl font-black text-[#134D41] tracking-tight">مجمع تحليل وحوكمة العقود الذكي</h1>
                         <p className="text-slate-500 text-xs font-bold mt-1">عارض احترافي وبوابة مراجعة للبنود، كشف ثغرات الأختام ومطابقة الامتثال</p>
                     </div>
                 </div>
@@ -355,44 +355,44 @@ const ContractAnalysisPage: React.FC = () => {
                 <div className="flex flex-wrap bg-slate-100 dark:bg-slate-900/60 p-1 rounded-2xl border border-slate-200/50 dark:border-slate-800">
                     <button 
                         onClick={() => setActiveTab('dashboard')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'dashboard' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'dashboard' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         <LayoutGrid className="w-4 h-4" />
                         المرصد العام
                     </button>
                     <button 
                         onClick={() => setActiveTab('analyze')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'analyze' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'analyze' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         <FileText className="w-4 h-4" />
                         عارض العقود والتحليل
                     </button>
                     <button 
                         onClick={() => setActiveTab('compare')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'compare' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'compare' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         <Scale className="w-4 h-4" />
                         محرك المقارنة
                     </button>
                     <button 
                         onClick={() => setActiveTab('editor')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'editor' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         <PenTool className="w-4 h-4" />
                         محرك الصياغة
                     </button>
                     <button 
                         onClick={() => setActiveTab('library')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'library' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'library' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
                         <BookOpen className="w-4 h-4" />
                         الأرشيف والمكتبة
                     </button>
                     <button 
                         onClick={() => setActiveTab('report')}
-                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'report' ? 'bg-white dark:bg-dm-card shadow-lg text-indigo-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${activeTab === 'report' ? 'bg-white dark:bg-dm-card shadow-lg text-[#134D41]' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                     >
-                        <ClipboardList className="w-4 h-4 text-indigo-500" />
+                        <ClipboardList className="w-4 h-4 text-[#134D41]" />
                         التقرير والطباعة الرسمية
                     </button>
                 </div>
@@ -416,7 +416,7 @@ const ContractAnalysisPage: React.FC = () => {
                                         placeholder="بحث بالاسم أو التابع..." 
                                         value={contractsFilter.search}
                                         onChange={(e) => setContractsFilter({ ...contractsFilter, search: e.target.value })}
-                                        className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-4 rounded-xl focus:ring-2 focus:ring-indigo-600 transition-all text-right"
+                                        className="bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 text-xs font-bold h-10 px-4 rounded-xl focus:ring-2 focus:ring-[#134D41] transition-all text-right"
                                     />
                                     <Select 
                                         value={contractsFilter.category} 
@@ -572,8 +572,8 @@ const ContractAnalysisPage: React.FC = () => {
                         <div className="xl:col-span-4 space-y-6">
                             <Card className="border-none shadow-xl rounded-[2rem] p-6 bg-white dark:bg-dm-card space-y-5">
                                 <div>
-                                    <h3 className="text-md font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                        <PenTool className="w-5 h-5 text-indigo-600" /> مجمع صياغة النماذج الكويتية
+                                    <h3 className="text-md font-black text-[#134D41] flex items-center gap-2">
+                                        <PenTool className="w-5 h-5" /> مجمع صياغة النماذج العمالية الكويتية
                                     </h3>
                                     <p className="text-[11px] text-slate-500 font-bold mt-1">تعديل المتغيرات يفرز النصوص مفعولاً فوري في المحرر</p>
                                 </div>
@@ -643,8 +643,8 @@ const ContractAnalysisPage: React.FC = () => {
                             <Card className="border-none shadow-xl rounded-[2.5rem] p-6 lg:p-8 bg-white dark:bg-dm-card space-y-5">
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-4 border-b border-slate-100 dark:border-slate-800">
                                     <div>
-                                        <h4 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                            <PenTool className="w-4 h-4 text-indigo-505" /> محرر التنسيق والتحرير القانوني البيني
+                                        <h4 className="text-sm font-black text-[#134D41] flex items-center gap-2">
+                                            <PenTool className="w-4 h-4" /> محرر التنسيق والتحرير القانوني البيني
                                         </h4>
                                         <p className="text-[10px] text-slate-400 font-bold mt-0.5">يمكنك تنقيح الصياغات وتصديرها مباشرة لمعاينة عارض التحليل الفوري</p>
                                     </div>
@@ -664,7 +664,7 @@ const ContractAnalysisPage: React.FC = () => {
                                                     setIsLoading(false);
                                                 }
                                             }}
-                                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-black text-[10px] h-9 px-3 rounded-lg flex items-center gap-1.5"
+                                            className="bg-[#134D41]/10 hover:bg-[#134D41]/20 text-[#134D41] font-black text-[10px] h-9 px-3 rounded-lg flex items-center gap-1.5"
                                         >
                                             <Sparkles className="w-3.5 h-3.5 shrink-0" /> تدقيق لغوي
                                         </Button>
@@ -713,7 +713,7 @@ const ContractAnalysisPage: React.FC = () => {
                                                 addToast({ type: 'success', title: 'تمت الصياغة والترحيل وجاهز للتحليل', message: 'تم ترحيل النص بنجاح إلى شاشة المحلل ومطابقة الامتثال.' });
                                                 setActiveTab('analyze');
                                             }}
-                                            className="bg-indigo-600 hover:bg-indigo-700 text-white font-black text-[10px] h-9 px-4 rounded-lg"
+                                            className="bg-[#134D41] hover:bg-[#0f2d25] text-white font-black text-[10px] h-9 px-4 rounded-lg"
                                         >
                                             ترحيل وجلب كمسودة للمحلل
                                         </Button>
@@ -741,7 +741,7 @@ const ContractAnalysisPage: React.FC = () => {
                                                 navigator.clipboard.writeText(quillContent);
                                                 addToast({ type: 'success', title: 'تم النسخ', message: 'تم نسخ مسودة العقد المصاغة بالكامل.' });
                                             }}
-                                            className="flex items-center gap-1 p-1 px-2.5 bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-400 rounded text-[10px] font-black"
+                                            className="flex items-center gap-1 p-1 px-2.5 bg-[#134D41]/10 text-[#134D41] rounded text-[10px] font-black"
                                         >
                                             <Share2 className="w-3 h-3" /> نسخ المسودة الحالية
                                         </button>
@@ -781,8 +781,8 @@ const ContractAnalysisPage: React.FC = () => {
                         <Card className="border-none shadow-xl rounded-[2.5rem] p-6 lg:p-8 bg-white dark:bg-dm-card">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-6 border-b border-slate-50 dark:border-slate-800 mb-6 font-semibold">
                                 <div>
-                                    <h4 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                                        <ClipboardList className="w-5 h-5 text-indigo-600" /> سجل مراجعة الاعتمادات والعمليات العقدية
+                                    <h4 className="text-sm font-black text-[#134D41] flex items-center gap-2">
+                                        <ClipboardList className="w-5 h-5" /> سجل مراجعة الاعتمادات والعمليات العقدية
                                     </h4>
                                     <p className="text-[10px] text-slate-500 font-bold">حصر كامل لجميع التعديلات والتعليقات والاعتمادات والتوقيع الرقمي بالأختام لمؤسسة المحاكم الكبرى</p>
                                 </div>
@@ -816,7 +816,7 @@ const ContractAnalysisPage: React.FC = () => {
                                                 <td className="py-4 px-2 text-slate-500">{log.date}</td>
                                                 <td className="py-4 px-2 text-slate-400 font-mono">{log.ip}</td>
                                                 <td className="py-4 px-2">
-                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${log.status === 'تم الختم' || log.status === 'مطابق للقانون' ? 'bg-emerald-50 text-emerald-700' : 'bg-indigo-50 text-indigo-700'}`}>
+                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${log.status === 'تم الختم' || log.status === 'مطابق للقانون' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-850'}`}>
                                                         {log.status}
                                                     </span>
                                                 </td>

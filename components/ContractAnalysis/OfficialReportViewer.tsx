@@ -182,30 +182,30 @@ export const OfficialReportViewer: React.FC<OfficialReportViewerProps> = ({
                     <div className="pr-16 pl-4 print:pr-10 print:pl-0 space-y-8">
                         
                         {/* 1. Official Royal Header */}
-                        <div className="flex justify-between items-start border-b-2 border-slate-800 pb-6">
+                        <div className="flex justify-between items-start border-b-2 border-slate-850 pb-6 relative">
                             
-                            {/* Right Unit: Kuwait Court Hierarchy */}
-                            <div className="space-y-1">
-                                <div className="text-sm font-black text-slate-900 tracking-tight">دولة الكـويـت</div>
-                                <div className="text-xs font-black text-slate-800">مجموعة الصناعات المرموقة</div>
-                                <div className="text-[10px] font-extrabold text-slate-500">منظومة الحوكمة والتدقيق القانوني</div>
-                                <div className="text-[9px] font-bold text-slate-400">إدارة الالتزام والامتثال للتشريعات</div>
+                            {/* Right Unit: Kuwait Court Hierarchy & Office Details */}
+                            <div className="space-y-1 text-right">
+                                <div className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">النظام القانوني الموحد</div>
+                                <div className="text-sm font-black text-slate-900 tracking-tight">مكتب المحامي صبري شطا</div>
+                                <div className="text-xs font-black text-[#134D41]">للمحاماة والاستشارات القانونية والتحكيم</div>
+                                <div className="text-[9px] font-bold text-slate-500">تحت إشراف: أ. صبري شطا وصياغات الامتثال</div>
                             </div>
 
                             {/* Center Logo Emblems */}
                             <div className="flex flex-col items-center justify-center">
-                                <div className="border border-slate-800 rounded-full w-14 h-14 flex items-center justify-center p-2 mb-1.5 select-none print:w-12 print:h-12">
-                                    <div className="font-serif font-black text-xs text-slate-800 tracking-widest text-center leading-tight">عدالة<br/>ADALAH</div>
+                                <div className="border border-slate-800 rounded-full w-14 h-14 flex items-center justify-center p-2 mb-1 select-none print:w-12 print:h-12 bg-white">
+                                    <div className="font-serif font-black text-sm text-[#134D41] tracking-widest text-center leading-tight">عدالة</div>
                                 </div>
-                                <div className="text-[8px] font-black text-slate-400">نموذج امتثال رقمي معتمد</div>
+                                <div className="text-[8px] font-black text-slate-400">نظام الإدارة القانونية الذكي</div>
                             </div>
 
                             {/* Left Unit: Serial Metadatas & Date */}
-                            <div className="space-y-1 text-left font-sans text-[10px] font-bold text-slate-600">
-                                <div>الرقم المسلسل: <span className="font-mono text-xs">{refNumber}</span></div>
-                                <div>تاريخ الإصدار: <span className="font-mono text-xs">{new Date().toISOString().split('T')[0]}</span></div>
-                                <div>التصنيف: <span className="font-mono text-xs text-indigo-600">{contract?.category || 'شؤون قانونية'}</span></div>
-                                <div>الحالة: <span className="text-emerald-700">معتمد للطباعة</span></div>
+                            <div className="space-y-1 text-left font-sans text-[10px] font-bold text-slate-600" dir="ltr">
+                                <div>Serial Ref: <span className="font-mono text-xs">{refNumber}</span></div>
+                                <div>Issuance: <span className="font-mono text-xs">{new Date().toISOString().split('T')[0]}</span></div>
+                                <div>Classification: <span className="font-mono text-xs text-indigo-600">{contract?.category || 'شؤون قانونية'}</span></div>
+                                <div>Status: <span className="text-emerald-700 font-extrabold uppercase">APPROVED / معتمد</span></div>
                             </div>
                         </div>
 
@@ -420,9 +420,20 @@ export const OfficialReportViewer: React.FC<OfficialReportViewerProps> = ({
                         </div>
 
                         {/* 8. Extra legal disclosure footer */}
-                        <div className="pt-8 border-t border-slate-100 flex justify-between items-center text-[8px] text-slate-400 font-sans font-medium px-2">
-                            <span>تم التحقق إلكترونياً وصياغة هذا التقرير آلياً بموجب المرسوم القانوني الكويتي رقم 6 لسنة 2010.</span>
-                            <span>صفحة 1 من 1</span>
+                        <div className="pt-8 border-t border-slate-150 flex flex-col sm:flex-row justify-between items-center text-[9px] text-slate-500 font-sans font-bold px-2 gap-2 mt-4">
+                            <div className="text-right">
+                                <span>تم التحقق إلكترونياً وصياغة هذا التقرير آلياً بموجب المرسوم القانوني الكويتي رقم 6 لسنة 2010.</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-[9px]" dir="rtl">
+                                <span className="bg-slate-100 px-2 py-0.5 rounded text-slate-650 font-black">عدالة الموحد</span>
+                                <span>مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</span>
+                                <span className="text-slate-300">•</span>
+                                <span>هاتف: <span className="font-sans font-black">+965 2244 8877</span></span>
+                                <span className="text-slate-300">•</span>
+                                <span>البريد الإلكتروني: <span className="font-sans font-black">support@adalah.kw</span></span>
+                                <span className="text-slate-300">•</span>
+                                <span className="text-[8px] text-slate-400">صفحة 1 من 1</span>
+                            </div>
                         </div>
 
                     </div>

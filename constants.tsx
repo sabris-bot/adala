@@ -554,6 +554,12 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     icon: DocumentDuplicateIcon
   },
   {
+    name: 'منظومة الطباعة والصكوك',
+    translationKey: 'deeds_printing_studio',
+    path: '/deeds-print',
+    icon: PrinterIcon
+  },
+  {
     name: 'الإدارة المالية',
     translationKey: 'financial_management',
     path: '/finance',

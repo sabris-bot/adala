@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Employee, Investigation } from '../../types';
 import { OFFICE_NAME } from '../../constants';
 import Button from '../../components/ui/Button';
@@ -21,6 +21,20 @@ export const InvestigationSummonsModal: React.FC<InvestigationSummonsModalProps>
     witnessName
 }) => {
     if (!investigation) return null;
+    
+    // Load dynamic office name to keep it synchronized with the rest of any printable items
+    const officeNameAr = useMemo(() => {
+        try {
+            const savedOffice = localStorage.getItem('profile_office_info');
+            if (savedOffice) {
+                const parsed = JSON.parse(savedOffice);
+                if (parsed.name) return parsed.name;
+            }
+        } catch (e) {
+            console.error('Failed to load dynamic office name in InvestigationSummonsModal', e);
+        }
+        return OFFICE_NAME;
+    }, []);
     
     const targetName = witnessName || employee?.fullNameAr || "المعلن إليه";
     const targetJob = witnessName ? "شاهد ومقرر أقوال" : (employee?.jobTitle || "موظف بالمنشأة");
@@ -64,8 +78,8 @@ export const InvestigationSummonsModal: React.FC<InvestigationSummonsModalProps>
                 <div id="printable-summons-content" className="p-8 bg-white text-slate-900 border rounded-xl shadow-inner font-serif text-right">
                     <div className="header flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-6">
                         <div>
-                            <h2 className="text-lg font-black">{OFFICE_NAME}</h2>
-                            <p className="text-xs font-bold text-slate-500">الإدارة القانونية - وحدة التحقيقات الإدارية والعمالية</p>
+                            <h2 className="text-lg font-black">{officeNameAr}</h2>
+                            <p className="text-xs font-bold text-[#134D41]">عدالة - منظومة الإدارة القانونية المتكاملة v3 | الإدارة القانونية</p>
                         </div>
                         <div className="text-left font-mono text-xs">
                             <p>REF: SUM-{investigation.investigationNumber || 'REG'}</p>
