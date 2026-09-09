@@ -176,6 +176,7 @@ export interface Hearing {
   date: string; // YYYY-MM-DD
   time?: string; // HH:MM
   courtRoomOrLocation?: string;
+  room?: string;
   type?: string; // e.g., "First Hearing", "Pleading", "Judgment"
   status: 'Scheduled' | 'Completed' | 'Postponed' | 'Cancelled';
   notes?: string;
@@ -186,6 +187,8 @@ export interface Hearing {
   caseTitle?: string; 
   clientName?: string; 
   lawyerSignature?: string; // Signature of the attending lawyer
+  courtDecision?: string;
+  circuit?: string;
 }
 
 export interface CaseFile {
@@ -195,6 +198,8 @@ export interface CaseFile {
   fileUrl?: string; // Link to the file
   uploadedAt: string; // ISO Date string
   description?: string;
+  tags?: string[]; // Tag IDs associated with this file
+  importance?: 'critical' | 'high' | 'medium' | 'low'; // Level of importance
 }
 
 export interface CaseNote {
@@ -232,6 +237,9 @@ export enum ExecutionActionStatus {
 export interface ExecutionAction {
   id: string;
   actionType: ExecutionActionType;
+  actionName?: string;
+  date?: string;
+  executorName?: string;
   applicationDate: string; // تاريخ تقديم الطلب لإدارة التنفيذ
   decisionDate?: string; // تاريخ صدور قرار قاضي التنفيذ
   effectiveDate?: string; // تاريخ بدء سريان الإجراء
@@ -283,6 +291,7 @@ export interface Case {
   id: string;
   title: string;
   caseNumber: string; 
+  automatedNo?: string;
   internalCaseNumber?: string;
   fileNumber?: string; // رقم الملف بالمكتب
   clientName: string;
@@ -345,6 +354,8 @@ export interface Case {
   isArchived?: boolean; // Added: Archive status
   archiveDate?: string; // Added: Archive date
   tasks?: string[]; // Added: Linked tasks
+  customTags?: { id: string; name: string; color: string }[]; // Customizable tags defined for this case
+  tags?: string[]; // Tag IDs associated with the case itself
 }
 
 // --- CONTRACT ANALYSIS (AI) ---
@@ -1000,6 +1011,9 @@ export interface Loan {
     remainingBalance?: number;
     guarantorName?: string;
     guarantorCivilId?: string;
+    isPromissoryNoteSigned?: boolean;
+    courtExecutionNumber?: string;
+    courtExecutionStatus?: string;
     notes?: string;
     createdAt: string;
     updatedAt?: string;
@@ -1493,6 +1507,15 @@ export interface PropertyDocument {
     referenceNumber?: string;
     filePathOrLink?: string;
     description?: string;
+    ocrContent?: string;
+    ocrConfidence?: number;
+    ocrExtractedEntities?: {
+        parties?: string[];
+        amounts?: string[];
+        dates?: string[];
+        paciNumber?: string;
+        legalClauses?: string[];
+    };
     uploadedBy?: string;
     uploadedAt: string;
     tags?: string[];
@@ -1603,6 +1626,50 @@ export interface MaintenanceRequest {
     completionNotes?: string;
     attachments?: RequestAttachment[];
     notes?: string;
+    createdAt: string;
+    updatedAt?: string;
+}
+
+// --- FIELD PROPERTY INSPECTION (تفتيش العقار الميداني) ---
+export enum StructuralConditionRating {
+    EXCELLENT = "ممتاز (حالة جديدة/ممتازة)",
+    GOOD = "جيد (حالة سليمة مع استهلاك طبيعي)",
+    MODERATE_MAINTENANCE = "يحتاج صيانة متوسطة",
+    CRITICAL_RISK = "حرج / خلل إنشائي يتطلب تدخلاً فورياً",
+}
+
+export interface StructuralElementEvaluation {
+    elementName: string;
+    rating: StructuralConditionRating;
+    notes?: string;
+    hasDefect: boolean;
+}
+
+export interface InspectionCapturedPhoto {
+    id: string;
+    url: string;
+    caption: string;
+    timestamp: string;
+}
+
+export interface FieldPropertyInspection {
+    id: string;
+    referenceNumber: string;
+    propertyId: string;
+    propertyName: string;
+    unitId?: string;
+    unitNumber?: string;
+    inspectorName: string;
+    inspectionDate: string;
+    overallCondition: StructuralConditionRating;
+    severityLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL_URGENT';
+    structuralElements: StructuralElementEvaluation[];
+    notes: string;
+    recommendations?: string;
+    estimatedRepairCost: number;
+    capturedPhotos: InspectionCapturedPhoto[];
+    autoLinkToCostEfficiency: boolean;
+    linkedCostEfficiencyId?: string;
     createdAt: string;
     updatedAt?: string;
 }
@@ -1870,6 +1937,9 @@ export interface AdminTask {
     attachments?: string[];
     dependencyId?: string;
     relatedCaseId?: string;
+    caseTitle?: string;
+    clientName?: string;
+    venue?: string;
     projectOrModule?: string;
     notes?: string;
     createdAt: string;
@@ -1878,6 +1948,8 @@ export interface AdminTask {
     assignerSignature?: string;
     subtasks?: { id: string; title: string; completed: boolean }[];
     courtVenue?: string;
+    startDate?: string;
+    historyLog?: { id: string; timestamp: string; user: string; action: string }[];
 }
 
 // Contacts
@@ -1919,6 +1991,12 @@ export interface Contact {
     updatedAt?: string;
     idCardPhotoUrl?: string;
     profileColor?: string; // Hex color for avatar fallback
+    // --- ADVANCED POA & INTERACTIONS LOGGING ---
+    poaNumber?: string;
+    poaDate?: string;
+    poaType?: string;
+    poaStatus?: 'valid' | 'expired' | 'revoked';
+    interactions?: { id: string; date: string; type: 'call' | 'meeting' | 'email' | 'whatsapp' | 'other'; note: string; user: string }[];
 }
 
 // --- SMART MIND MAPS ---
@@ -1929,6 +2007,8 @@ export enum MindMapLayoutType {
     FLOWCHART_VERTICAL = 'flowchart_vertical',
     RADIAL = 'radial',
     MINDMAP = 'mindmap',
+    TIMELINE = 'timeline',
+    DECISION_TREE = 'decision_tree',
 }
 
 export enum MindMapShape {
@@ -2338,6 +2418,12 @@ export interface SystemNotification {
     relatedEntityId?: string; // e.g. caseId, taskId
     actionUrl?: string;
     assignedTo?: string; // User ID
+    categoryArabic?: string;
+    priorityArabic?: string;
+    typeArabic?: string;
+    source?: string;
+    eventDate?: string;
+    eventTime?: string;
 }
 
 export interface NotificationSettingItem {
@@ -2376,6 +2462,9 @@ export interface NotificationLogEntry {
     status: SystemNotificationStatus;
     subject?: string; // for email
     messagePreview?: string;
+    reason?: string; 
+    relatedEntityId?: string;
+    relatedEntityTitle?: string;
 }
 
 // --- PARTY TRACKING ---
@@ -2535,4 +2624,8 @@ export interface Investigation {
     approvals?: { id: string; role: string; name: string; status: 'PENDING' | 'APPROVED' | 'REJECTED'; date?: string }[];
     legalComments?: string;
     activityLogs?: { id: string; action: string; user: string; timestamp: string }[];
+    facts?: string;
+    parties?: string;
+    associatedDates?: string;
+    confidentialNotes?: string;
 }

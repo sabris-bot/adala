@@ -1,28 +1,44 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Employee, Investigation } from '../../types';
 import { OFFICE_NAME } from '../../constants';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
-import { PrinterIcon } from 'lucide-react';
+import { PrinterIcon, CheckCircle2, Clock, Send, AlertCircle, FileText, Calendar, MapPin, User, ShieldCheck } from 'lucide-react';
 
 interface InvestigationSummonsModalProps {
     isOpen: boolean;
     onClose: () => void;
-    investigation: Investigation | null;
-    employee: Employee | null;
+    investigation?: Investigation | any | null;
+    employee?: Employee | any | null;
     witnessName?: string;
+    allCases?: any[];
+    allEmployees?: any[];
 }
 
 export const InvestigationSummonsModal: React.FC<InvestigationSummonsModalProps> = ({ 
     isOpen, 
     onClose, 
-    investigation, 
-    employee,
-    witnessName
+    investigation: initialInvestigation, 
+    employee: initialEmployee,
+    witnessName,
+    allCases = [],
+    allEmployees = []
 }) => {
-    if (!investigation) return null;
+    if (!isOpen) return null;
+
+    // Selected state
+    const [selectedCaseId, setSelectedCaseId] = useState<string>(initialInvestigation?.id || initialInvestigation?.caseNumber || (allCases[0]?.id || ''));
+    const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>(initialEmployee?.id || (allEmployees[0]?.id || ''));
     
-    // Load dynamic office name to keep it synchronized with the rest of any printable items
+    // Custom Summons Form Parameters
+    const [summonsType, setSummonsType] = useState<'summons' | 'formal_notice'>('summons');
+    const [summonsDate, setSummonsDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [summonsTime, setSummonsTime] = useState<string>('10:00 صباحاً');
+    const [summonsLocation, setSummonsLocation] = useState<string>('مقر الإدارة القانونية - المكتب الرئيسي');
+    const [deliveryStatus, setDeliveryStatus] = useState<'DELIVERED_HAND' | 'SENT_REGISTERED' | 'PENDING' | 'ELECTRONIC'>('DELIVERED_HAND');
+    const [deliveryNotes, setDeliveryNotes] = useState<string>('');
+
+    // Load dynamic office name
     const officeNameAr = useMemo(() => {
         try {
             const savedOffice = localStorage.getItem('profile_office_info');
@@ -30,124 +46,278 @@ export const InvestigationSummonsModal: React.FC<InvestigationSummonsModalProps>
                 const parsed = JSON.parse(savedOffice);
                 if (parsed.name) return parsed.name;
             }
-        } catch (e) {
-            console.error('Failed to load dynamic office name in InvestigationSummonsModal', e);
-        }
+        } catch (e) {}
         return OFFICE_NAME;
     }, []);
-    
-    const targetName = witnessName || employee?.fullNameAr || "المعلن إليه";
-    const targetJob = witnessName ? "شاهد ومقرر أقوال" : (employee?.jobTitle || "موظف بالمنشأة");
-    const targetId = witnessName ? "شاهد عيان" : (employee?.employeeId || "غير معروف");
+
+    // Derived current investigation case & employee
+    const activeCase = useMemo(() => {
+        if (initialInvestigation && (!selectedCaseId || selectedCaseId === initialInvestigation.id)) return initialInvestigation;
+        return allCases.find(c => c.id === selectedCaseId || c.caseNumber === selectedCaseId) || initialInvestigation || allCases[0] || null;
+    }, [selectedCaseId, initialInvestigation, allCases]);
+
+    const activeEmployee = useMemo(() => {
+        if (initialEmployee && (!selectedEmployeeId || selectedEmployeeId === initialEmployee.id)) return initialEmployee;
+        return allEmployees.find(e => e.id === selectedEmployeeId) || initialEmployee || allEmployees[0] || null;
+    }, [selectedEmployeeId, initialEmployee, allEmployees]);
+
+    const targetName = witnessName || activeCase?.employeeName || activeEmployee?.fullNameAr || activeEmployee?.fullName || "المحتكم إليه / المعلن";
+    const targetJob = witnessName ? "شاهد ومقرر أقوال" : (activeCase?.employeeJobTitle || activeEmployee?.jobTitle || "موظف بالمنشأة");
+    const targetId = witnessName ? "شاهد عيان" : (activeCase?.employeeId || activeEmployee?.employeeId || activeEmployee?.civilId || "غير محدد");
+    const caseRefNo = activeCase?.caseNumber || activeCase?.investigationNumber || `INV-2026-${Math.floor(100 + Math.random() * 900)}`;
+    const caseSubject = activeCase?.subject || "واقعة التحقيق والاستدلال القائمة بنظام عدالة";
 
     const printSummons = () => {
         const printContent = document.getElementById("printable-summons-content");
-        const originalContent = document.body.innerHTML;
         if (printContent) {
-            const printWindow = window.open('', '', 'height=600,width=800');
+            const printWindow = window.open('', '', 'height=750,width=900');
             if (printWindow) {
-                printWindow.document.write('<html><head><title>إعلان مثول للتحقيق</title>');
+                printWindow.document.write('<html><head><title>إعلان ومحضر استدعاء رسمي للتحقيق</title>');
                 printWindow.document.write('<style>');
                 printWindow.document.write(`
-                    body { font-family: "Georgia", serif; direction: rtl; padding: 40px; color: #1e293b; background-color: #fff; }
-                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px; }
-                    .title { text-align: center; margin-bottom: 40px; }
-                    .title h1 { font-size: 24px; font-weight: 900; text-decoration: underline; }
-                    .content { line-height: 1.8; margin-bottom: 40px; font-size: 15px; }
-                    .info-box { background: #f8fafc; padding: 20px; border-right: 5px solid #0f172a; margin: 20px 0; border-radius: 4px; }
-                    .dates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 30px 0; text-align: center; }
+                    body { font-family: "Georgia", serif; direction: rtl; padding: 40px; color: #0f172a; background-color: #fff; line-height: 1.6; }
+                    .summons-border { border: 3px double #0f172a; padding: 35px; border-radius: 8px; position: relative; }
+                    .header { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 25px; }
+                    .title { text-align: center; margin-bottom: 30px; }
+                    .title h1 { font-size: 22px; font-weight: 900; text-decoration: underline; text-underline-offset: 6px; }
+                    .content { line-height: 1.8; margin-bottom: 30px; font-size: 14px; }
+                    .info-box { background: #f8fafc; padding: 20px; border-right: 5px solid #0f172a; margin: 20px 0; border-radius: 6px; border: 1px solid #e2e8f0; }
+                    .dates-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 25px 0; text-align: center; }
                     .date-card { border: 1px solid #cbd5e1; padding: 15px; background: #f1f5f9; border-radius: 6px; }
                     .warning-box { border: 1px solid #fecaca; background: #fff5f5; padding: 15px; border-radius: 6px; font-weight: bold; font-size: 12px; color: #991b1b; }
-                    .sign-grid { display: flex; justify-content: space-between; margin-top: 60px; }
-                    .sign-box { text-align: center; width: 200px; }
+                    .status-badge { display: inline-block; padding: 4px 12px; background: #e0f2fe; color: #0369a1; border-radius: 12px; font-size: 11px; font-weight: bold; }
+                    .sign-grid { display: flex; justify-content: space-between; margin-top: 50px; }
+                    .sign-box { text-align: center; width: 220px; }
+                    .stamp-circle { width: 90px; height: 90px; border: 2px dashed #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #94a3b8; margin: 0 auto; }
                 `);
-                printWindow.document.write('</style></head><body>');
+                printWindow.document.write('</style></head><body><div class="summons-border">');
                 printWindow.document.write(printContent.innerHTML);
-                printWindow.document.write('</body></html>');
+                printWindow.document.write('</div></body></html>');
                 printWindow.document.close();
                 printWindow.print();
             }
-        } else {
-            window.print();
         }
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="إعلان رسمي للمثول أمام التحقيق" size="lg">
-            <div className="p-1" dir="rtl">
-                <div id="printable-summons-content" className="p-8 bg-white text-slate-900 border rounded-xl shadow-inner font-serif text-right">
-                    <div className="header flex justify-between items-center border-b-2 border-slate-900 pb-4 mb-6">
-                        <div>
-                            <h2 className="text-lg font-black">{officeNameAr}</h2>
-                            <p className="text-xs font-bold text-[#134D41]">عدالة - منظومة الإدارة القانونية المتكاملة v3 | الإدارة القانونية</p>
+        <Modal isOpen={isOpen} onClose={onClose} title="مركز إصدار الاستدعاءات والإشعارات الرسمية" size="xl">
+            <div className="p-2 space-y-6 text-right font-sans" dir="rtl">
+                
+                {/* Top Control Settings Panel */}
+                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-4 text-xs font-bold text-slate-700">
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-3">
+                        <span className="flex items-center gap-2 font-black text-slate-900 text-xs">
+                            <FileText className="w-4 h-4 text-amber-600" />
+                            بيانات وإعدادات كتاب الإعلان والاستدعاء
+                        </span>
+                        <span className="text-[10px] bg-slate-200 text-slate-700 px-2.5 py-0.5 rounded-full font-mono">
+                            نظام عدالة v3 • قانون العمل الكويتي
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        {/* Select Case if available */}
+                        {allCases.length > 0 && (
+                            <div className="space-y-1">
+                                <label className="text-[10px] text-slate-500 block">ربط بملف تحقيق قائم:</label>
+                                <select 
+                                    className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                    value={selectedCaseId}
+                                    onChange={(e) => setSelectedCaseId(e.target.value)}
+                                >
+                                    {allCases.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            #{c.caseNumber} - {c.employeeName} ({c.subject})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Summons Type */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 block">نوع المخطاط / الإعلان:</label>
+                            <select 
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                value={summonsType}
+                                onChange={(e) => setSummonsType(e.target.value as any)}
+                            >
+                                <option value="summons">إخطار واستدعاء للحضور الشخصي للتحقيق</option>
+                                <option value="formal_notice">كتاب إعلان رسمي بموضوع المخالفة والتكليف</option>
+                            </select>
                         </div>
-                        <div className="text-left font-mono text-xs">
-                            <p>REF: SUM-{investigation.investigationNumber || 'REG'}</p>
-                            <p>DATE: {new Date().toLocaleDateString('ar-EG')}</p>
+
+                        {/* Delivery Status */}
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 block">حالة التسليم والإعلان الحالي:</label>
+                            <select 
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2.5 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                value={deliveryStatus}
+                                onChange={(e) => setDeliveryStatus(e.target.value as any)}
+                            >
+                                <option value="DELIVERED_HAND">تم التسليم شخصياً وتوقيع المستلم ✓</option>
+                                <option value="SENT_REGISTERED">أُرسل بالبريد المسجل مع علم الوصول ✉️</option>
+                                <option value="ELECTRONIC">أُرسل إلكترونياً (البريد/تطبيق هويتي) 📱</option>
+                                <option value="PENDING">قيد التسليم والإعلان الجاري ⏳</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div className="title text-center mb-8">
-                        <h1 className="text-xl font-black underline underline-offset-8">إعلان بحضور تحقيق إداري رسمي</h1>
-                        <p className="text-[10px] font-bold text-slate-500 mt-2">(إخطار رسمي ملزم بموجب أحكام المادة 102 من قانون العمل الكويتي)</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 block">تاريخ جلسة الحضور:</label>
+                            <input 
+                                type="date"
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                value={summonsDate}
+                                onChange={(e) => setSummonsDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 block">التوقيت المحدد للجلسة:</label>
+                            <input 
+                                type="text"
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                value={summonsTime}
+                                onChange={(e) => setSummonsTime(e.target.value)}
+                                placeholder="مثال: 10:00 صباحاً"
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-[10px] text-slate-500 block">موقع ومكان المباشرة:</label>
+                            <input 
+                                type="text"
+                                className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-bold focus:outline-none focus:border-slate-400"
+                                value={summonsLocation}
+                                onChange={(e) => setSummonsLocation(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Printable Certificate Box */}
+                <div id="printable-summons-content" className="p-8 bg-white text-slate-900 border-2 border-slate-900 rounded-2xl shadow-inner font-serif text-right space-y-6">
+                    
+                    {/* Header */}
+                    <div className="header flex justify-between items-center border-b-2 border-slate-900 pb-4">
+                        <div className="space-y-0.5">
+                            <h1 className="text-xl font-black text-slate-950">أ. صبري شطا</h1>
+                            <h2 className="text-sm font-bold text-slate-800">مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</h2>
+                            <p className="text-xs font-bold text-emerald-800">منظومة الإدارة القانونية والامتثال «عدالة»</p>
+                            <p className="text-[10px] text-slate-500">قطاع شؤون الامتثال والتحقيقات العمالية</p>
+                        </div>
+                        <div className="text-left font-mono text-xs space-y-0.5">
+                            <p><strong>قيد الملف:</strong> #{caseRefNo}</p>
+                            <p><strong>تاريخ التحرير:</strong> {new Date().toLocaleDateString('ar-KW')}</p>
+                            <p className="text-[10px] text-slate-500">
+                                <strong>حالة الإعلان:</strong> {
+                                    deliveryStatus === 'DELIVERED_HAND' ? 'مُسلّم شخصياً' :
+                                    deliveryStatus === 'SENT_REGISTERED' ? 'مسجل بريدياً' :
+                                    deliveryStatus === 'ELECTRONIC' ? 'مرسل إلكترونياً' : 'قيد التسليم'
+                                }
+                            </p>
+                        </div>
                     </div>
 
+                    {/* Title */}
+                    <div className="title text-center space-y-2">
+                        <h1 className="text-xl font-black underline underline-offset-8 text-slate-950">
+                            {summonsType === 'summons' ? 'إعلان رسمـي بالمثول والتكليف بالحضور للتحقيق' : 'إخطـار وإعلان رسمـي بموضوع المخالفة والإفادة'}
+                        </h1>
+                        <p className="text-[11px] font-black text-slate-600">
+                            (إخطار إداري وقانوني ملزم بموجب أحكام المادة 102 من قانون العمل الكويتي رقم 6 لسنة 2010)
+                        </p>
+                    </div>
+
+                    {/* Target Employee Info Card */}
+                    <div className="bg-slate-50 p-4 border rounded-xl space-y-2 text-sm leading-relaxed">
+                        <div className="grid grid-cols-2 gap-4">
+                            <p>المعلن إليه / السيد: <strong className="text-slate-950 text-base">{targetName}</strong></p>
+                            <p>المسمى الوظيفي: <strong className="text-slate-900">{targetJob}</strong></p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-xs text-slate-600">
+                            <p>الرقم التعريفي / الوظيفي: <strong className="text-slate-900 font-mono">{targetId}</strong></p>
+                            <p>الجهة / القسم المستهدف: <strong className="text-slate-900">{activeCase?.employeeDepartment || "الإدارة العامة"}</strong></p>
+                        </div>
+                    </div>
+
+                    {/* Content text */}
                     <div className="content space-y-4 text-sm leading-relaxed text-slate-800">
-                        <p>السيد/ المحترم: <strong className="text-slate-950 font-sans text-base">{targetName}</strong></p>
-                        <p>المسمى الوظيفي: <strong className="text-slate-900">{targetJob}</strong> | المرجع التعريفي: <strong className="text-slate-900">{targetId}</strong></p>
-                        
-                        <div className="info-box p-4 bg-slate-50 border-r-4 border-slate-900 rounded">
-                            <p className="mb-2 font-bold">تحية طيبة وبعد ،،،</p>
-                            <p>بموجب الصلاحيات والأنظمة الإدارية والقوانين المعمول بها بدولة الكويت، وحيث تقرر إجراء تحقيق رسمي في الوقائع الخاصة بالمخالفة المقيدة برقم ملف التحقيق: <strong className="text-indigo-600 font-sans">{investigation.investigationNumber}</strong> وموضوعها:</p>
-                            <p className="mt-2 font-black text-slate-900">({investigation.subject})</p>
-                            <p className="mt-3">لذا، يقتضي إعلانكم رسمياً بوجوب الحضور الشخصي أمام رئيس لجنة التحقيق بالإدارة القانونية، وذلك لاستيفاء وسماع أقوالكم القانونية ومواجهتكم بالأوراق والمسوغات، وذلك في الميعاد المحدد أدناه:</p>
+                        <div className="info-box p-4 bg-slate-50/80 border-r-4 border-slate-900 rounded-lg space-y-2">
+                            <p className="font-black text-slate-900">تحية طيبة وبعد ،،،</p>
+                            <p>
+                                بناءً على الصلاحيات القانونية المنظمة للعمل الداخلي بدولة الكويت، وحيث تقرر فتح وتباشر الإدارة القانونية إجراءات الاستدلال والتحقيق في الوقائع المنسوبة بملف التحقيق رقم (<strong className="text-slate-950 font-mono">{caseRefNo}</strong>) وموضوعها:
+                            </p>
+                            <p className="p-3 bg-white border border-slate-200 rounded-lg font-black text-slate-900 text-sm">
+                                "{caseSubject}"
+                            </p>
+                            <p className="mt-2 font-medium">
+                                بناءً عليه، يُعلَن سيادتكم بضرورة الحضور الشخصي أمام الباحث والمحقق القانوني بالإدارة، وذلك للاستماع لأقوالكم ومواجهتكم بالأوراق والمستندات المرفقة بالملف، وذلك في الموعد المحدد تالياً:
+                            </p>
                         </div>
 
+                        {/* Date and Location Grid */}
                         <div className="dates-grid grid grid-cols-2 gap-4 text-center">
-                            <div className="date-card p-4 border rounded-xl bg-slate-50">
-                                <p className="text-[10px] font-black text-slate-600 mb-1 uppercase tracking-widest">تاريخ جلسة الحضور</p>
-                                <p className="font-black text-slate-900 text-base">{new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                            <div className="date-card p-4 border rounded-xl bg-slate-50 space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase">تاريخ وساعة الجلسة</p>
+                                <p className="font-black text-slate-950 text-sm">
+                                    {new Date(summonsDate).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                                </p>
+                                <p className="text-xs font-extrabold text-amber-700">الساعة: {summonsTime}</p>
                             </div>
-                            <div className="date-card p-4 border rounded-xl bg-slate-50">
-                                <p className="text-[10px] font-black text-slate-600 mb-1 uppercase tracking-widest">التوقيت وموقع المثول</p>
-                                <p className="font-black text-slate-900 text-base">العاشرة صباحاً (الإدارة القانونية - مقر الرئيسي للشركة)</p>
+
+                            <div className="date-card p-4 border rounded-xl bg-slate-50 space-y-1">
+                                <p className="text-[10px] font-black text-slate-500 uppercase">مقر المثول واللجنة</p>
+                                <p className="font-black text-slate-950 text-sm">{summonsLocation}</p>
+                                <p className="text-xs font-bold text-slate-600">رئيس اللجنة: {activeCase?.investigator || "المحقق القانوني المعتمد"}</p>
                             </div>
                         </div>
 
-                        <div className="warning-box p-4 bg-rose-50 border border-rose-200 rounded-xl">
-                            <p className="text-[11px] font-black text-rose-800 mb-1">■ تنبيهات قانونية هامة وجزاء تخلّف المثول:</p>
-                            <ul className="list-decimal list-inside text-xs text-rose-900 space-y-1 pr-1 font-bold">
-                                <li>يعتبر الحضور والتعاون مع التحقيق واجباً من واجبات السلوك الوظيفي المنصوص عليها قانوناً.</li>
-                                <li>عدم الحضور أو محاولة العرقلة دون مبرر مرضي أو قوة قاهرة يترتب عليه السير باللجراءات غيابياً واتخاذ الجزاء القانوني بحقكم.</li>
-                                <li>يحق لك الاستعانة بممثل أو تقديم مذكرات خطية دفاعية لضمها لملف الاستدلالات والواقعة.</li>
+                        {/* Legal Safeguards Warning Box */}
+                        <div className="warning-box p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-900 space-y-2">
+                            <p className="text-[11px] font-black flex items-center gap-1.5">
+                                <ShieldCheck className="w-4 h-4 text-rose-700" />
+                                الضمانات والتنبيهات القانونية الرسمية (وفقاً للمادتين 35 و 102 من قانون العمل):
+                            </p>
+                            <ul className="list-disc list-inside text-xs space-y-1 font-bold pr-2">
+                                <li>حضور التحقيق والإدلاء بالشهادة أو الأقوال واكب قانوني ملزم يحفظ حقوق طرفي العلاقة العمالية.</li>
+                                <li>يحق للمعلن إليه تقديم المذكرات أو الأدلة والمستندات الكتابية وطلب ضمها للملف.</li>
+                                <li>التخلف عن الحضور دون عذر قهري أو مبرر مقبول يترتب عليه استكمال الإجراءات والبت في التوصيات غيابياً.</li>
                             </ul>
                         </div>
                     </div>
 
-                    <div className="sign-grid flex justify-between items-end pt-12 text-sm">
-                        <div className="sign-box text-center">
-                            <p className="font-black mb-12">توقيع المستلم للتبليغ</p>
-                            <p className="text-[10px] text-slate-400 border-t pt-1 w-36">................................</p>
+                    {/* Signatures & Stamps */}
+                    <div className="sign-grid flex justify-between items-end pt-8 border-t border-slate-200 text-sm font-bold">
+                        <div className="sign-box text-center space-y-8">
+                            <p className="font-black text-slate-900">توقيع وصفة المستلم للإعلان</p>
+                            <div className="space-y-1 text-slate-400 text-[10px]">
+                                <p className="border-b border-dashed border-slate-400 w-44 mx-auto pb-1">الاسم: .......................................</p>
+                                <p className="border-b border-dashed border-slate-400 w-44 mx-auto pb-1">التوقيع: ....................................</p>
+                            </div>
                         </div>
-                        <div className="sign-box text-center">
-                            <p className="font-black mb-12">اعتماد المحقق الإداري قانوناً</p>
-                            <div className="w-20 h-20 border-2 border-dashed border-slate-200 rounded-full mx-auto flex items-center justify-center text-[10px] text-slate-400 italic">
-                                الختم الرسمي
+
+                        <div className="sign-box text-center space-y-3">
+                            <p className="font-black text-slate-900">المصادقة والختم الرسمي</p>
+                            <div className="stamp-circle border-2 border-dashed border-slate-300 rounded-full w-24 h-24 mx-auto flex items-center justify-center text-[9px] text-slate-400 font-bold p-2">
+                                ختم الإدارة القانونية - عدالة
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-12 pt-4 border-t border-slate-100 flex justify-between text-[10px] font-mono text-slate-400 uppercase italic">
-                        <span>Adala - Public Prosecution Summons Standard V3</span>
-                        <span>صفحة 1 من 1</span>
-                    </div>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-4 pt-4 border-t">
-                    <Button variant="outline" onClick={onClose}>إغلاق</Button>
-                    <Button variant="primary" onClick={printSummons} leftIcon={<PrinterIcon className="w-4 h-4" />}>طباعة استدعاء الحضور</Button>
+                {/* Footer Buttons */}
+                <div className="flex justify-end items-center gap-3 pt-4 border-t border-slate-200">
+                    <Button variant="outline" onClick={onClose} className="rounded-xl font-bold">
+                        إغلاق
+                    </Button>
+                    <Button variant="primary" onClick={printSummons} leftIcon={<PrinterIcon className="w-4 h-4" />} className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-black">
+                        طباعة كراسة الاستدعاء والإعلان
+                    </Button>
                 </div>
             </div>
         </Modal>
     );
 };
+

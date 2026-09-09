@@ -43,15 +43,22 @@ import {
     ArrowDownTrayIcon,
     ShareIcon,
     TrashIcon,
-    ShieldCheckIcon
+    ShieldCheckIcon,
+    MapPinIcon
 } from '../constants';
 import Button from '../components/ui/Button';
 import { Badge, ExpertActionStatusBadge } from '../components/ui/Badge';
 import { useToast } from '../components/ui/Toast';
 
+import SmartProceduralRoadmap from '../components/SmartProceduralRoadmap';
+import CourtLocationMapModal from '../components/CourtLocationMapModal';
+import AiTaskBar from '../components/AiTaskBar';
+import DocketAudioSettingsModal from '../components/DocketAudioSettingsModal';
+import DocketActivityLog, { DocketActivityLogItem } from '../components/DocketActivityLog';
+
 // --- TYPES & STRUCTURES ---
 type ViewMode = 'day' | 'week' | 'month' | 'timeline' | 'year' | 'date-range' | 'court-group' | 'lawyer-group' | 'casetype-group' | 'client-group';
-type TabType = 'roll' | 'experts' | 'deadlines' | 'audit_rbac';
+type TabType = 'roll' | 'roadmap' | 'experts' | 'deadlines' | 'audit_rbac' | 'moj_connector';
 
 interface Appointment {
     id: string;
@@ -83,6 +90,7 @@ interface ScheduleEvent {
     opponents?: string;
     lastAction?: string;
     nextAction?: string;
+    category?: string;
     progress?: number;
     caseType?: string;
 }
@@ -227,10 +235,152 @@ const AutomatedDocketPage: React.FC = () => {
     const [selectedHearingForDelete, setSelectedHearingForDelete] = useState<string | null>(null);
     const [customRangeStart, setCustomRangeStart] = useState<string>('2026-05-24');
     const [customRangeEnd, setCustomRangeEnd] = useState<string>('2026-06-05');
+
+    // Audio Alert, Court Map & Drag-and-Drop States
+    const [audioAlertsEnabled, setAudioAlertsEnabled] = useState<boolean>(true);
+    const [selectedTone, setSelectedTone] = useState<string>('chime');
+    const [audioVolume, setAudioVolume] = useState<number>(80);
+    const [alertLeadMinutes, setAlertLeadMinutes] = useState<number>(15);
+    const [isAudioSettingsOpen, setIsAudioSettingsOpen] = useState<boolean>(false);
+
+    const [isCourtMapModalOpen, setIsCourtMapModalOpen] = useState<boolean>(false);
+    const [selectedCourtNameModal, setSelectedCourtNameModal] = useState<string>('قصر العدل');
+    const [draggedHearingId, setDraggedHearingId] = useState<string | null>(null);
+    const [dropZoneHighlight, setDropZoneHighlight] = useState<string | null>(null);
+
+    // Activity Log State for Drag-and-Drop Operations
+    const [activityLogs, setActivityLogs] = useState<DocketActivityLogItem[]>([]);
+
+    const playDocketChime = (overrideTone?: string, overrideVolume?: number) => {
+        try {
+            const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioCtx) return;
+            const ctx = new AudioCtx();
+            const tone = overrideTone || selectedTone;
+            const volPercent = overrideVolume !== undefined ? overrideVolume : audioVolume;
+            const gainValue = Math.max(0.01, (volPercent / 100) * 0.35);
+
+            if (tone === 'gavel') {
+                [0, 0.16].forEach((delay) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(190, ctx.currentTime + delay);
+                    osc.frequency.exponentialRampToValueAtTime(50, ctx.currentTime + delay + 0.12);
+                    gain.gain.setValueAtTime(gainValue * 1.3, ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.12);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + delay);
+                    osc.stop(ctx.currentTime + delay + 0.12);
+                });
+            } else if (tone === 'harp') {
+                [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+                    const delay = idx * 0.07;
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, ctx.currentTime + delay);
+                    gain.gain.setValueAtTime(gainValue, ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + delay);
+                    osc.stop(ctx.currentTime + delay + 0.35);
+                });
+            } else if (tone === 'urgent') {
+                [0, 0.12, 0.24].forEach((delay) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(1046.5, ctx.currentTime + delay);
+                    gain.gain.setValueAtTime(gainValue * 0.4, ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.09);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + delay);
+                    osc.stop(ctx.currentTime + delay + 0.09);
+                });
+            } else {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.25);
+                gain.gain.setValueAtTime(gainValue, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.45);
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.start();
+                osc.stop(ctx.currentTime + 0.45);
+            }
+        } catch (err) {
+            console.error('Audio play error', err);
+        }
+    };
+
+    // --- DRAG AND DROP & ACTIVITY LOG HANDLERS ---
+    const handleDragAndDropStatusChange = (hearingId: string, newStatus: string) => {
+        const targetEvent = allEvents.find(e => e.id === hearingId);
+        const oldStatus = targetEvent?.status || 'Scheduled';
+
+        if (oldStatus === newStatus) return;
+
+        updateHearingStatus(hearingId, newStatus as any);
+
+        const newLogItem: DocketActivityLogItem = {
+            id: `draglog-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            timestamp: format(new Date(), 'HH:mm:ss'),
+            hearingId: hearingId,
+            caseTitle: targetEvent?.title || 'جلسة قضائية بالرول',
+            oldStatus: oldStatus,
+            newStatus: newStatus,
+            actionType: 'status_change',
+            performedBy: currentUserRole
+        };
+
+        setActivityLogs(prev => [newLogItem, ...prev]);
+        addAuditLog(`سحب وإسقاط الجلسة (${targetEvent?.title || hearingId}) وتغيير حالتها من [${oldStatus}] إلى [${newStatus}]`);
+
+        if (audioAlertsEnabled) playDocketChime();
+
+        addToast({
+            type: newStatus === 'Scheduled' ? 'success' : newStatus === 'Postponed' ? 'warning' : 'info',
+            title: 'تحديث السحب والإسقاط 🎯',
+            message: `تم نقل الجلسة إلى [${newStatus === 'Scheduled' ? 'جاهز للمرافعة' : newStatus === 'Postponed' ? 'مؤجلة' : 'تم الحضور'}] وتسجيلها بسجل النشاط.`
+        });
+    };
+
+    const handleUndoLastDrag = () => {
+        if (activityLogs.length === 0) return;
+        const lastLog = activityLogs[0];
+        handleUndoSpecificLog(lastLog.id);
+    };
+
+    const handleUndoSpecificLog = (logId: string) => {
+        const logItem = activityLogs.find(l => l.id === logId);
+        if (!logItem) return;
+
+        updateHearingStatus(logItem.hearingId, logItem.oldStatus as any);
+        setActivityLogs(prev => prev.filter(l => l.id !== logId));
+
+        addAuditLog(`تراجع عن عملية السحب والإسقاط للجلسة (${logItem.caseTitle}) وإعادة حالتها لـ [${logItem.oldStatus}]`);
+
+        if (audioAlertsEnabled) playDocketChime();
+
+        addToast({
+            type: 'info',
+            title: '↩️ تم التراجع بنجاح (Undo)',
+            message: `تم إعادة الجلسة (${logItem.caseTitle}) إلى حالتها السابقة [${logItem.oldStatus}].`
+        });
+    };
     const [hearingForm, setHearingForm] = useState<Partial<Hearing>>({
+        caseId: '1',
+        date: new Date().toISOString().split('T')[0],
+        time: '09:00',
+        courtRoomOrLocation: 'قصر العدل قاعة 15',
+        type: 'جلسة مرافعة كتابية',
         status: 'Scheduled',
-        courtRoomOrLocation: '',
-        type: '',
         notes: '',
         courtDecision: ''
     } as any);
@@ -248,8 +398,10 @@ const AutomatedDocketPage: React.FC = () => {
     const [selectedPreset, setSelectedPreset] = useState<string>('none');
     const [sortBy, setSortBy] = useState<string>('time-asc');
     
-    // Expanded Record Rows State
+    // Expanded Record Rows State (Standard & Multi support)
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
+    const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+    const [customWeights, setCustomWeights] = useState<Record<string, number>>({});
     
     // Simulated Upload attachments state mapped by case/apt ID
     const [attachments, setAttachments] = useState<Record<string, {title: string, size: string, date: string, type: string}[]>>({
@@ -275,6 +427,54 @@ const AutomatedDocketPage: React.FC = () => {
         { id: 'notif-2', text: 'ميعاد حرج: انتهاء ميعاد سقوط استئناف مجموعة الأنوار رقم 99112992 متبقي 19 يوماً.', type: 'critical', time: 'ميعاد إجرائي للمادة 129 مرافعات' }
     ]);
 
+    // MOJ API Connector States
+    const [mojAutomatedNo, setMojAutomatedNo] = useState('26198543');
+    const [mojCaseNo, setMojCaseNo] = useState('1192/2026');
+    const [mojYear, setMojYear] = useState('2026');
+    const [mojCourt, setMojCourt] = useState('capital-total');
+    const [isMojQuerying, setIsMojQuerying] = useState(false);
+    const [mojQueryStep, setMojQueryStep] = useState(0);
+    const [fetchedResults, setFetchedResults] = useState<any[]>([]);
+
+    const handleMojQuery = () => {
+        if (!mojAutomatedNo) {
+            addToast({ type: 'error', title: 'حقل مطلوب', message: 'يرجى إدخال الرقم الآلي الموحد لغرض مطابقة الملف.' });
+            return;
+        }
+
+        setIsMojQuerying(true);
+        setMojQueryStep(0);
+        setFetchedResults([]);
+
+        // Staggered Steps Simulation
+        setTimeout(() => {
+            setMojQueryStep(1);
+            setTimeout(() => {
+                setMojQueryStep(2);
+                setTimeout(() => {
+                    setMojQueryStep(3);
+                    setTimeout(() => {
+                        setIsMojQuerying(false);
+                        addToast({ type: 'success', title: 'تم جلب التحديثات', message: 'تم الربط ببوابة وزارة العدل وسحب الجلسات المتطابقة.' });
+                        setFetchedResults([
+                            {
+                                automatedNo: mojAutomatedNo,
+                                caseNumber: mojCaseNo || '1192/2026',
+                                title: 'دعوى عمالية ضد مؤسسة الموانئ الكويتية',
+                                courtName: mojCourt === 'capital-total' ? 'العاصمة الكلية' : 'محكمة الاستئناف',
+                                circuit: 'العمالية الكلية - الدائرة الأولى',
+                                mojStatus: 'نشطة - بانتظار الحكم',
+                                localHearing: 'لا توجد جلسات مجدولة',
+                                mojHearing: 'جلسة مرافعة مجدولة في 2026-08-14 بقاعة 102 (تقديم مذكرات ختامية)',
+                                mojDate: '2026-08-14'
+                            }
+                        ]);
+                    }, 1200);
+                }, 1200);
+            }, 1200);
+        }, 1200);
+    };
+
     // Deadlines interactive inputs (Art 16 & 18 Kuwait Procedural Law)
     const [dlStartDate, setDlStartDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [dlDistance, setDlDistance] = useState<number>(0);
@@ -293,6 +493,94 @@ const AutomatedDocketPage: React.FC = () => {
     const [reportType, setReportType] = useState<string>('official');
     const [reportSignature, setReportSignature] = useState<string>('shata');
     const [reportIncludesNotes, setReportIncludesNotes] = useState<boolean>(true);
+
+    // --- MOJ PORTAL LIVE SYNCHRONIZATION STATES ---
+    const [isSyncing, setIsSyncing] = useState<boolean>(false);
+    const [syncProgress, setSyncProgress] = useState<number>(0);
+    const [syncStatus, setSyncStatus] = useState<string>('');
+    const [lastSyncedAt, setLastSyncedAt] = useState<string>('لم تتم المزامنة الفورية اليوم بعد');
+
+    // Live link simulation function to fetch sessions from Ministry of Justice Kuwait
+    const handleMOJSync = () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        setSyncProgress(5);
+        setSyncStatus('جاري تهيئة الاتصال المشفر بمخدم السجل المدني وبوابة وزارة العدل الكويتية (MOJ-SSL)...');
+        
+        const steps = [
+            { p: 25, text: 'جاري التحقق من التوكيلات وتوافق الرقم الآلي الموحد في دولة الكويت...' },
+            { p: 55, text: 'جاري جلب جدول الرول العام للدوائر التجارية، العمالية والأحوال الشخصية...' },
+            { p: 80, text: 'جاري تحليل تعارض حضور المحامين ومقارنة نسب توافق لجان الخبراء...' },
+            { p: 100, text: 'اكتمل الربط الإلكتروني بنجاح! جاري دمج جلسات الرول الآلي مع قواعد المكاتب...' }
+        ];
+
+        steps.forEach((step, index) => {
+            setTimeout(() => {
+                setSyncProgress(step.p);
+                setSyncStatus(step.text);
+                
+                if (step.p === 100) {
+                    setTimeout(() => {
+                        setIsSyncing(false);
+                        const nowString = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+                        setLastSyncedAt(nowString);
+                        
+                        // Inject 3 high-priority sessions that were "discovered" on MOJ portal
+                        const fetchedHearings: Hearing[] = [
+                            {
+                                id: `h-moj-sync-1-${Date.now()}`,
+                                caseId: '1',
+                                caseTitle: 'دعوى بطلان طعن استئنافي وإلزام رد المدفوعات',
+                                clientName: 'ناصر فهد العتيبي',
+                                date: new Date().toISOString().split('T')[0],
+                                time: '10:30',
+                                courtRoomOrLocation: 'قصر العدل - الدائرة ٢٢ استئناف مستعجل الكبرى',
+                                type: 'تقديم مستندات ودفاع صائب وتكليف خبير كويتي',
+                                status: 'Scheduled',
+                                notes: 'تم سحبها مباشرة عبر البوابة الآلية الموحدة لوزارة العدل.',
+                                attendedBy: []
+                            },
+                            {
+                                id: `h-moj-sync-2-${Date.now()}`,
+                                caseId: '2',
+                                caseTitle: 'دعوى شطب رهن عقاري مصطنع بقصر العاصمة',
+                                clientName: 'شركة الأمل العقارية',
+                                date: new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0],
+                                time: '09:00',
+                                courtRoomOrLocation: 'مجمع محاكم الرقعي - قاعة ٩ تجاري كلي',
+                                type: 'تقديم المرافعة الختامية',
+                                status: 'Scheduled',
+                                notes: 'مستندة لقرارات لجنة تسوية المنازعات ومحاضر الخبراء.',
+                                attendedBy: []
+                            },
+                            {
+                                id: `h-moj-sync-3-${Date.now()}`,
+                                caseId: '3',
+                                caseTitle: 'تظلم إداري مالي لترسية مناقصات عامة',
+                                clientName: 'مجموعة الأنوار للتجارة',
+                                date: new Date(new Date().setDate(new Date().getDate() + 3)).toISOString().split('T')[0],
+                                time: '11:15',
+                                courtRoomOrLocation: 'قصر العدل - الدائرة ٥ إداري تظلمات',
+                                type: 'جلسة تمهيدية لتقديم الدفوع ومصادقة المستندات',
+                                status: 'Scheduled',
+                                notes: 'جلسة هامة تم جدولتها آلياً تحت الرقم الآلي من السجل القضائي الكويتي.',
+                                attendedBy: []
+                            }
+                        ];
+
+                        fetchedHearings.forEach(h => addHearing(h));
+                        
+                        addAuditLog('مزامنة ناجحة لكامل الرول والآليات القانونية المعتمدة من خوادم بوابة وزارة العدل الإلكترونية (Kuwait MOJ Gateway)');
+                        addToast({
+                            type: 'success',
+                            title: 'اكتملت مزامنة الرول الآلي ⚡',
+                            message: 'تم تحديث ٣ قضايا للجلسات والمواعيد عبر الاتصال المباشر بقصر العدل والمحاكم بنجاح.'
+                        });
+                    }, 400);
+                }
+            }, (index + 1) * 500);
+        });
+    };
 
     // --- SENSE DOCKET LOGS ---
     const addAuditLog = (action: string) => {
@@ -490,13 +778,19 @@ const AutomatedDocketPage: React.FC = () => {
         return result.sort((a, b) => {
             const timeA = new Date(`${a.date}T${a.time}`).getTime();
             const timeB = new Date(`${b.date}T${b.time}`).getTime();
+            if (sortBy === 'custom-order') {
+                const weightA = customWeights[a.id] || 0;
+                const weightB = customWeights[b.id] || 0;
+                if (weightB !== weightA) return weightB - weightA;
+                return timeA - timeB;
+            }
             if (sortBy === 'time-asc') return timeA - timeB;
             if (sortBy === 'time-desc') return timeB - timeA;
             if (sortBy === 'progress-desc') return (b.progress || 0) - (a.progress || 0);
             return 0;
         });
 
-    }, [allEvents, searchQuery, selectedCategory, courtFilter, lawyerFilter, statusFilter, casetypeFilter, clientFilterVal, viewMode, currentDate, customRangeStart, customRangeEnd, sortBy]);
+    }, [allEvents, searchQuery, selectedCategory, courtFilter, lawyerFilter, statusFilter, casetypeFilter, clientFilterVal, viewMode, currentDate, customRangeStart, customRangeEnd, sortBy, customWeights]);
 
     // KPI Counters (Dynamic stats for layout dashboard)
     const kpis = useMemo(() => {
@@ -600,6 +894,123 @@ const AutomatedDocketPage: React.FC = () => {
         });
     }, [dlStartDate, dlDistance, dlCustomDays]);
 
+    // Reordering actions
+    const moveEventUp = (eventId: string) => {
+        setCustomWeights(prev => {
+            const currentWeight = prev[eventId] || 0;
+            return { ...prev, [eventId]: currentWeight + 1 };
+        });
+        addAuditLog(`إعادة ترتيب الحدث #${eventId} برفع أولويته بجدول الرول`);
+        addToast({ type: 'info', title: 'تم تغيير الترتيب', message: 'تم رفع أولوية ترتيب السجل في القائمة.' });
+    };
+
+    const moveEventDown = (eventId: string) => {
+        setCustomWeights(prev => {
+            const currentWeight = prev[eventId] || 0;
+            return { ...prev, [eventId]: currentWeight - 1 };
+        });
+        addAuditLog(`إعادة ترتيب الحدث #${eventId} بخفض أولويته بجدول الرول`);
+        addToast({ type: 'info', title: 'تم تغيير الترتيب', message: 'تم خفض أولوية ترتيب السجل في القائمة.' });
+    };
+
+    // Collapse/Expand all
+    const expandAllRows = () => {
+        const nextExpanded: Record<string, boolean> = {};
+        filteredEvents.forEach(e => {
+            nextExpanded[e.id] = true;
+        });
+        setExpandedRows(nextExpanded);
+        addAuditLog('تطبيق التوسيع الشامل لكامل الجلسات المرئية في الرول');
+        addToast({ type: 'info', title: 'توسيع الكل', message: 'تم توسيع كامل تفاصيل الجلسات المسجلة.' });
+    };
+
+    const collapseAllRows = () => {
+        setExpandedRows({});
+        addAuditLog('تطبيق الطي الشامل والسرية لجدول الرول');
+        addToast({ type: 'info', title: 'طي الكل', message: 'تم طي كامل تفاصيل الجلسات.' });
+    };
+
+    // Copy Content to clipboard
+    const handleCopyEventContent = (event: ScheduleEvent) => {
+        const content = `[رول القضائي الكويتي المحمي]
+الحدث: ${event.type === 'Hearing' ? 'جلسة رول قضائي' : 'موعد إداري مكثف'}
+العنوان: ${event.title}
+الأطراف والموكل: ${event.subtitle}
+المقر والقاعة: ${event.location}
+التوقيت: يوم ${event.date} الساعة ${event.time}
+الحالة والدائرة: ${event.status} | ${event.circuit || 'عام'}
+الملاحظات والإجراءات: ${event.notes || 'بلا ملاحظات مضافة بالملف'}`;
+        
+        navigator.clipboard.writeText(content).then(() => {
+            addAuditLog(`نسخ محتوى كارت الحدث #${event.id} للحافظة الإلكترونية`);
+            addToast({ type: 'success', title: 'تم النسخ للحافظة 📋', message: 'تم نسخ تفاصيل الجلسة لتتمكن من مشاركتها بسهولة.' });
+        }).catch(() => {
+            addToast({ type: 'error', title: 'خطأ في النسخ', message: 'تعذر الوصول إلى الحافظة.' });
+        });
+    };
+
+    // Submit Hearing (Add & Edit)
+    const handleSubmitHearing = (e: React.FormEvent) => {
+        e.preventDefault();
+        const activeCase = initialCases.find(c => c.id === hearingForm.caseId) || initialCases[0];
+        
+        if (editingHearing) {
+            const updated: Hearing = {
+                ...editingHearing,
+                caseId: hearingForm.caseId,
+                caseTitle: hearingForm.caseTitle || activeCase.title,
+                clientName: hearingForm.clientName || activeCase.clientName,
+                date: hearingForm.date || new Date().toISOString().split('T')[0],
+                time: hearingForm.time || '09:00',
+                courtRoomOrLocation: hearingForm.courtRoomOrLocation || 'قصر العدل قاعة 15',
+                type: hearingForm.type || 'جلسة مرافعة',
+                status: (hearingForm.status as any) || 'Scheduled',
+                notes: hearingForm.notes || '',
+                courtDecision: hearingForm.courtDecision || '',
+                attendedBy: editingHearing.attendedBy || []
+            };
+            updateHearing(updated);
+            addAuditLog(`تعديل بيانات جلسة رول: ${updated.caseTitle} (${updated.id})`);
+            addToast({ type: 'success', title: 'تم التعديل الكلي', message: 'تم حفظ كافة التحديثات لورقة الرول.' });
+        } else {
+            const randId = `h-docket-custom-${Date.now()}`;
+            const newHearing: Hearing = {
+                id: randId,
+                caseId: hearingForm.caseId,
+                caseTitle: hearingForm.caseTitle || activeCase.title,
+                clientName: hearingForm.clientName || activeCase.clientName,
+                date: hearingForm.date || new Date().toISOString().split('T')[0],
+                time: hearingForm.time || '09:00',
+                courtRoomOrLocation: hearingForm.courtRoomOrLocation || 'قصر العدل قاعة 15',
+                type: hearingForm.type || 'جلسة مرافعة كتابية',
+                status: 'Scheduled',
+                notes: hearingForm.notes || '',
+                courtDecision: '',
+                attendedBy: []
+            };
+            addHearing(newHearing);
+            addAuditLog(`إضافة وجدولة جلسة رول جديدة: ${newHearing.caseTitle}`);
+            addToast({ type: 'success', title: 'تم تسجيل الجلسة', message: 'تم إدراج الجلسة بنجاح بنظام الرول الموحد.' });
+        }
+        setIsHearingModalOpen(false);
+        setEditingHearing(null);
+    };
+
+    // Delete confirmation handler
+    const handleConfirmDelete = () => {
+        if (!selectedHearingForDelete) return;
+        if (selectedHearingForDelete.startsWith('apt-')) {
+            setAppointments(prev => prev.filter(a => a.id !== selectedHearingForDelete));
+            addAuditLog(`حذف موعد إداري: ${selectedHearingForDelete}`);
+        } else {
+            deleteHearing(selectedHearingForDelete);
+            addAuditLog(`حذف جلسة محكمة من الرول: ${selectedHearingForDelete}`);
+        }
+        setIsDeleteConfirmOpen(false);
+        setSelectedHearingForDelete(null);
+        addToast({ type: 'warning', title: 'تم الحذف', message: 'تم إرجاع وتطهير السجل من الرول بنجاح.' });
+    };
+
     // Handle interactive appointments save
     const handleSubmitApt = (e: React.FormEvent) => {
         e.preventDefault();
@@ -672,6 +1083,96 @@ const AutomatedDocketPage: React.FC = () => {
         addToast({ type: 'success', title: 'تم تصدير الكشف', message: 'تنزيل ملف Excel بنجاح.' });
     };
 
+    const handleExportCalendar = (event: any) => {
+        const formatDate = (dateStr: string, timeStr: string, isEnd: boolean = false) => {
+            if (!dateStr) {
+                const d = new Date();
+                if (isEnd) d.setHours(d.getHours() + 1);
+                return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            }
+            
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+                const year = parts[0];
+                const month = parts[1].padStart(2, '0');
+                const day = parts[2].padStart(2, '0');
+                
+                let hourNum = 9;
+                let minNum = 0;
+                if (timeStr && timeStr.includes(':')) {
+                    const tParts = timeStr.split(':');
+                    hourNum = parseInt(tParts[0], 10) || 9;
+                    minNum = parseInt(tParts[1], 10) || 0;
+                }
+                
+                if (isEnd) {
+                    hourNum += 1;
+                }
+                
+                const hour = String(hourNum).padStart(2, '0');
+                const min = String(minNum).padStart(2, '0');
+                return `${year}${month}${day}T${hour}${min}00Z`;
+            }
+            
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) {
+                    const now = new Date();
+                    if (isEnd) now.setHours(now.getHours() + 1);
+                    return now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                }
+                if (isEnd) d.setHours(d.getHours() + 1);
+                return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            } catch (e) {
+                const now = new Date();
+                if (isEnd) now.setHours(now.getHours() + 1);
+                return now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+            }
+        };
+
+        const start = formatDate(event.date, event.time);
+        const end = formatDate(event.date, event.time, true);
+
+        const cleanDesc = `النوع: ${event.type === 'Hearing' ? 'جلسة محكمة' : 'موعد إداري'}\nالموكل: ${event.subtitle || event.client || 'غير محدد'}\nالدائرة القضائية: ${event.circuit || 'المكتب الرئيسي'}\nالمحامي المسؤول: ${event.lawyer || 'غير محدد'}\nالتفاصيل: ${event.notes || 'لا يوجد ملاحظات إضافية'}`
+            .replace(/\n/g, '\\n')
+            .replace(/,/g, '\\,')
+            .replace(/;/g, '\\;');
+            
+        const cleanTitle = (event.title || '').replace(/,/g, '\\,').replace(/;/g, '\\;');
+        const cleanLoc = (event.location || '').replace(/,/g, '\\,').replace(/;/g, '\\;');
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'VERSION:2.0',
+            'PRODID:-//Adala Law Firm//Calendar Export//EN',
+            'CALSCALE:GREGORIAN',
+            'METHOD:PUBLISH',
+            'BEGIN:VEVENT',
+            `UID:event-${event.id || 'export'}-${Math.random().toString(36).substr(2, 9)}@adala.com`,
+            `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, '').split('.')[0]}Z`,
+            `DTSTART:${start}`,
+            `DTEND:${end}`,
+            `SUMMARY:جلسة/موعد: ${cleanTitle}`,
+            `DESCRIPTION:${cleanDesc}`,
+            cleanLoc ? `LOCATION:${cleanLoc}` : '',
+            'STATUS:CONFIRMED',
+            'SEQUENCE:0',
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].filter(Boolean).join('\r\n');
+
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `event_${event.id || 'export'}.ics`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        addAuditLog(`تصدير ملف التقويم .ics للحدث #${event.id} بنجاح`);
+    };
+
     return (
         <div className="space-y-6 pb-20 font-sans text-right" dir="rtl">
             
@@ -712,117 +1213,163 @@ const AutomatedDocketPage: React.FC = () => {
                 )}
             </AnimatePresence>
 
-            {/* HEADER DESIGN AREA */}
-            <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
+            {/* HEADER DESIGN AREA - SLATE SYSTEM */}
+            <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
                 <div className="absolute inset-0 bg-grid-white/[0.03] bg-[size:20px_20px]" />
-                <div className="absolute -top-12 -left-12 w-48 h-48 bg-primary/20 rounded-full blur-3xl" />
+                <div className="absolute -top-12 -left-12 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                 
-                <div className="relative flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6">
+                <div className="relative flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 border-b border-slate-800 pb-6">
                     <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <span className="bg-amber-500 text-slate-900 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1">
-                                <ClockIcon className="w-3.5 h-3.5" /> بوابة منظومة العدالة الذكية
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="bg-emerald-500/10 text-emerald-400 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider border border-emerald-500/20 flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                                الرول الآلي وجدولة المحاكمات الذكية
                             </span>
-                            <span className="bg-slate-800/80 text-gray-300 text-[10px] px-2.5 py-1 rounded-full border border-slate-700/60">
-                                نظام الرول الآلي الموحد v3
+                            <span className="bg-slate-800 text-slate-400 text-[10px] font-bold px-2.5 py-1 rounded-full border border-slate-700">
+                                Slate Design System
                             </span>
                         </div>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-2">
-                            نظام الرول الآلي وجدولة المحاكمات الذكية
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight mb-1 text-white">
+                            جدولة الجلسات والرول القضائي الموحد
                         </h1>
-                        <p className="text-sm text-slate-300 font-bold max-w-2xl leading-relaxed">
-                            إدارة متقدمة لجميع الجلسات، لجان الخبراء، والمهام الإدارية لمكاتب المحاماة في دولة الكويت مع تتبع المواعيد الإجرائية لضمان تفادي تفويت مدد الطعون والاستئناف والتمييز.
+                        <p className="text-xs text-slate-400 font-medium max-w-2xl leading-relaxed">
+                            متابعة وتنظيم رول اليوم، لجان الخبراء، والقرارات الإدارية في دولة الكويت بأسلوب عصري فائق البساطة والانسيابية.
                         </p>
                     </div>
 
+                    {/* QUICK ACTIONS CENTER */}
                     <div className="flex flex-wrap gap-2.5 self-stretch sm:self-auto justify-end">
                         <Button 
-                            onClick={() => setIsReportModalOpen(true)} 
-                            variant="primary" 
-                            className="bg-amber-500 hover:bg-amber-600 text-slate-900 font-black shadow-lg shadow-amber-500/10"
-                            leftIcon={<PrinterIcon className="w-5 h-5"/>}
+                            onClick={() => {
+                                setEditingHearing(null);
+                                setHearingForm({
+                                    caseId: '1',
+                                    date: new Date().toISOString().split('T')[0],
+                                    time: '09:00',
+                                    courtRoomOrLocation: 'قصر العدل قاعة 15',
+                                    type: 'جلسة مرافعة كتابية',
+                                    status: 'Scheduled',
+                                    notes: '',
+                                    courtDecision: ''
+                                });
+                                setIsHearingModalOpen(true);
+                            }}
+                            variant="primary"
+                            className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black shadow-md shadow-emerald-500/20 text-xs px-4 py-2.5"
+                            leftIcon={<PlusCircleIcon className="w-4 h-4" />}
                         >
-                            مركز التقارير والطباعة القضائية
+                            + إضافة جلسة / موعد
                         </Button>
                         <Button 
-                            onClick={() => setIsAptModalOpen(true)} 
-                            variant="secondary" 
-                            className="bg-slate-800 border border-slate-700 text-white font-bold hover:bg-slate-700"
-                            leftIcon={<PlusCircleIcon className="w-5 h-5" />}
+                            disabled={isSyncing}
+                            onClick={handleMOJSync}
+                            variant="secondary"
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-4 py-2.5 font-bold"
+                            leftIcon={<ArrowPathIcon className={`w-4 h-4 ${isSyncing ? 'animate-spin text-amber-400' : 'text-slate-300'}`} />}
                         >
-                            جدولة اجتماع / إعلان جديد
+                            {isSyncing ? 'جاري المزامنة...' : 'تحديث الرول (مزامنة بوابة العدل)'}
+                        </Button>
+                        <Button 
+                            onClick={() => setIsReportModalOpen(true)} 
+                            variant="secondary" 
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3.5 py-2.5 font-bold"
+                            leftIcon={<PrinterIcon className="w-4 h-4"/>}
+                        >
+                            طباعة الرول اليومي
+                        </Button>
+                        <Button 
+                            onClick={triggerExcelMockExport} 
+                            variant="secondary" 
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs px-3.5 py-2.5 font-bold"
+                            leftIcon={<ArrowDownTrayIcon className="w-4 h-4"/>}
+                        >
+                            تصدير Excel
                         </Button>
                     </div>
                 </div>
 
-                {/* KPI BENTO GRID */}
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-3.5 mt-8 relative border-t border-white/10 pt-6">
-                    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all">
-                        <span className="text-slate-400 text-xs font-bold block mb-1">إجمالي قضايا الرول النشطة</span>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-amber-500">{kpis.totalHearings}</span>
-                            <span className="text-[10px] text-slate-400">جلسة مسجلة</span>
+                {/* 3 CLEAN KPI INDICATORS */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/60 flex items-center justify-between">
+                        <div>
+                            <span className="text-slate-400 text-xs font-bold block mb-1">📅 جلسات اليوم</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-emerald-400">{kpis.scheduledToday}</span>
+                                <span className="text-[10px] text-slate-400 font-bold">جلسة مجدولة</span>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all">
-                        <span className="text-slate-400 text-xs font-bold block mb-1">جلسات مجدولة اليوم</span>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-emerald-400">{kpis.scheduledToday}</span>
-                            <span className="text-[10px] text-slate-400">أجندة معلقة</span>
+                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                            <ClockIcon className="w-5 h-5" />
                         </div>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all">
-                        <span className="text-slate-400 text-xs font-bold block mb-1">الجلسات المؤجلة تقنياً</span>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-amber-400">{kpis.totalPostponed}</span>
-                            <span className="text-[10px] text-slate-400">انتظار المراجعة</span>
+                    <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/60 flex items-center justify-between">
+                        <div>
+                            <span className="text-slate-400 text-xs font-bold block mb-1">🗓️ جلسات الأسبوع</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-amber-400">{kpis.scheduledThisWeek}</span>
+                                <span className="text-[10px] text-slate-400 font-bold">جلسة خلال الأسبوع</span>
+                            </div>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                            <CalendarDaysIcon className="w-5 h-5" />
                         </div>
                     </div>
 
-                    <div className="bg-white/5 backdrop-blur-md rounded-2xl p-4 border border-white/5 hover:border-white/10 transition-all">
-                        <span className="text-slate-400 text-xs font-bold block mb-1">معدل الحضور والإنجاز</span>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-2xl font-black text-indigo-400">{kpis.successRate}%</span>
-                            <span className="text-[10px] text-slate-400">حضور قطعي</span>
+                    <div className="bg-slate-800/60 backdrop-blur-md rounded-2xl p-4 border border-slate-700/60 flex items-center justify-between">
+                        <div>
+                            <span className="text-slate-400 text-xs font-bold block mb-1">⚖️ القضايا بانتظار القرار</span>
+                            <div className="flex items-baseline gap-2">
+                                <span className="text-3xl font-black text-indigo-400">
+                                    {hearings.filter(h => h.status === 'Scheduled' || h.status === 'Postponed').length}
+                                </span>
+                                <span className="text-[10px] text-slate-400 font-bold">قضية قيد المتابعة</span>
+                            </div>
                         </div>
-                    </div>
-
-                    <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-amber-500/10 to-indigo-500/10 backdrop-blur-md rounded-2xl p-4 border border-white/10">
-                        <span className="text-amber-400 text-xs font-black block mb-1">رول المحاماة النشط</span>
-                        <div className="text-[11px] text-slate-300 leading-snug">
-                            مستوي الحماية الأمنية والرقابة: <span className="font-black text-emerald-400">فعّال</span>
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                            <GavelIcon className="w-5 h-5" />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* TAB SELECTOR INTERACTIVE BAR */}
-            <div className="bg-white dark:bg-dm-card p-2 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 flex flex-wrap gap-1">
+            {/* MAIN NAVIGATION & TAB SYSTEM */}
+            <div className="bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 flex flex-wrap gap-1">
                 <button 
                     onClick={() => setActiveTab('roll')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'roll' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-gray-800'}`}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'roll' ? 'bg-slate-900 text-white shadow-sm dark:bg-emerald-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                 >
-                    <GavelIcon className="w-4 h-4" /> الرول اليومي وجداول الجلسات والمواعيد
+                    <GavelIcon className="w-4 h-4" /> الرول اليومي وجدول الجلسات
+                </button>
+                <button 
+                    onClick={() => setActiveTab('roadmap')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'roadmap' ? 'bg-slate-900 text-white shadow-sm dark:bg-emerald-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                >
+                    <ScaleIcon className="w-4 h-4 text-emerald-400" /> الدليل الإجرائي الذكي للتقاضي (Roadmap)
                 </button>
                 <button 
                     onClick={() => setActiveTab('experts')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'experts' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-gray-800'}`}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'experts' ? 'bg-slate-900 text-white shadow-sm dark:bg-emerald-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                 >
-                    <UsersIcon className="w-4 h-4" /> جلسات الخبراء ولجان التحقيق م.ع ({expertMeetings.length})
+                    <UsersIcon className="w-4 h-4" /> جلسات الخبراء ولجان التحقيق ({expertMeetings.length})
                 </button>
                 <button 
                     onClick={() => setActiveTab('deadlines')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'deadlines' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-gray-800'}`}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'deadlines' ? 'bg-slate-900 text-white shadow-sm dark:bg-emerald-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                 >
-                    <CalculatorIcon className="w-4 h-4" /> حاسبة المواعيد الإجرائية (للائحتي ١٦ و ١٨ مرافعات)
+                    <CalculatorIcon className="w-4 h-4" /> حاسبة المواعيد الإجرائية
                 </button>
                 <button 
                     onClick={() => setActiveTab('audit_rbac')}
-                    className={`flex items-center gap-2 px-5 py-3 text-xs font-black rounded-xl transition-all ${activeTab === 'audit_rbac' ? 'bg-primary text-white shadow-md' : 'text-gray-500 hover:text-gray-800'}`}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'audit_rbac' ? 'bg-slate-900 text-white shadow-sm dark:bg-emerald-500 dark:text-slate-950' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                 >
-                    <ShieldCheckIcon className="w-4 h-4" /> تفعيل الرقابة وسجل التعديلات (Audit & RBAC)
+                    <ShieldCheckIcon className="w-4 h-4" /> سجل التعديلات والرقابة
+                </button>
+                <button 
+                    onClick={() => setActiveTab('moj_connector')}
+                    className={`flex items-center gap-2 px-4 py-2.5 text-xs font-black rounded-xl transition-all ${activeTab === 'moj_connector' ? 'bg-amber-600 text-white shadow-sm' : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30'}`}
+                >
+                    <ArrowPathIcon className="w-4 h-4 animate-pulse" /> بوابة ربط وزارة العدل (API MOJ)
                 </button>
             </div>
 
@@ -836,143 +1383,238 @@ const AutomatedDocketPage: React.FC = () => {
                         initial={{ opacity: 0, y: 15 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -15 }}
-                        className="space-y-6 text-right"
+                        className="space-y-5 text-right"
                     >
-                        
-                        {/* 1. REAL-TIME CONFLICT DETECTOR & NOTIFICATIONS DECK */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                            {/* Notifications Center */}
-                            <div className="lg:col-span-7 bg-[#E0F2F1]/40 border border-[#B2DFDB]/50 p-4 rounded-2xl shadow-sm space-y-3">
-                                <span className="text-[#00796B] text-xs font-black flex items-center gap-2">
-                                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                                    إشعارات وبلاغات الرول المحدثة (مكتب الوجيان)
-                                </span>
-                                <div className="space-y-2 max-h-[140px] overflow-y-auto scrollbar-thin">
-                                    {activeNotificationLog.map(notif => (
-                                        <div key={notif.id} className="flex justify-between items-center bg-white p-2.5 rounded-xl text-[11px] border border-slate-100 shadow-xs">
-                                            <div className="flex items-center gap-2">
-                                                <span className={`w-2 h-2 rounded-full ${
-                                                    notif.type === 'critical' || notif.type === 'urgent' ? 'bg-red-500' : 'bg-[#00796B]'
-                                                }`} />
-                                                <span className="font-bold text-slate-700">{notif.text}</span>
-                                            </div>
-                                            <span className="text-[9px] text-[#00796B] bg-[#E0F2F1] px-2 py-0.5 rounded-md font-mono">{notif.time}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
+                        {/* AI TASK BAR FOR NATURAL LANGUAGE DOCKETING */}
+                        <AiTaskBar 
+                            onParseAndFill={(parsed) => {
+                                setHearingForm(prev => ({ ...prev, ...parsed }));
+                                setIsHearingModalOpen(true);
+                            }} 
+                        />
 
-                            {/* Scheduling Conflict Warnings */}
-                            <div className="lg:col-span-5 bg-red-50/50 border border-red-100 p-4 rounded-2xl shadow-sm space-y-3">
-                                <span className="text-red-800 text-xs font-black flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>
-                                    مراقب تعارض جدولة المحامين (جدول الجلسات المانع للتكرار)
-                                </span>
-                                <div className="space-y-2 max-h-[140px] overflow-y-auto scrollbar-thin">
-                                    {(() => {
-                                        const conflicts: string[] = [];
-                                        const timeMatch: Record<string, typeof hearings> = {};
-                                        hearings.forEach(h => {
-                                            if (h.status !== 'Cancelled') {
-                                                const caseObj = initialCases.find(c => c.id === h.caseId) as any;
-                                                const lawyerName = (h as any).assignedLawyer || caseObj?.assignedLawyer || 'أ. صبري أحمد شطا';
-                                                const key = `${h.date}T${h.time || '09:00'}_${lawyerName}`;
-                                                if (!timeMatch[key]) timeMatch[key] = [];
-                                                timeMatch[key].push(h);
-                                            }
-                                        });
-                                        Object.entries(timeMatch).forEach(([key, items]) => {
-                                            if (items.length > 1) {
-                                                const caseObj = initialCases.find(c => c.id === items[0].caseId) as any;
-                                                const lawyerName = (items[0] as any).assignedLawyer || caseObj?.assignedLawyer || 'أ. صبري أحمد شطا';
-                                                conflicts.push(`المحامي: ${lawyerName} لديه تعارض جدولة بجلستين في ${items[0].date} الساعة ${items[0].time || '09:00'}`);
-                                            }
-                                        });
-
-                                        return conflicts.length === 0 ? (
-                                            <div className="text-center py-6 text-emerald-800 text-[11px] font-bold">
-                                                ✅ نظام الجدولة آمن وقائم بالكامل بدون أي تداخلات زمنية للمندوبين.
-                                            </div>
-                                        ) : (
-                                            conflicts.map((conf, index) => (
-                                                <div key={index} className="p-2 bg-red-100/40 border border-red-200/50 text-[10px] text-red-900 rounded-xl font-bold flex items-center gap-2">
-                                                    <span className="text-red-700">⚠️</span>
-                                                    {conf}
-                                                </div>
-                                            ))
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 2. COURT ROLL SYSTEM SWITCHER (25 Sections) */}
-                        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                            <span className="text-[#00796B] text-xs font-black block mb-3">البحث الفئوي - تصنيفات الرول المعتمدة الـ 25:</span>
-                            <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto scrollbar-thin">
-                                {ROLL_CATEGORIES.map((cat) => (
-                                    <button
-                                        key={cat.id}
-                                        onClick={() => {
-                                            setSelectedCategory(cat.id);
-                                            addAuditLog(`استعراض رول فئة: [${cat.name}]`);
+                        {/* AUDIO ALERTS CONTROL & STATUS DROP TARGETS BAR */}
+                        <div className="bg-slate-900 text-white dark:bg-slate-800/90 p-3.5 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border border-slate-800 shadow-xs">
+                            {/* Audio Alerts Toggle & Chime Test Button */}
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label className="flex items-center gap-2 cursor-pointer bg-slate-800/80 dark:bg-slate-900/80 px-3 py-1.5 rounded-xl border border-slate-700">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={audioAlertsEnabled}
+                                        onChange={(e) => {
+                                            setAudioAlertsEnabled(e.target.checked);
+                                            if (e.target.checked) playDocketChime();
+                                            addToast({
+                                                type: 'info',
+                                                title: e.target.checked ? 'تم تفعيل التنبيهات الصوتية 🔊' : 'تم تعطيل التنبيهات الصوتية 🔇',
+                                                message: e.target.checked ? 'سيتم إصدار تنبيه صوتي قبل موعد الجلسة بـ 15 دقيقة.' : 'تنبيهات الصوت متوقفة حالياً.'
+                                            });
                                         }}
-                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-tight transition-all flex items-center gap-1.5 ${
-                                            selectedCategory === cat.id 
-                                                ? 'bg-slate-900 text-white shadow-sm ring-2 ring-primary/20' 
-                                                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300'
-                                        }`}
-                                    >
-                                        <span className={`w-1.5 h-1.5 rounded-full ${cat.color}`} />
-                                        {cat.name}
-                                    </button>
-                                ))}
+                                        className="w-4 h-4 accent-emerald-500 rounded cursor-pointer"
+                                    />
+                                    <span className="text-xs font-black text-slate-200">
+                                        {audioAlertsEnabled ? '🔊 تنبيهات الجلسات الصوتية (قبل 15 دقيقة): مفعّلة' : '🔇 تنبيهات الصوت: معطلة'}
+                                    </span>
+                                </label>
+
+                                <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    onClick={() => {
+                                        playDocketChime();
+                                        addToast({ type: 'success', title: '🔊 تجربة الصوت', message: 'تم تشغيل التنبيه الصوتي بنجاح!' });
+                                    }}
+                                    className="text-[11px] font-bold py-1 px-3 bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-emerald-500/30"
+                                >
+                                    🔔 تجربة النغمة
+                                </Button>
+
+                                <Button 
+                                    variant="secondary" 
+                                    size="sm" 
+                                    onClick={() => setIsAudioSettingsOpen(true)}
+                                    className="text-[11px] font-bold py-1 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                                >
+                                    ⚙️ إعدادات نغمة التنبيه
+                                </Button>
+                            </div>
+
+                            {/* Drag & Drop Quick Status Zones */}
+                            <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                                <span className="text-[10px] text-slate-400 font-bold shrink-0">🎯 منطقة سحب وإسقاط الجلسات:</span>
+                                <div 
+                                    onDragOver={(e) => { e.preventDefault(); setDropZoneHighlight('Scheduled'); }}
+                                    onDragLeave={() => setDropZoneHighlight(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const id = e.dataTransfer.getData('text/plain') || draggedHearingId;
+                                        if (id) {
+                                            handleDragAndDropStatusChange(id, 'Scheduled');
+                                        }
+                                        setDropZoneHighlight(null);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${dropZoneHighlight === 'Scheduled' ? 'bg-emerald-500 text-slate-950 border-emerald-400 scale-105 shadow-md' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'}`}
+                                >
+                                    🟢 جاهز للمرافعة
+                                </div>
+
+                                <div 
+                                    onDragOver={(e) => { e.preventDefault(); setDropZoneHighlight('Postponed'); }}
+                                    onDragLeave={() => setDropZoneHighlight(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const id = e.dataTransfer.getData('text/plain') || draggedHearingId;
+                                        if (id) {
+                                            handleDragAndDropStatusChange(id, 'Postponed');
+                                        }
+                                        setDropZoneHighlight(null);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${dropZoneHighlight === 'Postponed' ? 'bg-amber-500 text-slate-950 border-amber-400 scale-105 shadow-md' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}`}
+                                >
+                                    🟡 مؤجلة
+                                </div>
+
+                                <div 
+                                    onDragOver={(e) => { e.preventDefault(); setDropZoneHighlight('Completed'); }}
+                                    onDragLeave={() => setDropZoneHighlight(null)}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        const id = e.dataTransfer.getData('text/plain') || draggedHearingId;
+                                        if (id) {
+                                            handleDragAndDropStatusChange(id, 'Completed');
+                                        }
+                                        setDropZoneHighlight(null);
+                                    }}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer border ${dropZoneHighlight === 'Completed' ? 'bg-blue-500 text-white border-blue-400 scale-105 shadow-md' : 'bg-blue-500/10 text-blue-400 border-blue-500/30'}`}
+                                >
+                                    🔵 تم الحضور
+                                </div>
                             </div>
                         </div>
-
-                        {/* 3. DOCKET CONTROL DECK & ADVANCED FILTER PANEL */}
-                        <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b pb-4">
-                                <div className="space-y-1 text-right">
-                                    <h3 className="font-black text-sm text-[#00796B]">التحكم والبحث المتقدم في الجلسات</h3>
-                                    <p className="text-[10px] text-slate-400 font-bold">فرز وتصفية مرنة عبر التواريخ، المحاكم، المحامين المسؤولين ومستويات الطعن.</p>
-                                </div>
+                        
+                        {/* QUICK TIMEFRAME & ROLL SWITCHER HEADER */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
+                            
+                            {/* TOP BAR: TIMEFRAMES & ROLL TYPES */}
+                            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
                                 
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <span className="text-xs text-slate-500 font-bold">الفلاتر المحفوظة مسبقاً:</span>
-                                    <select
-                                        value={selectedPreset}
-                                        onChange={(e) => setSelectedPreset(e.target.value)}
-                                        className="text-xs bg-[#E0F2F1]/50 border-none rounded-lg p-2 font-bold cursor-pointer text-[#00796B] outline-none"
+                                {/* Timeframe Switcher (النطاق الزمني) */}
+                                <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl overflow-x-auto w-full lg:w-auto">
+                                    <span className="text-[10px] text-slate-500 font-black px-2.5 shrink-0">النطاق الزمني:</span>
+                                    <button 
+                                        onClick={() => { setViewMode('day'); addAuditLog('استعراض رول اليوم'); }}
+                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${viewMode === 'day' ? 'bg-slate-900 text-white dark:bg-emerald-500 dark:text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'}`}
                                     >
-                                        {PRESETS_FILTERS.map(preset => (
-                                            <option key={preset.id} value={preset.id}>{preset.name}</option>
-                                        ))}
-                                    </select>
+                                        📅 رول اليوم
+                                    </button>
+                                    <button 
+                                        onClick={() => { setViewMode('week'); addAuditLog('استعراض رول الأسبوع'); }}
+                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${viewMode === 'week' ? 'bg-slate-900 text-white dark:bg-emerald-500 dark:text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'}`}
+                                    >
+                                        🗓️ رول الأسبوع
+                                    </button>
+                                    <button 
+                                        onClick={() => { setViewMode('month'); addAuditLog('استعراض رول الشهر'); }}
+                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${viewMode === 'month' ? 'bg-slate-900 text-white dark:bg-emerald-500 dark:text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'}`}
+                                    >
+                                        📆 رول الشهر
+                                    </button>
+                                    <button 
+                                        onClick={() => { setViewMode('date-range'); addAuditLog('تصفح نطاق زمني مخصص'); }}
+                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${viewMode === 'date-range' ? 'bg-slate-900 text-white dark:bg-emerald-500 dark:text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'}`}
+                                    >
+                                        ⏱️ نطاق مخصص
+                                    </button>
                                 </div>
+
+                                {/* Roll Category Tabs (أنواع الرول) */}
+                                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 p-1 rounded-2xl overflow-x-auto w-full lg:w-auto border border-slate-200 dark:border-slate-700">
+                                    <button
+                                        onClick={() => setSelectedCategory('sessions')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${selectedCategory === 'sessions' || selectedCategory === 'all' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60'}`}
+                                    >
+                                        ⚖️ رول الجلسات
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedCategory('experts')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${selectedCategory === 'experts' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60'}`}
+                                    >
+                                        👥 رول الخبراء
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedCategory('announcements')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${selectedCategory === 'announcements' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60'}`}
+                                    >
+                                        📋 رول القرارات والإعلانات
+                                    </button>
+                                    <button
+                                        onClick={() => setSelectedCategory('execution')}
+                                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shrink-0 ${selectedCategory === 'execution' ? 'bg-emerald-500 text-slate-950 shadow-xs' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60'}`}
+                                    >
+                                        🏛️ رول التنفيذ
+                                    </button>
+                                </div>
+
                             </div>
 
-                            {/* Filters Grid */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 text-right">
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">البحث النصي الشامل</span>
+                            {/* CUSTOM DATE RANGE SELECTOR POPUP IF SELECTED */}
+                            {viewMode === 'date-range' && (
+                                <motion.div 
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="bg-slate-50 dark:bg-slate-800 p-3 rounded-2xl border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs"
+                                >
+                                    <div>
+                                        <label className="text-[10px] text-slate-500 font-black block mb-1">من تاريخ:</label>
+                                        <input 
+                                            type="date" 
+                                            value={customRangeStart}
+                                            onChange={(e) => setCustomRangeStart(e.target.value)}
+                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 w-full font-bold outline-none text-slate-800 dark:text-slate-200"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] text-slate-500 font-black block mb-1">إلى تاريخ:</label>
+                                        <input 
+                                            type="date" 
+                                            value={customRangeEnd}
+                                            onChange={(e) => setCustomRangeEnd(e.target.value)}
+                                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-2 w-full font-bold outline-none text-slate-800 dark:text-slate-200"
+                                        />
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {/* SMART UNIFIED SEARCH & ESSENTIAL FILTERS BAR */}
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+                                
+                                {/* Unified Search Bar */}
+                                <div className="md:col-span-5 relative">
                                     <input 
                                         type="text"
-                                        placeholder="رقم القضية، موكل، خصم..."
+                                        placeholder="🔍 بحث موحد: رقم القضية، الموكل، الخصم، المحكمة، المحامي..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 rounded-xl py-2.5 px-3 font-semibold text-slate-700 outline-none focus:ring-1 focus:ring-[#00796B]/30"
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 pr-3 pl-8 font-bold text-slate-800 dark:text-slate-100 outline-none focus:ring-2 focus:ring-emerald-500/40"
                                     />
+                                    {searchQuery && (
+                                        <button 
+                                            onClick={() => setSearchQuery('')}
+                                            className="absolute left-2.5 top-2.5 text-xs text-slate-400 hover:text-slate-600 font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    )}
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">المحكمة ومجمع المحاكم</span>
+                                {/* Court Dropdown */}
+                                <div className="md:col-span-3">
                                     <select 
                                         value={courtFilter} 
                                         onChange={(e) => setCourtFilter(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 text-slate-750 font-bold outline-none rounded-xl py-2.5 px-2"
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold outline-none rounded-xl py-2.5 px-3"
                                     >
-                                        <option value="all">كل المحاكم الكترونياً</option>
+                                        <option value="all">كل المحاكم</option>
                                         <option value="قصر العدل">قصر العدل (العاصمة)</option>
                                         <option value="الرقعي">مجمع محاكم الرقعي</option>
                                         <option value="حولي">مجمع محاكم حولي</option>
@@ -982,602 +1624,365 @@ const AutomatedDocketPage: React.FC = () => {
                                     </select>
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">المحامي المسؤول</span>
+                                {/* Lawyer Dropdown */}
+                                <div className="md:col-span-2">
                                     <select
                                         value={lawyerFilter}
                                         onChange={(e) => setLawyerFilter(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 text-slate-750 font-bold outline-none rounded-xl py-2.5 px-2"
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold outline-none rounded-xl py-2.5 px-3"
                                     >
-                                        <option value="all">الكل بدون قيود</option>
-                                        <option value="شطا">أ. صبري أحمد شطا (محامي أول)</option>
-                                        <option value="الأنصاري">أ. أحمد مبارك الأنصاري</option>
-                                        <option value="الكندري">أ. فاطمة علي الكندري</option>
+                                        <option value="all">كل المحامين</option>
+                                        <option value="شطا">أ. صبري شطا</option>
+                                        <option value="الأنصاري">أ. أحمد الأنصاري</option>
+                                        <option value="الكندري">أ. فاطمة الكندري</option>
                                         <option value="العتيبي">أ. مريم العتيبي</option>
                                     </select>
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">حالة الجلسة / الموقف</span>
+                                {/* Session Status Dropdown */}
+                                <div className="md:col-span-2">
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 text-[#00796B] font-bold outline-none rounded-xl py-2.5 px-2"
+                                        className="w-full text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-bold outline-none rounded-xl py-2.5 px-3"
                                     >
-                                        <option value="all">كل الحالات الإجرائية</option>
-                                        <option value="Scheduled">Scheduled (مجدولة)</option>
-                                        <option value="Completed">Completed (منتهية)</option>
-                                        <option value="Postponed">Postponed (مؤجلة)</option>
-                                        <option value="Cancelled">Cancelled (ملغاة)</option>
+                                        <option value="all">كل الحالات</option>
+                                        <option value="Scheduled">مجدولة / جاهز</option>
+                                        <option value="Completed">منتهية / مكتملة</option>
+                                        <option value="Postponed">مؤجلة</option>
+                                        <option value="Cancelled">ملغاة</option>
                                     </select>
                                 </div>
 
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">تصنيف الدعوى</span>
-                                    <select
-                                        value={casetypeFilter}
-                                        onChange={(e) => setCasetypeFilter(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 text-[#00796B] font-bold outline-none rounded-xl py-2.5 px-2"
-                                    >
-                                        <option value="all">كل التصنيفات القضائية</option>
-                                        <option value="تجاري">تجاري كلي</option>
-                                        <option value="عمالي">عمالي أفراد وشركات</option>
-                                        <option value="إيجارات">إيجارات وهدم ومطالبات</option>
-                                        <option value="إداري">إداري تظلمات شؤون</option>
-                                        <option value="مدني">مدني تعويضات كلية</option>
-                                        <option value="جنائي">جنائي وجنايات</option>
-                                        <option value="شخصي">أحوال شخصية وأسرة</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <span className="text-[10px] text-slate-400 font-black block mb-1">تصفية حسب اسم الموكل</span>
-                                    <select
-                                        value={clientFilterVal}
-                                        onChange={(e) => setClientFilterVal(e.target.value)}
-                                        className="w-full text-xs bg-slate-50 border border-slate-100 text-[#00796B] font-bold outline-none rounded-xl py-2.5 px-2"
-                                    >
-                                        <option value="all">كل الشركاء والموكلين</option>
-                                        <option value="العتيبي">ناصر فهد العتيبي</option>
-                                        <option value="الأمل">شركة الأمل العقارية</option>
-                                        <option value="الأنوار">مجموعة الأنوار للتجارة</option>
-                                        <option value="الخليج">شركة الخليج للبترولية</option>
-                                    </select>
-                                </div>
                             </div>
-
-                            {/* Time-Range Filters & Advanced Visual Views */}
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-3 pt-4 border-t border-slate-100 bg-slate-50/55 p-2 rounded-2xl">
-                                <div className="flex items-center gap-1 overflow-x-auto w-full md:w-auto scrollbar-none py-1">
-                                    <button 
-                                        onClick={() => { setViewMode('day'); addAuditLog('استعراض الرول اليومي للجلسات'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'day' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        الرول اليومي
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('week'); addAuditLog('استعراض المخطط الأسبوعي للجلسات'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'week' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        الأسبوعي
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('month'); addAuditLog('فتح الأجندة التفاعلية للشهر الحالي'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'month' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        البرنامج الشهري
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('year'); addAuditLog('تفعيل استعراض الأرند السنوي للجلسات والمطالبات'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'year' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        السنوي
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('date-range'); addAuditLog('تصفح الجلسات لنطاق زمني مخصص'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'date-range' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        نطاق مخصص
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('court-group'); addAuditLog('معاينة بانتو الجلسات مبوبة بالمطاف والمحاكم الكلية'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'court-group' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        تبويب المحاكم
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('lawyer-group'); addAuditLog('معاينة بانتو الجلسات مقسمة لكل مستشار'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'lawyer-group' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        تبويب الشركاء
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('casetype-group'); addAuditLog('معاينة الجلسات مبوبة بالنوع'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'casetype-group' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        تبويب فروع القانون
-                                    </button>
-                                    <button 
-                                        onClick={() => { setViewMode('client-group'); addAuditLog('معاينة الجلسات مبوبة بالعميل'); }}
-                                        className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all inline-flex items-center gap-1 ${viewMode === 'client-group' ? 'bg-[#00796B] text-white' : 'bg-white hover:bg-slate-100 text-slate-600'}`}
-                                    >
-                                        تبويب الموكلين
-                                    </button>
-                                </div>
-
-                                <div className="flex gap-1">
-                                    <button 
-                                        onClick={() => {
-                                            const prev = new Date(currentDate);
-                                            prev.setDate(prev.getDate() - (viewMode === 'month' ? 30 : 7));
-                                            setCurrentDate(prev);
-                                        }}
-                                        className="p-2 bg-slate-50 hover:bg-slate-100 text-[#00796B] font-black text-sm rounded-lg"
-                                    >
-                                        &gt;
-                                    </button>
-                                    <span className="text-[11px] font-black bg-slate-100 py-2 px-3 rounded-lg text-slate-800 shrink-0 min-w-[120px] text-center">
-                                        {format(currentDate, 'dd MMMM yyyy', { locale: ar })}
-                                    </span>
-                                    <button 
-                                        onClick={() => {
-                                            const next = new Date(currentDate);
-                                            next.setDate(next.getDate() + (viewMode === 'month' ? 30 : 7));
-                                            setCurrentDate(next);
-                                        }}
-                                        className="p-2 bg-slate-50 hover:bg-slate-100 text-[#00796B] font-black text-sm rounded-lg"
-                                    >
-                                        &lt;
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Specific Controls for Niche Views */}
-                            {viewMode === 'date-range' && (
-                                <div className="bg-[#E0F2F1]/20 p-3 rounded-2xl border border-[#B2DFDB]/30 grid grid-cols-2 gap-4 text-xs text-right">
-                                    <div>
-                                        <label className="text-[10px] text-[#00796B] font-black block mb-1">بداية النطاق الزمني لتوليد الرول:</label>
-                                        <input 
-                                            type="date" 
-                                            value={customRangeStart}
-                                            onChange={(e) => setCustomRangeStart(e.target.value)}
-                                            className="bg-white border rounded-lg p-2 w-full font-bold outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] text-[#00796B] font-black block mb-1">نهاية النطاق الزمني الموحد:</label>
-                                        <input 
-                                            type="date" 
-                                            value={customRangeEnd}
-                                            onChange={(e) => setCustomRangeEnd(e.target.value)}
-                                            className="bg-white border rounded-lg p-2 w-full font-bold outline-none"
-                                        />
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
-                        {/* 5. MULTI-VIEW INTEGRATED DOCKET ENGINE */}
-                        {viewMode === 'month' && (
-                            <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm text-right">
-                                <div className="flex justify-between items-center mb-4">
-                                    <span className="text-slate-400 text-[10px] font-black">مناظرة الأحداث والجدولة الشهرية الرسمية للمكتب</span>
-                                    <div className="flex gap-2 text-[9px] font-bold">
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-teal-500 block"></span> جلسة محكمة</span>
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block"></span> موعد إداري</span>
+                        {/* CLEAN SLATE SESSION CARDS & ACCORDION TABLE VIEW */}
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden text-right">
+                            
+                            {/* Bar Controls Header */}
+                            <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-slate-50/60 dark:bg-slate-800/40">
+                                <div>
+                                    <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                                        <span>جدول الرول الكرونولوجي الجاري</span>
+                                        <span className="text-[10px] bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold px-2 py-0.5 rounded-full">
+                                            {filteredEvents.length} جلسة
+                                        </span>
+                                    </h3>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                        type="button"
+                                        onClick={expandAllRows}
+                                        className="text-[10px] bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-xl font-bold transition-all"
+                                    >
+                                        توسيع الكل ↓
+                                    </button>
+                                    <button 
+                                        type="button"
+                                        onClick={collapseAllRows}
+                                        className="text-[10px] bg-white dark:bg-slate-800 hover:bg-slate-100 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-xl font-bold transition-all"
+                                    >
+                                        طي الكل ↑
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* LIST CONTENT */}
+                            {filteredEvents.length === 0 ? (
+                                <div className="text-center py-16 px-4">
+                                    <div className="w-14 h-14 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <GavelIcon className="w-7 h-7 text-slate-400" />
                                     </div>
+                                    <h4 className="text-xs font-black text-slate-700 dark:text-slate-300">لا توجد جلسات مطابقة لخيارات البحث</h4>
+                                    <p className="text-[10px] text-slate-400 mt-1">جرب تغيير الفلاتر أو تحديد نطاق زمني مختلف.</p>
                                 </div>
-                                <div className="grid grid-cols-7 border-b pb-2 text-center text-xs font-black text-slate-500 gap-1.5">
-                                    {['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map(day => (
-                                        <div key={day} className="py-2 bg-slate-50 rounded-lg">{day}</div>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-7 gap-1.5 mt-2">
-                                    {Array.from({ length: 35 }).map((_, idx) => {
-                                        const dayNum = (idx % 30) + 1;
-                                        const tempDate = new Date(currentDate);
-                                        tempDate.setDate(dayNum);
-                                        const dayEvents = filteredEvents.filter(e => isSameDay(new Date(e.date), tempDate));
+                            ) : (
+                                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {filteredEvents.map((event) => {
+                                        const isExpanded = expandedRow === event.id || !!expandedRows[event.id];
                                         return (
-                                            <div key={idx} className="min-h-[110px] bg-slate-50/30 rounded-xl p-2 border border-slate-100 hover:border-[#00796B]/30 transition-all flex flex-col justify-between">
-                                                <span className="text-[10px] font-black text-slate-400">{dayNum}</span>
-                                                <div className="space-y-1 mt-1 flex-1 overflow-y-auto max-h-[75px] scrollbar-none">
-                                                    {dayEvents.map(ev => (
-                                                        <div 
-                                                            key={ev.id} 
-                                                            onClick={() => {
-                                                                setViewEvent(ev);
-                                                                addAuditLog(`عرض مفصل للجلسة #${ev.id} من التقويم الشهري`);
-                                                            }}
-                                                            className={`text-[9px] font-black p-1.5 rounded-md truncate cursor-pointer hover:shadow-xs transition-all ${
-                                                                ev.type === 'Hearing' ? 'bg-[#E0F2F1] text-[#00796B] border border-[#B2DFDB]/30' : 'bg-emerald-50 text-emerald-800'
-                                                            }`}
-                                                            title={`${ev.time} | ${ev.title}`}
-                                                        >
-                                                            {ev.time} | {ev.title}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {viewMode === 'week' && (
-                            <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm text-right">
-                                <span className="text-slate-400 text-[10px] font-black block mb-4">الأجندة والمخطط الأسبوعي النشط وإشغال الشركاء</span>
-                                <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
-                                    {['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'].map((day, idx) => {
-                                        const tempDate = new Date(currentDate);
-                                        tempDate.setDate(currentDate.getDate() + idx - 3);
-                                        const dayEvents = filteredEvents.filter(e => isSameDay(new Date(e.date), tempDate));
-                                        return (
-                                            <div key={day} className="bg-slate-50/45 rounded-2xl p-3 border border-slate-100 flex flex-col min-h-[300px]">
-                                                <h4 className="text-[11px] font-black border-b pb-2 text-[#00796B] flex justify-between items-center">
-                                                    <span>{day}</span>
-                                                    <span className="text-[10px] text-slate-400">({tempDate.getDate()}/{tempDate.getMonth() + 1})</span>
-                                                </h4>
-                                                <div className="space-y-2 mt-3 flex-1 overflow-y-auto max-h-[250px] scrollbar-none">
-                                                    {dayEvents.length === 0 ? (
-                                                        <span className="text-[9px] text-gray-400 italic block text-center py-10">بلا التزامات</span>
-                                                    ) : (
-                                                        dayEvents.map(ev => (
-                                                            <div 
-                                                                key={ev.id} 
-                                                                onClick={() => {
-                                                                    setViewEvent(ev);
-                                                                    addAuditLog(`تفحص الحدث #${ev.id} من الجدول الأسبوعي`);
-                                                                }}
-                                                                className={`p-2.5 rounded-xl text-[10px] font-bold cursor-pointer transition-all hover:-translate-y-0.5 border ${
-                                                                    ev.type === 'Hearing' ? 'bg-[#E0F2F1]/80 border-[#B2DFDB] text-[#00796B]' : 'bg-emerald-50/80 border-emerald-100 text-emerald-900'
-                                                                }`}
-                                                            >
-                                                                <span className="block font-black">{ev.time}</span>
-                                                                <span className="line-clamp-2 mt-1 font-bold">{ev.title}</span>
-                                                                <span className="block text-[8px] opacity-75 mt-1 font-mono">📍 {ev.location}</span>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {viewMode === 'day' && (
-                            <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm text-right space-y-4">
-                                <div className="border-b pb-3 flex justify-between items-center">
-                                    <span className="text-slate-400 text-[10px] font-black">الجدول الزمني الكرونولوجي ليوم {format(currentDate, 'dd MMMM yyyy', { locale: ar })}</span>
-                                    <span className="text-[10px] text-slate-500 font-bold">جلسات رول منظمة بترتيب الساعات</span>
-                                </div>
-                                <div className="space-y-3">
-                                    {['08:00', '09:00', '10:00', '11:00', '12:00', '13:00'].map(hour => {
-                                        const hourEvents = filteredEvents.filter(e => e.time.startsWith(hour.split(':')[0]));
-                                        return (
-                                            <div key={hour} className="flex gap-4 items-start border-l-2 border-slate-100 pl-4 py-1">
-                                                <span className="font-mono text-xs font-black text-[#00796B] bg-[#E0F2F1] px-2.5 py-1 rounded-lg shrink-0">{hour}</span>
-                                                <div className="flex-1 space-y-2">
-                                                    {hourEvents.length === 0 ? (
-                                                        <span className="text-[10px] text-slate-300 italic block py-0.5">لا توجد جلسات مجدولة في هذا التوقيت</span>
-                                                    ) : (
-                                                        hourEvents.map(ev => (
-                                                            <div 
-                                                                key={ev.id}
-                                                                onClick={() => setViewEvent(ev)}
-                                                                className="bg-slate-50 hover:bg-[#E0F2F1]/30 p-3 rounded-xl border border-slate-100 cursor-pointer transition-all flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
-                                                            >
-                                                                <div>
-                                                                    <div className="flex items-center gap-1.5">
-                                                                        <span className="text-[9px] bg-[#00796B] text-white px-2 py-0.5 rounded-full font-black">{ev.type}</span>
-                                                                        {ev.circuit && <span className="text-[9px] text-slate-500 font-bold bg-slate-100 py-0.5 px-2 rounded">{ev.circuit}</span>}
-                                                                    </div>
-                                                                    <h5 className="text-xs font-black text-slate-800 mt-1">{ev.title}</h5>
-                                                                    <p className="text-[10px] text-slate-400 font-semibold mt-1">الموكل: {ev.subtitle}</p>
-                                                                </div>
-                                                                <div className="text-left">
-                                                                    <span className="text-[9px] text-slate-400 block font-bold">القاعة</span>
-                                                                    <span className="text-[10px] font-black text-[#00796B] block mt-0.5">{ev.location}</span>
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {viewMode === 'year' && (
-                            <div className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm text-right space-y-4">
-                                <span className="text-slate-400 text-[10px] font-black block">الكشف والأرند السنوي التراكمي لجلسات عام {currentDate.getFullYear()}</span>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {Array.from({ length: 12 }).map((_, mIdx) => {
-                                        const mDate = new Date(currentDate.getFullYear(), mIdx, 1);
-                                        const mEvents = filteredEvents.filter(e => {
-                                            const d = new Date(e.date);
-                                            return d.getFullYear() === currentDate.getFullYear() && d.getMonth() === mIdx;
-                                        });
-                                        return (
-                                            <div key={mIdx} className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 hover:border-[#00796B]/30 transition-all text-right">
-                                                <h5 className="text-xs font-black text-[#00796B]">{format(mDate, 'LLLL', { locale: ar })}</h5>
-                                                <div className="mt-3 flex justify-between items-center">
-                                                    <span className="text-[10px] text-slate-400 font-bold">عدد جلسات الشهر:</span>
-                                                    <span className="font-mono text-sm font-black text-slate-800 bg-white shadow-xs py-1 px-2.5 rounded-lg border border-slate-100">{mEvents.length}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* GROUPED BENTO LAYOUTS */}
-                        {['court-group', 'lawyer-group', 'casetype-group', 'client-group'].includes(viewMode) && (
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                {(() => {
-                                    // Group matching elements
-                                    let groups: { [key: string]: typeof filteredEvents } = {};
-                                    filteredEvents.forEach(e => {
-                                        let key = '';
-                                        if (viewMode === 'court-group') key = e.location.split(' - ')[0] || 'أخرى';
-                                        else if (viewMode === 'lawyer-group') key = e.lawyer || 'غير محدد';
-                                        else if (viewMode === 'casetype-group') key = e.title.includes('عمالي') ? 'عمالي' : e.title.includes('تجاري') ? 'تجاري' : 'مطالبات أخرى';
-                                        else if (viewMode === 'client-group') key = e.subtitle || 'موكل عام';
-
-                                        if (!groups[key]) groups[key] = [];
-                                        groups[key].push(e);
-                                    });
-
-                                    return Object.keys(groups).map(gKey => (
-                                        <div key={gKey} className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm text-right flex flex-col min-h-[350px]">
-                                            <div className="border-b pb-3 mb-3 flex justify-between items-center">
-                                                <h4 className="text-xs font-black text-[#00796B]">{gKey}</h4>
-                                                <span className="text-[10px] bg-[#E0F2F1] text-[#00796B] font-black px-2 py-0.5 rounded-md">
-                                                    {groups[gKey].length} جلسة
-                                                </span>
-                                            </div>
-                                            <div className="space-y-2 flex-1 overflow-y-auto max-h-[300px] scrollbar-none">
-                                                {groups[gKey].map(ev => (
-                                                    <div 
-                                                        key={ev.id}
-                                                        onClick={() => setViewEvent(ev)}
-                                                        className="p-3 rounded-2xl bg-slate-50 hover:bg-[#E0F2F1]/20 border border-slate-100 cursor-pointer transition-all space-y-1.5"
-                                                    >
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-[9px] font-black text-[#00796B]">{ev.time}</span>
-                                                            <span className="text-[8px] text-slate-400 font-mono">{ev.date}</span>
-                                                        </div>
-                                                        <h5 className="text-[11px] font-black text-slate-800 leading-snug">{ev.title}</h5>
-                                                        <p className="text-[9px] text-slate-400 font-semibold">{ev.subtitle}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ));
-                                })()}
-                            </div>
-                        )}
-
-                        {/* DETAILED LIST / TIMELINE (Fallback & Custom date ranges) */}
-                        {!['month', 'week', 'day', 'year', 'court-group', 'lawyer-group', 'casetype-group', 'client-group'].includes(viewMode) && (
-                            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden text-right">
-                                <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50/50">
-                                    <div className="space-y-0.5">
-                                        <h4 className="text-xs font-black text-slate-700">نتائج البحث والاستعراض الفوري للرول الموحد</h4>
-                                        <p className="text-[10px] text-slate-400 font-bold">بوابة المستندات ومحاضر الجلسات القانونية المكتملة والمجمدة.</p>
-                                    </div>
-                                    <span className="text-[10px] bg-[#E0F2F1] text-[#00796B] px-3 py-1 rounded-full font-black">
-                                        يتم عرض {filteredEvents.length} تدوينات من الجلسات والمواعيد
-                                    </span>
-                                </div>
-
-                                {filteredEvents.length === 0 ? (
-                                    <div className="text-center py-20">
-                                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                                            <BriefcaseIcon className="w-8 h-8 text-slate-350" />
-                                        </div>
-                                        <h3 className="text-xs font-black text-slate-700">لم يتم العثور على أي جلسات أو التزامات</h3>
-                                        <p className="text-[10px] text-slate-400 mt-1">يرجى تعديل شروط الفلترة أو إعادة تحديد الأيام في شريط السجل.</p>
-                                    </div>
-                                ) : (
-                                    <div className="divide-y divide-gray-100">
-                                        {filteredEvents.map((event) => {
-                                            const isExpanded = expandedRow === event.id;
-                                            return (
-                                                <div key={event.id} className="transition-all hover:bg-slate-50/30">
-                                                    
-                                                    {/* ROW SUMMARY SUMMARY CARD */}
-                                                    <div className="p-5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 cursor-pointer" onClick={() => setExpandedRow(isExpanded ? null : event.id)}>
+                                            <div 
+                                                key={event.id} 
+                                                draggable={true}
+                                                onDragStart={(e) => {
+                                                    e.dataTransfer.setData('text/plain', event.id);
+                                                    setDraggedHearingId(event.id);
+                                                }}
+                                                className={`transition-all hover:bg-slate-50/80 dark:hover:bg-slate-800/50 ${draggedHearingId === event.id ? 'opacity-50 border-2 border-dashed border-emerald-500 bg-emerald-50/30' : ''}`}
+                                            >
+                                                
+                                                {/* ROW ITEM HEADER SUMMARY */}
+                                                <div 
+                                                    className="p-4 md:p-5 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 cursor-pointer"
+                                                    onClick={() => {
+                                                        setExpandedRow(isExpanded ? null : event.id);
+                                                        setExpandedRows(prev => ({ ...prev, [event.id]: !isExpanded }));
+                                                    }}
+                                                >
+                                                    {/* Left/Right Main Info */}
+                                                    <div className="flex items-start gap-3">
                                                         
-                                                        {/* Timing Block */}
-                                                        <div className="flex items-center gap-4">
-                                                            <div className="text-center font-mono py-2 px-3 bg-[#E0F2F1]/55 rounded-xl min-w-[75px]">
-                                                                <span className="block text-xs font-black text-[#00796B]">{event.time}</span>
-                                                                <span className="text-[9px] text-slate-400 block mt-0.5">{event.date}</span>
+                                                        {/* Drag Handle & Time/Room Badge */}
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-slate-400 hover:text-slate-600 font-mono text-xs cursor-grab active:cursor-grabbing px-1" title="اسحب الجلسة لتغيير حالتها">
+                                                                ⋮⋮
+                                                            </span>
+                                                            <div className="text-center py-2 px-3 bg-slate-900 text-white dark:bg-slate-800 dark:text-emerald-400 rounded-2xl shrink-0 min-w-[90px]">
+                                                                <span className="block text-xs font-black font-mono">{event.time}</span>
+                                                                <span className="text-[9px] text-slate-300 dark:text-slate-400 block mt-0.5 font-bold">
+                                                                    {event.location.includes('قاعة') ? event.location.split('قاعة')[1] ? `قاعة ${event.location.split('قاعة')[1]}` : event.location : event.location}
+                                                                </span>
                                                             </div>
-                                                            <div>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Badge 
-                                                                        text={event.type === 'Hearing' ? 'جلسة رول محكمة الكلية' : 'موعد إداري'} 
-                                                                        variant={event.type === 'Hearing' ? 'primary' : 'success'} 
-                                                                        size="xs" 
-                                                                    />
-                                                                    {event.circuit && (
-                                                                        <span className="text-[10px] bg-slate-100 text-slate-500 font-extrabold px-2 py-0.5 rounded">
-                                                                            {event.circuit}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                                <h4 className="text-xs font-black text-slate-800 mt-1.5 leading-snug">
+                                                        </div>
+
+                                                        {/* Details Stack */}
+                                                        <div className="space-y-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                {/* Case Number & Circuit */}
+                                                                <span className="text-xs font-black text-slate-900 dark:text-white">
                                                                     {event.title}
-                                                                </h4>
-                                                                <span className="text-[10px] text-slate-400 font-bold block mt-1">
-                                                                    {event.subtitle}
                                                                 </span>
+                                                                {event.circuit && (
+                                                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold px-2 py-0.5 rounded-md">
+                                                                        {event.circuit}
+                                                                    </span>
+                                                                )}
+                                                                
+                                                                {/* Court Location Interactive Map Trigger */}
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setSelectedCourtNameModal(event.location);
+                                                                        setIsCourtMapModalOpen(true);
+                                                                    }}
+                                                                    className="inline-flex items-center gap-1 text-[10px] font-extrabold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-lg transition-all"
+                                                                    title="عرض موقع المحكمة والتوجيه الملاحي على الخريطة التفاعلية"
+                                                                >
+                                                                    <MapPinIcon className="w-3 h-3 text-emerald-500" />
+                                                                    <span>📍 الخريطة والوصول ({event.location.split(' ')[0]})</span>
+                                                                </button>
                                                             </div>
+
+                                                            {/* Parties: Client vs Opponent */}
+                                                            <div className="text-xs text-slate-600 dark:text-slate-400 font-bold flex flex-wrap items-center gap-2">
+                                                                <span>👤 الموكل: <strong className="text-slate-800 dark:text-slate-200">{event.subtitle || 'غير محدد'}</strong></span>
+                                                                {event.opponents && (
+                                                                    <span>• الخصم: <strong className="text-slate-700 dark:text-slate-300">{event.opponents}</strong></span>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Required Action / Previous Decision */}
+                                                            {event.notes && (
+                                                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium line-clamp-1 mt-1">
+                                                                    📌 <strong className="text-slate-700 dark:text-slate-300">الإجراء المطلوب / قرار الجلسة:</strong> {event.notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Right Side Info: Lawyer, Status & Actions */}
+                                                    <div className="flex flex-wrap items-center gap-3 xl:ms-auto shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                        
+                                                        {/* Lawyer Badge */}
+                                                        <div className="bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-1 rounded-xl text-right">
+                                                            <span className="text-[9px] text-slate-400 block font-bold">المحامي المكلف</span>
+                                                            <span className="text-[11px] font-black text-slate-800 dark:text-slate-200">
+                                                                👨‍⚖️ {event.lawyer || 'أ. صبري شطا'}
+                                                            </span>
                                                         </div>
 
-                                                        {/* Location & Status Progress Row */}
-                                                        <div className="flex flex-wrap items-center gap-6 xl:ms-auto">
-                                                            <div className="text-right">
-                                                                <span className="text-[10px] text-slate-400 block font-bold">المقر والقاعة</span>
-                                                                <span className="text-xs font-black text-slate-700 flex items-center gap-1.5 mt-1">
-                                                                    <HomeIcon className="w-3.5 h-3.5 text-slate-400" /> {event.location}
-                                                                </span>
-                                                            </div>
-
-                                                            <div className="min-w-[110px]">
-                                                                <div className="flex justify-between text-[10px] font-black mb-1">
-                                                                    <span className="text-slate-400">تحضير المستندات</span>
-                                                                    <span className="text-[#00796B]">{event.progress || 0}%</span>
-                                                                </div>
-                                                                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                                                                    <div className="bg-[#00796B] h-1.5 rounded-full" style={{ width: `${event.progress || 0}%` }} />
-                                                                </div>
-                                                            </div>
-
-                                                            <div>
-                                                                <Badge 
-                                                                    text={event.status} 
-                                                                    variant={
-                                                                        event.status === 'Completed' || event.status === 'منتهية' ? 'success' : 
-                                                                        event.status === 'Postponed' || event.status === 'مؤجلة' ? 'warning' : 'primary'
-                                                                    }
-                                                                    size="sm"
-                                                                />
-                                                            </div>
+                                                        {/* Status Badge */}
+                                                        <div>
+                                                            <span className={`inline-block text-xs font-extrabold px-3 py-1.5 rounded-xl ${
+                                                                event.status === 'Completed' || event.status === 'منتهية' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-400' :
+                                                                event.status === 'Postponed' || event.status === 'مؤجلة' ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-400' :
+                                                                'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                                                            }`}>
+                                                                {event.status === 'Scheduled' ? 'جاهز للمرافعة' : event.status === 'Completed' ? 'تم الحضور' : event.status === 'Postponed' ? 'مؤجل' : event.status}
+                                                            </span>
                                                         </div>
+
+                                                        {/* Accordion Expand Arrow Toggle */}
+                                                        <button 
+                                                            onClick={() => {
+                                                                setExpandedRow(isExpanded ? null : event.id);
+                                                                setExpandedRows(prev => ({ ...prev, [event.id]: !isExpanded }));
+                                                            }}
+                                                            className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-500 transition-colors"
+                                                            title={isExpanded ? 'طي التفاصيل' : 'توسيع التفاصيل'}
+                                                        >
+                                                            <svg className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                                                            </svg>
+                                                        </button>
 
                                                     </div>
 
-                                                    {/* EXPANDED PANEL DETAILS IN PLACE */}
-                                                    <AnimatePresence>
-                                                        {isExpanded && (
-                                                            <motion.div
-                                                                initial={{ opacity: 0, height: 0 }}
-                                                                animate={{ opacity: 1, height: 'auto' }}
-                                                                exit={{ opacity: 0, height: 0 }}
-                                                                className="overflow-hidden bg-slate-50/50 border-t"
-                                                            >
-                                                                <div className="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 text-xs text-right">
-                                                                    
-                                                                    {/* Col 1: Extra Details and actions taken */}
-                                                                    <div className="space-y-4">
-                                                                        <Card title="بيانات الموقف والتحضير" titleClassName="text-xs font-black">
-                                                                            <div className="space-y-2.5 text-slate-600">
-                                                                                <p><strong>الإجراء الأخير المتخذ:</strong> {event.lastAction || '---'}</p>
-                                                                                <p><strong>الإجراء القادم بالتكليف:</strong> {event.nextAction || '---'}</p>
-                                                                                <p><strong>المحامي المباشر للدعوى:</strong> {event.lawyer || '---'}</p>
-                                                                                <p><strong>الخصوم وممثلوهم القانونيون:</strong> {event.opponents || '---'}</p>
-                                                                            </div>
-                                                                        </Card>
-                                                                        
-                                                                        {/* Action to complete or change status */}
-                                                                        <div className="bg-white p-4 rounded-2xl border flex items-center justify-between gap-4">
-                                                                            <div>
-                                                                                <span className="text-[10px] text-gray-400 block font-bold">تغيير حالة الحضور إجرائياً</span>
-                                                                                <span className="text-[11px] font-black text-slate-800">أتمتة المهام المرتبطة</span>
-                                                                            </div>
-                                                                            <div className="flex gap-1.5">
-                                                                                {event.type === 'Hearing' && event.status !== 'Completed' && (
-                                                                                    <Button 
-                                                                                        size="sm" 
-                                                                                        onClick={() => {
-                                                                                            updateHearingStatus(event.id, 'Completed');
-                                                                                            addAuditLog(`تحديث حالة حضور جلسة #${event.id} إلى مكتملة (تنشيط أتمتة المهام)`);
-                                                                                            addToast({ type: 'success', title: 'تم التحديث', message: 'اكتملت الجلسة وصدر إشعار الأتمتة الإجرائي للزملاء.' });
-                                                                                        }}
-                                                                                    >
-                                                                                        تم الحضور الكلي
-                                                                                    </Button>
-                                                                                )}
-                                                                                <Button 
-                                                                                    size="sm" 
-                                                                                    variant="outline"
-                                                                                    onClick={() => setViewEvent(event)}
-                                                                                >
-                                                                                    التفاصيل والبطاقة
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                     </div>
-
-                                                                    {/* Col 2: Interactive Memorandum text editor */}
-                                                                    <div className="space-y-4">
-                                                                        <div className="bg-white p-5 rounded-2xl border">
-                                                                            <h5 className="font-black mb-2 text-slate-800 flex items-center gap-2">
-                                                                                <ScaleIcon className="w-4 h-4 text-[#00796B]" /> مذكرات دفاع وطلبات مسودة الجلسة العاجلة
-                                                                            </h5>
-                                                                            <textarea 
-                                                                                value={memos[event.id] || ''}
-                                                                                onChange={(e) => setMemos({ ...memos, [event.id]: e.target.value })}
-                                                                                placeholder="اكتب هنا الدفوع والطلبات الختامية وملاحظات المرافعة الشفهية المقترحة للجلسة..."
-                                                                                rows={4}
-                                                                                className="w-full text-xs p-2.5 bg-slate-50 border rounded-xl outline-none focus:ring-1 focus:ring-[#00796B]/30"
-                                                                            />
-                                                                            <div className="flex justify-end gap-2 mt-2">
-                                                                                <Button 
-                                                                                    size="sm" 
-                                                                                    onClick={() => handleSaveMemoText(event.id, memos[event.id] || '')}
-                                                                                >
-                                                                                    حفظ الدفوع بالمسودة
-                                                                                </Button>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                    {/* Col 3: Interactive attachments documents file box */}
-                                                                    <div className="space-y-3">
-                                                                        <div className="bg-white p-5 rounded-2xl border">
-                                                                            <h5 className="font-black text-slate-800 mb-2 flex items-center justify-between">
-                                                                                <span>الأرشيف ووثائق ومرفقات الجلسة</span>
-                                                                                <span className="text-[9px] text-gray-400">سعة سحابية مخصصة</span>
-                                                                            </h5>
-                                                                            
-                                                                            {/* Documents List */}
-                                                                            <div className="space-y-2 max-h-[110px] overflow-y-auto">
-                                                                                {(attachments[event.id] || []).length === 0 ? (
-                                                                                    <span className="text-[10px] text-gray-400 italic block text-center py-4">لا توجد وثائق معلنة بالجلسة حتى الآن</span>
-                                                                                ) : (
-                                                                                    (attachments[event.id] || []).map((file, fIdx) => (
-                                                                                         <div key={fIdx} className="p-2 bg-slate-50 rounded-lg flex items-center justify-between">
-                                                                                             <span className="truncate max-w-[150px] font-bold text-slate-750">{file.title}</span>
-                                                                                             <span className="text-[9px] text-[#00796B] font-mono">{file.size}</span>
-                                                                                         </div>
-                                                                                    ))
-                                                                                )}
-                                                                            </div>
-
-                                                                            {/* Simulated upload box */}
-                                                                            <div 
-                                                                                onClick={() => handleAddMockFile(event.id, event.type === 'Hearing' ? 'مذكرة' : 'مستمسك')}
-                                                                                className="mt-3 py-3 border-2 border-dashed border-gray-100 rounded-xl text-center cursor-pointer hover:border-[#00796B]/40 transition-all bg-slate-50/50 hover:bg-[#E0F2F1]/10"
-                                                                            >
-                                                                                <span className="text-[10px] font-black text-[#00796B] block">اسحب ملفات المحضر القانوني أو تصفح المرفق</span>
-                                                                                <span className="text-[8px] text-gray-400 mt-0.5 font-bold">PDF, DOC, ZIP بحد أقصى 50 MB</span>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-
-                                                                </div>
-                                                            </motion.div>
-                                                        )}
-                                                    </AnimatePresence>
-
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
 
+                                                {/* ACCORDION EXPANDED PANEL IN-PLACE */}
+                                                <AnimatePresence>
+                                                    {isExpanded && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, height: 0 }}
+                                                            animate={{ opacity: 1, height: 'auto' }}
+                                                            exit={{ opacity: 0, height: 0 }}
+                                                            className="overflow-hidden bg-slate-50/80 dark:bg-slate-800/40 border-t border-slate-200 dark:border-slate-800"
+                                                        >
+                                                            <div className="p-5 grid grid-cols-1 lg:grid-cols-3 gap-5 text-xs text-right">
+                                                                
+                                                                {/* Col 1: File Status, Client Info & Court Level */}
+                                                                <div className="space-y-3">
+                                                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2.5 text-slate-700 dark:text-slate-300">
+                                                                        <div className="flex justify-between items-center border-b pb-2">
+                                                                            <h5 className="font-black text-slate-900 dark:text-white text-xs">تفاصيل الملف والموكل</h5>
+                                                                            <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-black px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                                                                حالة الملف: جاري المتابعة
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="flex items-center justify-between">
+                                                                            <span><strong>👤 اسم الموكل:</strong> {event.subtitle || 'غير محدد'}</span>
+                                                                            <span className="text-[10px] font-mono font-bold text-slate-500">📱 +965 9988 7766</span>
+                                                                        </p>
+                                                                        <p><strong>🏛️ المقر والمحكمة:</strong> {event.location}</p>
+                                                                        <p><strong>⚖️ الدائرة والدرجة:</strong> {event.circuit || 'المحكمة الكلية'} - {event.caseType || 'مدني وتجاري'}</p>
+                                                                        <p><strong>👤 الخصم وممثلوه:</strong> {event.opponents || 'لا يوجد بيانات مضافة'}</p>
+                                                                        <p><strong>📅 موعد الجلسة:</strong> {event.date} الساعة {event.time}</p>
+                                                                    </div>
+
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {event.type === 'Hearing' && event.status !== 'Completed' && (
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-black"
+                                                                                onClick={() => {
+                                                                                    updateHearingStatus(event.id, 'Completed');
+                                                                                    addAuditLog(`تحديث حالة حضور جلسة #${event.id} إلى مكتملة`);
+                                                                                    addToast({ type: 'success', title: 'تم التحديث', message: 'اكتملت الجلسة وصدر إشعار الأتمتة الإجرائي.' });
+                                                                                }}
+                                                                            >
+                                                                                تأكيد الحضور وانقضاء الجلسة
+                                                                            </Button>
+                                                                        )}
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline"
+                                                                            className="border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                                                            onClick={() => handleExportCalendar(event)}
+                                                                        >
+                                                                            <CalendarDaysIcon className="w-3.5 h-3.5" /> تصدير للتقويم
+                                                                        </Button>
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline"
+                                                                            className="border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200"
+                                                                            onClick={() => handleCopyEventContent(event)}
+                                                                        >
+                                                                            📋 نسخ المحتوى
+                                                                        </Button>
+                                                                        <Button 
+                                                                            size="sm" 
+                                                                            variant="outline"
+                                                                            className="border-amber-200 text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                                                                            onClick={() => {
+                                                                                if (event.type === 'Hearing') {
+                                                                                    setEditingHearing(event.rawSource as Hearing);
+                                                                                    setHearingForm({ ...event.rawSource } as any);
+                                                                                    setIsHearingModalOpen(true);
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            تعديل
+                                                                        </Button>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Col 2: Lawyer Notes & Defense Memorandum Editor */}
+                                                                <div className="space-y-3">
+                                                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-2">
+                                                                        <div className="flex justify-between items-center mb-1">
+                                                                            <h5 className="font-black text-slate-800 dark:text-white flex items-center gap-1.5 text-xs">
+                                                                                <ScaleIcon className="w-4 h-4 text-emerald-500" /> ملاحظات المحامي والدفوع الإجرائية
+                                                                            </h5>
+                                                                            <span className="text-[10px] text-emerald-600 font-bold">تحديث فوري</span>
+                                                                        </div>
+                                                                        <textarea 
+                                                                            value={memos[event.id] !== undefined ? memos[event.id] : event.notes || ''}
+                                                                            onChange={(e) => setMemos({ ...memos, [event.id]: e.target.value })}
+                                                                            placeholder="سجل هنا ملاحظات المحامي، الطلبات الختامية وملاحظات المرافعة الشفهية..."
+                                                                            rows={4}
+                                                                            className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:ring-1 focus:ring-emerald-500"
+                                                                        />
+                                                                        <div className="flex justify-end gap-2 mt-2">
+                                                                            <Button 
+                                                                                size="sm" 
+                                                                                onClick={() => handleSaveMemoText(event.id, memos[event.id] || '')}
+                                                                                className="bg-slate-900 text-white dark:bg-emerald-500 dark:text-slate-950 font-bold text-xs"
+                                                                            >
+                                                                                حفظ ملاحظات المحامي
+                                                                            </Button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Col 3: Session Attachments / Files */}
+                                                                <div className="space-y-3">
+                                                                    <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                                                                        <h5 className="font-black text-slate-800 dark:text-white mb-2 flex items-center justify-between text-xs">
+                                                                            <span>الأرشيف والمستندات المرفقة</span>
+                                                                            <span className="text-[9px] text-slate-400">سعة سحابية مؤمنة</span>
+                                                                        </h5>
+                                                                        
+                                                                        <div className="space-y-2 max-h-[110px] overflow-y-auto">
+                                                                            {(attachments[event.id] || []).length === 0 ? (
+                                                                                <span className="text-[10px] text-slate-400 italic block text-center py-4">لا توجد وثائق معلنة بالجلسة حتى الآن</span>
+                                                                            ) : (
+                                                                                (attachments[event.id] || []).map((file, fIdx) => (
+                                                                                    <div key={fIdx} className="p-2 bg-slate-50 dark:bg-slate-800 rounded-lg flex items-center justify-between text-xs">
+                                                                                        <span className="truncate max-w-[150px] font-bold text-slate-700 dark:text-slate-300">{file.title}</span>
+                                                                                        <span className="text-[9px] text-emerald-600 font-mono font-bold">{file.size}</span>
+                                                                                    </div>
+                                                                                ))
+                                                                            )}
+                                                                        </div>
+
+                                                                        <div 
+                                                                            onClick={() => handleAddMockFile(event.id, event.type === 'Hearing' ? 'مذكرة' : 'مستمسك')}
+                                                                            className="mt-3 py-2.5 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-center cursor-pointer hover:border-emerald-500 transition-all bg-slate-50/50 dark:bg-slate-800/50"
+                                                                        >
+                                                                            <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 block">+ إضافة وثيقة / محضر للجلسة</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                        </div>
+
+                    </motion.div>
+                )}
+
+                {/* TAB 2: SMART PROCEDURAL ROADMAP */}
+                {activeTab === 'roadmap' && (
+                    <motion.div
+                        key="roadmap"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                    >
+                        <SmartProceduralRoadmap />
                     </motion.div>
                 )}
 
@@ -1805,7 +2210,248 @@ const AutomatedDocketPage: React.FC = () => {
                     </motion.div>
                 )}
 
+                {/* TAB 5: KUWAIT MINISTRY OF JUSTICE AUTOMATED API CONNECTOR */}
+                {activeTab === 'moj_connector' && (
+                    <motion.div 
+                        key="moj_connector"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        className="space-y-6 text-right"
+                    >
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            
+                            {/* Connector Configuration Panel */}
+                            <div className="lg:col-span-4 bg-white dark:bg-dm-card p-6 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4">
+                                <div className="border-b pb-3 flex items-center gap-2">
+                                    <div className="p-2 bg-amber-500/10 text-amber-600 rounded-xl">
+                                        <ArrowPathIcon className="w-5 h-5 animate-spin-slow" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-sm text-slate-800 dark:text-gray-200">إعدادات أداة المزامنة والربط القضائي</h3>
+                                        <p className="text-[10px] text-gray-400 font-bold">بوابة الخدمات الإلكترونية الموحدة - وزارة العدل بدولة الكويت</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 text-xs font-bold">
+                                    <div>
+                                        <label className="text-[10px] text-slate-500 block mb-1 font-sans">الرقم الآلي الموحد للقضية (Automated No)*</label>
+                                        <input 
+                                            type="text" 
+                                            value={mojAutomatedNo}
+                                            onChange={(e) => setMojAutomatedNo(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 dark:bg-slate-850 dark:border-slate-750 rounded-xl p-3 font-mono font-bold"
+                                            placeholder="أدخل الرقم الآلي المكون من 8 أرقام"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-[10px] text-slate-500 block mb-1 font-sans">رقم القضية في الجدول (Case Number)</label>
+                                        <input 
+                                            type="text" 
+                                            value={mojCaseNo}
+                                            onChange={(e) => setMojCaseNo(e.target.value)}
+                                            className="w-full bg-slate-50 border border-slate-200 dark:bg-slate-850 dark:border-slate-750 rounded-xl p-3 font-mono font-bold"
+                                            placeholder="مثال: 1192/2026"
+                                        />
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 block mb-1">سنة تسجيل الدعوى</label>
+                                            <select 
+                                                value={mojYear}
+                                                onChange={(e) => setMojYear(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 dark:bg-slate-850 dark:border-slate-750 rounded-xl p-3 font-bold"
+                                            >
+                                                <option value="2026">2026</option>
+                                                <option value="2025">2025</option>
+                                                <option value="2024">2024</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-slate-500 block mb-1">المحكمة المختصة</label>
+                                            <select 
+                                                value={mojCourt}
+                                                onChange={(e) => setMojCourt(e.target.value)}
+                                                className="w-full bg-slate-50 border border-slate-200 dark:bg-slate-850 dark:border-slate-750 rounded-xl p-3 font-bold"
+                                            >
+                                                <option value="capital-total">العاصمة الكلية</option>
+                                                <option value="appeal">محكمة الاستئناف</option>
+                                                <option value="hawalli">حولي الكلية</option>
+                                                <option value="farwaniya">الفروانية</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-slate-50 dark:bg-slate-850 rounded-xl space-y-1 border border-slate-100 text-slate-500 text-[10px] leading-relaxed">
+                                        <span className="font-extrabold text-slate-800 dark:text-gray-200 block">بروتوكول الربط الأمني الآمن:</span>
+                                        <p>• يتم الاتصال عبر واجهة برمجية مشفرة ببروتوكول HTTPS وتخطي جدران الحماية لوزارة العدل الكويتية.</p>
+                                        <p>• مطابقة ذكية للخصوم لضمان عدم حدوث تشابه أسماء أو تكرار بالرول.</p>
+                                    </div>
+
+                                    <Button 
+                                        fullWidth 
+                                        onClick={handleMojQuery}
+                                        disabled={isMojQuerying}
+                                        className="bg-amber-600 hover:bg-amber-700 text-white font-extrabold py-3.5 rounded-xl text-xs gap-2 shadow-lg shadow-amber-600/10"
+                                    >
+                                        {isMojQuerying ? 'جاري الاتصال وسحب البيانات...' : 'تشغيل استعلام والربط بالبوابة'}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Main Gateway Status & Query Results */}
+                            <div className="lg:col-span-8 space-y-6">
+                                
+                                {/* Live fetch steps simulator */}
+                                {isMojQuerying && (
+                                    <div className="bg-white dark:bg-dm-card p-6 rounded-3xl border border-gray-200 dark:border-slate-800 shadow-sm space-y-4 text-xs font-bold">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-xs font-black text-amber-600 flex items-center gap-2">
+                                                <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                                                جاري المزامنة النشطة مع بوابة وزارة العدل...
+                                            </span>
+                                            <span className="font-mono text-xs text-gray-400">الخطوة {mojQueryStep + 1} من 4</span>
+                                        </div>
+
+                                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
+                                            <div 
+                                                className="bg-amber-600 h-full transition-all duration-500" 
+                                                style={{ width: `${(mojQueryStep + 1) * 25}%` }}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2 text-xs font-bold font-sans">
+                                            <div className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-all ${mojQueryStep >= 0 ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10' : 'text-slate-400'}`}>
+                                                <span className="w-2 h-2 rounded-full bg-current" />
+                                                <span>جاري تأمين ممر البيانات مع البوابة الإلكترونية لوزارة العدل الكويتية (Kuwait MOJ Gateway)...</span>
+                                            </div>
+                                            <div className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-all ${mojQueryStep >= 1 ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10' : 'text-slate-400'}`}>
+                                                <span className="w-2 h-2 rounded-full bg-current" />
+                                                <span>التحقق من صحة الرقم الآلي وتخطي بروتوكول حماية البوابة الحكومية المانعة للروبوتات...</span>
+                                            </div>
+                                            <div className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-all ${mojQueryStep >= 2 ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10' : 'text-slate-400'}`}>
+                                                <span className="w-2 h-2 rounded-full bg-current" />
+                                                <span>مطابقة رول الجلسات المنعقدة وسحب محاضر القرار والدائرة القضائية الحالية...</span>
+                                            </div>
+                                            <div className={`flex items-center gap-2.5 p-2.5 rounded-xl transition-all ${mojQueryStep >= 3 ? 'text-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/10' : 'text-slate-400'}`}>
+                                                <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                                                <span>نجاح الاتصال! تم جلب وتصفية البيانات بخصوص الدعاوى القضائية المستعلمة.</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Results Showcase */}
+                                {!isMojQuerying && fetchedResults.length === 0 && (
+                                    <div className="bg-slate-50 dark:bg-dm-card/30 rounded-3xl p-12 border-2 border-dashed border-gray-200 dark:border-gray-800 text-center flex flex-col items-center justify-center space-y-3">
+                                        <div className="p-4 bg-amber-500/10 text-amber-600 rounded-full">
+                                            <ArrowPathIcon className="w-8 h-8" />
+                                        </div>
+                                        <h3 className="font-black text-base text-slate-800 dark:text-gray-200">جاهز لبدء ربط البيانات الآلي بوزارة العدل</h3>
+                                        <p className="text-xs text-slate-500 max-w-md leading-relaxed">
+                                            أدخل الرقم الآلي أو رقم القضية للقضايا المسجلة بدولة الكويت واضغط على تشغيل الاستعلام لجلب الجلسات والمواعيد والقرارات الصادرة فورياً من بوابة العدل.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {!isMojQuerying && fetchedResults.length > 0 && (
+                                    <div className="space-y-4">
+                                        <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200/50 rounded-2xl p-4 flex justify-between items-center text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping" />
+                                                <span className="font-black text-emerald-800 dark:text-emerald-300">تم جلب تحديثات رسمية جديدة ومتطابقة للدعاوى المستعلمة بنجاح!</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100/50 dark:bg-emerald-950/30 px-2.5 py-1 rounded-md">موثق ومطابق للبوابة</span>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            {fetchedResults.map((res, idx) => (
+                                                <div key={idx} className="bg-white dark:bg-dm-card rounded-2xl border p-5 shadow-xs space-y-4">
+                                                    <div className="flex justify-between items-start flex-wrap gap-2">
+                                                        <div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-300 font-extrabold px-2.5 py-0.5 rounded font-sans">رقم آلي: {res.automatedNo}</span>
+                                                                <span className="text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 font-bold px-2.5 py-0.5 rounded font-sans">رقم القضية: {res.caseNumber}</span>
+                                                            </div>
+                                                            <h4 className="font-black text-sm text-slate-900 dark:text-gray-200">{res.title}</h4>
+                                                            <p className="text-[10px] text-gray-400 font-bold mt-1">المحكمة: {res.courtName} | الدائرة القضائية: {res.circuit}</p>
+                                                        </div>
+                                                        <div className="text-left font-sans">
+                                                            <span className="text-[10px] text-gray-400 block mb-1">الحالة بالوزارة</span>
+                                                            <span className="text-xs font-black text-emerald-600 bg-emerald-50 dark:bg-emerald-950/20 px-3 py-1 rounded-full">{res.mojStatus}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-850 p-4 rounded-xl text-xs font-bold font-sans">
+                                                        <div className="space-y-1 text-right">
+                                                            <span className="text-[10px] text-slate-400 block">الجلسة المسجلة حالياً بالمكتب:</span>
+                                                            <span className="text-slate-600 dark:text-slate-300 block">{res.localHearing || 'لا توجد جلسات مجدولة'}</span>
+                                                        </div>
+                                                        <div className="space-y-1 border-r md:pr-4 text-right">
+                                                            <span className="text-[10px] text-amber-600 block flex items-center gap-1 justify-end">
+                                                                <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                                                                التحديث الفوري من بوابة وزارة العدل:
+                                                            </span>
+                                                            <span className="text-slate-900 dark:text-gray-100 block">{res.mojHearing}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex justify-end gap-2 text-xs flex-wrap">
+                                                        <Button 
+                                                            variant="outline" 
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                addToast({ type: 'info', title: 'سحب تفاصيل الخصوم', message: 'جاري جلب الأسماء والأرقام المدنية للخصوم من الهيئة العامة للمعلومات المدنية.' });
+                                                            }}
+                                                        >
+                                                            سحب تفاصيل الدعاوى والخصوم
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                // Apply synchronization to the local system/docket!
+                                                                const newHearing: Hearing = {
+                                                                    id: `h-moj-${res.automatedNo}`,
+                                                                    caseId: `c-${res.automatedNo}`,
+                                                                    caseTitle: res.title,
+                                                                    date: res.mojDate,
+                                                                    time: '09:00',
+                                                                    type: 'مرافعة',
+                                                                    room: 'قاعة 102',
+                                                                    notes: 'تم جلبها وتحديثها تلقائياً من بوابة وزارة العدل الكويتية',
+                                                                    status: 'Scheduled'
+                                                                };
+                                                                addHearing(newHearing);
+                                                                addAuditLog(`مزامنة تلقائية من وزارة العدل لقضية آلي رقم [${res.automatedNo}]: إدراج جلسة بتاريخ ${res.mojDate}`);
+                                                                addToast({ type: 'success', title: 'تمت المزامنة وحفظ الجلسة', message: `تم إدراج الجلسة الجديدة بتاريخ ${res.mojDate} بنجاح بالرول المؤتمت!` });
+                                                            }}
+                                                            className="bg-[#00796B] hover:bg-[#004D40] text-white"
+                                                        >
+                                                            تطبيق المزامنة وحفظ الجلسة بالرول
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+                    </motion.div>
+                )}
+
             </AnimatePresence>
+
+            {/* AUTOMATED DOCKET ACTIVITY LOG & UNDO ENGINE */}
+            <DocketActivityLog 
+                logs={activityLogs}
+                onUndoLast={handleUndoLastDrag}
+                onUndoSpecific={handleUndoSpecificLog}
+                onClearLogs={() => setActivityLogs([])}
+            />
 
             {/* MODAL 1: SCHEDULING NEW EVENT/APPOINTMENT */}
             <Modal 
@@ -2056,6 +2702,14 @@ const AutomatedDocketPage: React.FC = () => {
                         </div>
 
                         <div className="flex justify-end gap-2 border-t pt-4">
+                            <Button 
+                                variant="outline" 
+                                className="border-indigo-200 text-indigo-700 bg-indigo-50/50 hover:bg-indigo-100 flex items-center gap-1.5"
+                                onClick={() => handleExportCalendar(viewEvent)}
+                            >
+                                <CalendarDaysIcon className="w-4 h-4 text-indigo-600" />
+                                تصدير للتقويم (.ics)
+                            </Button>
                             <Button variant="outline" onClick={() => setViewEvent(null)}>أغلـق المعاينة</Button>
                             <Button 
                                 onClick={() => {
@@ -2069,6 +2723,192 @@ const AutomatedDocketPage: React.FC = () => {
                     </div>
                 )}
             </Modal>
+
+            {/* MODAL 4: ADD & EDIT COURT HEARING */}
+            <Modal
+                isOpen={isHearingModalOpen}
+                onClose={() => {
+                    setIsHearingModalOpen(false);
+                    setEditingHearing(null);
+                }}
+                title={editingHearing ? 'تعديل وتحديث بيانات الجلسة القضائية' : 'إضافة وجدولة جلسة رول قضائي جديدة'}
+                size="md"
+            >
+                <form onSubmit={handleSubmitHearing} className="space-y-4 text-xs font-sans text-right">
+                    <Select
+                        label="ربط القضية المرفوعة بالمكتب"
+                        value={hearingForm.caseId || '1'}
+                        onChange={(e) => {
+                            const selectedId = e.target.value;
+                            const activeC = initialCases.find(c => c.id === selectedId) || initialCases[0];
+                            setHearingForm({
+                                ...hearingForm,
+                                caseId: selectedId,
+                                caseTitle: activeC.title,
+                                clientName: activeC.clientName
+                            });
+                        }}
+                        options={initialCases.map(c => ({
+                            value: c.id,
+                            label: `${c.title} (الموكل: ${c.clientName})`
+                        }))}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input 
+                            label="تاريخ حضور الجلسة"
+                            type="date"
+                            value={hearingForm.date || ''}
+                            onChange={(e) => setHearingForm({ ...hearingForm, date: e.target.value })}
+                            required
+                        />
+                        <Input 
+                            label="ساعة الجلسة وتوقيتها"
+                            type="time"
+                            value={hearingForm.time || ''}
+                            onChange={(e) => setHearingForm({ ...hearingForm, time: e.target.value })}
+                            required
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Input 
+                            label="المقر والمحكمة والقاعة"
+                            value={hearingForm.courtRoomOrLocation || ''}
+                            onChange={(e) => setHearingForm({ ...hearingForm, courtRoomOrLocation: e.target.value })}
+                            required
+                            placeholder="مثال: قصر العدل، قاعة 5 تجاري"
+                        />
+                        <Select
+                            label="نوع وشكل الجلسة"
+                            value={hearingForm.type || 'جلسة مرافعة كتابية'}
+                            onChange={(e) => setHearingForm({ ...hearingForm, type: e.target.value })}
+                            options={[
+                                { value: 'جلسة مرافعة كتابية', label: 'جلسة مرافعة كتابية' },
+                                { value: 'جلسة تقديم مذكرات لجان الخبراء', label: 'جلسة تقديم مذكرات لجان الخبراء' },
+                                { value: 'جلسة مرافعة شفهية', label: 'جلسة مرافعة شفهية' },
+                                { value: 'جلسة استجواب شهود الإثبات', label: 'جلسة استجواب شهود الإثبات' },
+                                { value: 'جلسة نطق بالحكم التمهيدي', label: 'جلسة نطق بالحكم التمهيدي' }
+                            ]}
+                        />
+                    </div>
+
+                    {editingHearing && (
+                        <div className="grid grid-cols-2 gap-3">
+                            <Select
+                                label="الحالة القضائية الحالية"
+                                value={hearingForm.status || 'Scheduled'}
+                                onChange={(e) => setHearingForm({ ...hearingForm, status: e.target.value as any })}
+                                options={[
+                                    { value: 'Scheduled', label: 'قيد الانتظار لموعد الجلسة' },
+                                    { value: 'Completed', label: 'منتهية ومحسوم المرافعة' },
+                                    { value: 'Postponed', label: 'مؤجلة لجلسة قادمة' }
+                                ]}
+                            />
+                            <Input 
+                                label="الدائرة القضائية (اختياري)"
+                                value={hearingForm.circuit || ''}
+                                onChange={(e) => setHearingForm({ ...hearingForm, circuit: e.target.value })}
+                                placeholder="مثال: الدائرة 12 كلي"
+                            />
+                        </div>
+                    )}
+
+                    <TextArea 
+                        label="ملاحظات الدفاع والدفوع الجوهرية للجلسة"
+                        value={hearingForm.notes || ''}
+                        onChange={(e) => setHearingForm({ ...hearingForm, notes: e.target.value })}
+                        rows={3}
+                        placeholder="أدخل المسودة الأولية للدفع القانوني أو طلبات التأجيل الحسابية..."
+                    />
+
+                    {hearingForm.status === 'Completed' && (
+                        <TextArea 
+                            label="قرار المحكمة الصادر بالجلسة (المنطوق القانوني)"
+                            value={hearingForm.courtDecision || ''}
+                            onChange={(e) => setHearingForm({ ...hearingForm, courtDecision: e.target.value })}
+                            rows={2}
+                            placeholder="مثال: قررت المحكمة حجز القضية للحكم مع تمكين مذكرات دفاع ختامية..."
+                        />
+                    )}
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                        <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => {
+                                setIsHearingModalOpen(false);
+                                setEditingHearing(null);
+                            }}
+                        >
+                            إلغاء وتراجع
+                        </Button>
+                        <Button type="submit">
+                            {editingHearing ? 'حفظ وتعديل الجلسة' : 'إدراج القضية لجدول الرول'}
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* MODAL 5: DELETE CONFIRMATION MODAL */}
+            <Modal
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => {
+                    setIsDeleteConfirmOpen(false);
+                    setSelectedHearingForDelete(null);
+                }}
+                title="تأكيد الحذف وحقن التطهير"
+                size="sm"
+            >
+                <div className="text-right space-y-4 text-xs font-sans">
+                    <div className="p-4 bg-red-50 text-red-700 rounded-2xl flex items-start gap-3">
+                        <ExclamationTriangleIcon className="w-5 h-5 flex-shrink-0 mt-0.5" />
+                        <div>
+                            <h4 className="font-extrabold text-sm mb-1">هل أنت متأكد من الحذف تماماً؟</h4>
+                            <p className="leading-relaxed">سيؤدي هذا الخيار إلى إزالة الجلسة/الموعد بصورة نهائية وتطهير كافة المستندات المرفقة بنظام السجلات الآلي للمحكمة دون رجعة.</p>
+                        </div>
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => {
+                                setIsDeleteConfirmOpen(false);
+                                setSelectedHearingForDelete(null);
+                            }}
+                        >
+                            إلغاء الأمر
+                        </Button>
+                        <Button 
+                            onClick={handleConfirmDelete}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                        >
+                            نعم، تأكيد الحذف النهائي
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL 6: INTERACTIVE COURT LOCATION MAP & TRAFFIC MODAL */}
+            <CourtLocationMapModal 
+                isOpen={isCourtMapModalOpen} 
+                onClose={() => setIsCourtMapModalOpen(false)} 
+                courtName={selectedCourtNameModal} 
+            />
+
+            {/* MODAL 7: AUDIO ALERT CUSTOMIZATION & SOUND TONE LIBRARY */}
+            <DocketAudioSettingsModal
+                isOpen={isAudioSettingsOpen}
+                onClose={() => setIsAudioSettingsOpen(false)}
+                audioEnabled={audioAlertsEnabled}
+                onAudioEnabledChange={setAudioAlertsEnabled}
+                selectedTone={selectedTone}
+                onSelectedToneChange={setSelectedTone}
+                volume={audioVolume}
+                onVolumeChange={setAudioVolume}
+                alertLeadMinutes={alertLeadMinutes}
+                onAlertLeadMinutesChange={setAlertLeadMinutes}
+                playTone={playDocketChime}
+            />
 
         </div>
     );

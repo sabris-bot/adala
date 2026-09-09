@@ -1,11 +1,13 @@
 /**
  * Sharia & Civil Law Inheritance Engine (محرك حساب المواريث الشرعي والقانوني)
- * Al-Wagayan, Al-Awadhi & Al-Ruwayeh Systems
- * Fully compliant with Kuwaiti Personal Status Law (Articles 288-330) and Sunnah/Jafari Jurisprudence.
+ * Sabry Shatta Law Firm Systems - State of Kuwait
+ * Fully compliant with Kuwaiti Personal Status Law No. 51 of 1984 (Articles 288-342) 
+ * and Kuwait Jafari Family Court Jurisprudence.
  */
 
 export type Gender = 'M' | 'F';
 export type CalculationMadhab = 'sunni' | 'jafari';
+export type HeirSpecialCondition = 'normal' | 'deceased_before' | 'impediment_religion' | 'impediment_homicide' | 'fetus' | 'khuntha';
 
 export interface HeirDefinition {
     id: string;
@@ -13,6 +15,7 @@ export interface HeirDefinition {
     label: string;
     gender: Gender;
     count: number;
+    specialCondition?: HeirSpecialCondition;
     notes?: string;
 }
 
@@ -20,17 +23,18 @@ export interface CalculatedShare {
     heirLabel: string;
     heirType: string;
     count: number;
-    shareLabel: string; // e.g. "1/6", "1/4", "تعصيب"
-    shareFractionNum: number; // numerator of final share
-    shareFractionDen: number; // denominator of final share
-    shareValue: number; // decimal from 0 to 1
-    amount: number; // in KWD
+    shareType: 'faradh' | 'assaba_nafs' | 'assaba_ghayr' | 'assaba_ma_alghayr' | 'radd' | 'wasiyya_wajibah' | 'reserved_fetus' | 'khuntha_half' | 'special';
+    shareLabel: string; // e.g. "1/6 فرضاً", "1/4 فرضاً", "عصبة بالنفس (الباقي)", "ثلث الباقي"
+    shareFractionNum: number;
+    shareFractionDen: number;
+    shareValue: number; // decimal between 0 and 1
+    amount: number; // in KWD (3 decimals precision)
     isExcluded: boolean;
     exclusionReason?: string;
     evidence: {
         source: string;
         text: string;
-        article?: string;
+        article: string;
     };
 }
 
@@ -40,18 +44,48 @@ export interface ExcludedHeir {
     count: number;
     reason: string;
     excludedBy: string;
+    article?: string;
+}
+
+export interface EstateAssets {
+    cash: number;
+    realEstate: number;
+    stocks: number;
+    jewelry: number;
+    vehicles: number;
+    receivables: number;
+    endOfService?: number;     // مكافأة نهاية الخدمة والمعاشات التقاعدية
+    businessLicenses?: number; // الرخص والشركات والمؤسسات التجارية
+    otherAssets?: number;      // أصول عينية وممتلكات أخرى
+}
+
+export interface EstateDeductions {
+    securedDebts: number;    // 1. حقوق العين والرهون المقيدة بالأصول
+    funeralExpenses: number; // 2. مصاريف التجهيز والتكفين بالمعروف
+    unsecuredDebts: number;  // 3. قضاء الديون الإلهية والآدمية
+    wills: number;           // 4. الوصية الشرعية (في حدود الثلث)
 }
 
 export interface InheritanceCalculation {
     id: string;
     deceasedName: string;
     deceasedGender: Gender;
+    civilId?: string;
     dateOfDeath?: string;
+    notes?: string;
+    clientName?: string;
+    clientPhone?: string;
+    caseNumber?: string;
+    status?: 'active' | 'amicable' | 'disputed' | 'archived';
+    createdAt?: string;
+    assets: EstateAssets;
+    deductions: EstateDeductions;
     totalEstate: number;
+    netEstate: number;
     debts: number;
     funeralExpenses: number;
     wills: number;
-    netEstate: number;
+    wasiyyaWajibahAmount: number;
     madhab: CalculationMadhab;
     baseProblem: number; // أصل المسألة
     finalProblem: number; // مصح المسألة أو عولها
@@ -60,149 +94,274 @@ export interface InheritanceCalculation {
     shares: CalculatedShare[];
     excludedHeirs: ExcludedHeir[];
     steps: string[];
-    advisoryText: string; // Intelligent paragraph explaining the case
+    advisoryText: string;
     warnings: string[];
 }
 
-const LEGAL_EVIDENCE: Record<string, { source: string; text: string; article: string }> = {
+export const LEGAL_EVIDENCE_DATABASE: Record<string, { source: string; text: string; article: string }> = {
     husband_1_2: {
-        source: 'سورة النساء، الآية 12',
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
         text: 'وَلَكُمْ نِصْفُ مَا تَرَكَ أَزْوَاجُكُمْ إِن لَّمْ يَكُن لَّهُنَّ وَلَدٌ',
-        article: 'المادة 288 من قانون الأحوال الشخصية الكويتي'
+        article: 'المادة (288) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     husband_1_4: {
-        source: 'سورة النساء، الآية 12',
-        text: 'فَإِن كَانَ لَهُنَّ وَلَدٌ فَلَكُمُ الرُّبُعُ مِمَّا تَرَكْنَ',
-        article: 'المادة 288 من قانون الأحوال الشخصية الكويتي'
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
+        text: 'فَإِن كَانَ لَهُنَّ وَلَدٌ فَلَكُمُ الرُّبُعُ مِمَّا تَرَكْنَ مِن بَعْدِ وَصِيَّةٍ يُوصِينَ بِهَا أَوْ دَيْنٍ',
+        article: 'المادة (288) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     wife_1_4: {
-        source: 'سورة النساء، الآية 12',
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
         text: 'وَلَهُنَّ الرُّبُعُ مِمَّا تَرَكْتُمْ إِن لَّمْ يَكُن لَّكُمْ وَلَدٌ',
-        article: 'المادة 289 من قانون الأحوال الشخصية الكويتي'
+        article: 'المادة (289) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     wife_1_8: {
-        source: 'سورة النساء، الآية 12',
-        text: 'فَإِن كَانَ لَكُمْ وَلَدٌ فَلَهُنَّ الثُّمُنُ مِمَّا تَرَكْتُم',
-        article: 'المادة 289 من قانون الأحوال الشخصية الكويتي'
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
+        text: 'فَإِن كَانَ لَكُمْ وَلَدٌ فَلَهُنَّ الثُّمُنُ مِمَّا تَرَكْتُم مِّن بَعْدِ وَصِيَّةٍ تُوصُونَ بِهَا أَوْ دَيْنٍ',
+        article: 'المادة (289) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     mother_1_6: {
-        source: 'سورة النساء، الآية 11',
-        text: 'وَلِأَبَوَيْهِ لِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ مِمَّا تَرَكَ إِن كَانَ لَهُ وَلَدٌ',
-        article: 'المادة 290 من قانون الأحوال الشخصية الكويتي'
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
+        text: 'وَلِأَبَوَيْهِ لِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ مِمَّا تَرَكَ إِن كَانَ لَهُ وَلَدٌ فَإِن كَانَ لَهُ إِخْوَةٌ فَلِأُمِّهِ السُّدُسُ',
+        article: 'المادة (290) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     mother_1_3: {
-        source: 'سورة النساء، الآية 11',
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
         text: 'فَإِن لَّمْ يَكُن لَّهُ وَلَدٌ وَوَرِثَهُ أَبَوَاهُ فَلِأُمِّهِ الثُّلُثُ',
-        article: 'المادة 290 من قانون الأحوال الشخصية الكويتي'
+        article: 'المادة (290) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     mother_1_3_residue: {
-        source: 'إجماع الصحابة (قضاء عمر بن الخطاب في الغراوين)',
-        text: 'للأم ثلث ما يتبقى بعد نصيب الزوج أو الزوجة لوجود الأب مع أحد الزوجين للعدالة الشرعية',
-        article: 'المادة 290 بند (ب) من قانون الأحوال الشخصية الكويتي'
+        source: 'إجماع الصحابة وقضاء أمير المؤمنين عمر بن الخطاب (المسألتان العمريتان)',
+        text: 'للأم ثلث الباقي بعد فرض أحد الزوجين حفظاً لقاعدة "للذكر مثل حظ الأنثيين" بين الأبوين',
+        article: 'المادة (290 بند ب) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     father_1_6: {
-        source: 'سورة النساء، الآية 11',
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
         text: 'وَلِأَبَوَيْهِ لِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ مِمَّا تَرَكَ إِن كَانَ لَهُ وَلَدٌ',
-        article: 'المادة 291 من قانون الأحوال الشخصية الكويتي'
+        article: 'المادة (291) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
-    daughter_1_2: {
-        source: 'سورة النساء، الآية 11',
-        text: 'وَإِن كَانَتْ وَاحِدَةً فَلَهَا النِّصْفُ',
-        article: 'المادة 293 من قانون الأحوال الشخصية الكويتي'
+    father_1_6_plus_assaba: {
+        source: 'القرآن والسنة وإجماع الفقهاء',
+        text: 'يجمع الأب بين السدس فرضاً والباقي تعصيباً عند وجود الفرع الوارث المؤنث دون المذكر',
+        article: 'المادة (291) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
-    daughter_2_3: {
-        source: 'سورة النساء، الآية 11',
-        text: 'فَإِن كُنَّ نِسَاءً فَوْقَ اثْنَتَيْنِ فَلَهُنَّ ثُلُثَا مَا تَرَكَ',
-        article: 'المادة 293 من قانون الأحوال الشخصية الكويتي'
-    },
-    sister_1_2: {
-        source: 'سورة النساء، الآية 176',
-        text: 'إِنِ امْرُؤٌ هَلَكَ لَيْسَ لَهُ وَلَدٌ وَلَهُ أُخْتٌ فَلَهَا نِصْفُ مَا تَرَكَ',
-        article: 'المادة 300 من قانون الأحوال الشخصية الكويتي'
-    },
-    sister_2_3: {
-        source: 'سورة النساء، الآية 176',
-        text: 'فَإِن كَانَتَا اثْنَتَيْنِ فَلَهُمَا الثُّلُثَانِ مِمَّا تَرَكَ',
-        article: 'المادة 300 من قانون الأحوال الشخصية الكويتي'
-    },
-    maternal_sibling_1_6: {
-        source: 'سورة النساء، الآية 12',
-        text: 'وَإِن كَانَ رَجُلٌ يُورَثُ كَلَالَةً أَوِ امْرَأَةٌ وَلَهُ أَخٌ أَوْ أُخْتٌ فَلِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ',
-        article: 'المادة 301 من قانون الأحوال الشخصية الكويتي'
-    },
-    maternal_sibling_1_3: {
-        source: 'سورة النساء، الآية 12',
-        text: 'فَإِن كَانُوا أَكْثَرَ مِن ذَٰلِكَ فَهُمْ شُرَكَاءُ فِي الثُّلُثِ',
-        article: 'المادة 301 من قانون الأحوال الشخصية الكويتي'
-    },
-    assaba: {
+    father_assaba: {
         source: 'الحديث النبوي الشريف (صحيح البخاري ومسلم)',
         text: 'ألحقوا الفرائض بأهلها، فما بقي فهو لأولى رجل ذكر',
-        article: 'المادة 292 و 293 من قانون الأحوال الشخصية الكويتي'
+        article: 'المادة (291 و 292) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    daughter_1_2: {
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
+        text: 'وَإِن كَانَتْ وَاحِدَةً فَلَهَا النِّصْفُ',
+        article: 'المادة (293) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    daughter_2_3: {
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
+        text: 'فَإِن كُنَّ نِسَاءً فَوْقَ اثْنَتَيْنِ فَلَهُنَّ ثُلُثَا مَا تَرَكَ',
+        article: 'المادة (293) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    son_daughter_assaba_ghayr: {
+        source: 'القرآن الكريم - سورة النساء (الآية 11)',
+        text: 'يُوصِيكُمُ اللَّهُ فِي أَوْلادِكُمْ لِلذَّكَرِ مِثْلُ حَظِّ الأُنثَيَيْنِ',
+        article: 'المادة (292 و 293) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    granddaughter_1_6_takmila: {
+        source: 'قضاء ابن مسعود رضي الله عنه (صحيح البخاري)',
+        text: 'لبنت الابن السدس تكملة للثلثين مع البنت الصلبية الواحدة صاحبة النصف',
+        article: 'المادة (294) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     grandmother_1_6: {
-        source: 'السنة النبوية بقضاء الرسول ﷺ',
-        text: 'أن الطاغية قضى بالجدة السدس إذا غابت الأم',
-        article: 'المادة 297 من قانون الأحوال الشخصية الكويتي'
+        source: 'السنة النبوية بقضاء الرسول ﷺ وقضاء أبي بكر الصديق',
+        text: 'أن النبي ﷺ أعطى الجدة السدس إذا لم تكن دونها أم',
+        article: 'المادة (297) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    grandfather_sahih: {
+        source: 'قواعد الفقه الكويتي وإجماع الصحابة',
+        text: 'الجد الصحيح كالأب عند فقده، ويسقط بوجود الأب',
+        article: 'المادة (298) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    sister_1_2: {
+        source: 'القرآن الكريم - سورة النساء (الآية 176)',
+        text: 'إِنِ امْرُؤٌ هَلَكَ لَيْسَ لَهُ وَلَدٌ وَلَهُ أُخْتٌ فَلَهَا نِصْفُ مَا تَرَكَ',
+        article: 'المادة (300) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    sister_2_3: {
+        source: 'القرآن الكريم - سورة النساء (الآية 176)',
+        text: 'فَإِن كَانَتَا اثْنَتَيْنِ فَلَهُمَا الثُّلُثَانِ مِمَّا تَرَكَ',
+        article: 'المادة (300) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    sister_assaba_ma_alghayr: {
+        source: 'الحديث النبوي الشريف (صحيح البخاري)',
+        text: 'اجعلوا الأخوات مع البنات عصبة',
+        article: 'المادة (300 بند د) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    maternal_sibling_1_6: {
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
+        text: 'وَإِن كَانَ رَجُلٌ يُورَثُ كَلَالَةً أَوِ امْرَأَةٌ وَلَهُ أَخٌ أَوْ أُخْتٌ فَلِكُلِّ وَاحِدٍ مِّنْهُمَا السُّدُسُ',
+        article: 'المادة (301) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    maternal_sibling_1_3: {
+        source: 'القرآن الكريم - سورة النساء (الآية 12)',
+        text: 'فَإِن كَانُوا أَكْثَرَ مِن ذَٰلِكَ فَهُمْ شُرَكَاءُ فِي الثُّلُثِ',
+        article: 'المادة (301) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    mushtarakah: {
+        source: 'قضاء عمر بن الخطاب وعثمان بن عفان وزيد بن ثابت (المسألة المشتركة / الحمارية)',
+        text: 'يُشرّك الإخوة الأشقاء مع الإخوة لأم في الثلث بالسوية لاشتراكهم جميعاً في رحم الأم',
+        article: 'المادة (304) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    assaba_nafs: {
+        source: 'الحديث النبوي الشريف (صحيح البخاري ومسلم)',
+        text: 'ألحقوا الفرائض بأهلها، فما بقي فهو لأولى رجل ذكر',
+        article: 'المواد (292-296) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    radd_law: {
+        source: 'أحكام الرد المقررة بقانون الأحوال الشخصية الكويتي',
+        text: 'إذا لم تستغرق الفروض التركة ولم توجد عصبة، رُدّ الباقي على ذوي الفروض النسبية بنسبة أنصبائهم',
+        article: 'المادة (326) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    aoul_law: {
+        source: 'قضاء أمير المؤمنين علي بن أبي طالب وعمر بن الخطاب (المنبرية وغيرها)',
+        text: 'عند تزاحم الفروض وزيادتها عن أصل المسألة، يعال الأصل وتدخل النقيصة على جميع الورثة بحسب سهامهم',
+        article: 'المادة (327) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    wasiyyah_wajibah: {
+        source: 'قانون الأحوال الشخصية الكويتي المستمد من الفقه الإسلامي',
+        text: 'تجب الوصية لأولاد الابن أو البنت المتوفى والدهم في حياة المورث بمقدار حصته لو كان حياً في حدود الثلث',
+        article: 'المادة (328) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     },
     jafari_base: {
-        source: 'أحكام المواريث في المذهب الجعفري المعتمد بالدوائر القضائية الجعفرية بالكويت',
-        text: 'التقسيم بالطبقات والقرابة الإيجابية والنسبية مع عدم صحة العول والرد بالتراص للقرابة الوالدية',
-        article: 'لائحة المحكمة الجعفرية الكويتية في قضايا الأحوال الشخصية مادة 344'
+        source: 'الفقه الجعفري المعتمد بالدوائر الجعفرية بمحاكم دولة الكويت',
+        text: 'التقسيم بالطبقات الثلاث مع عدم العول (النقص يدخل على البنات أو الأخوات) والرد بالقرابة',
+        article: 'لائحة المحكمة الجعفرية وقضاء الدائرة الجعفرية بمحكمة الاستئناف والتمييز الكويتية'
+    },
+    fetus_reserve: {
+        source: 'أحكام الحمل المستكن في الميراث',
+        text: 'يوقف للحمل أوفر النصيبين (نصيب ذكرين أو أنثيين) حتى تنكشف الولادة حياً',
+        article: 'المادة (337) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
+    },
+    khuntha_mushkal: {
+        source: 'أحكام الخنثى المشكل في الشريعة والقانون',
+        text: 'يأخذ الخنثى المشكل نصف نصيب الذكر ونصف نصيب الأنثى عدلاً وإنصافاً',
+        article: 'المادة (338) من قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984'
     }
 };
 
-// Utility function to compute GCD
+// Utilities
 const gcd = (a: number, b: number): number => {
-    return b === 0 ? a : gcd(b, a % b);
+    const x = Math.abs(Math.round(a));
+    const y = Math.abs(Math.round(b));
+    return y === 0 ? x : gcd(y, x % y);
 };
 
-// Utility function to compute LCM
 const lcm = (a: number, b: number): number => {
-    return (a * b) / gcd(a, b);
+    if (a === 0 || b === 0) return 1;
+    return Math.abs(Math.round((a * b) / gcd(a, b)));
 };
 
-// Find LCM of an array of numbers
 const lcmMultiple = (arr: number[]): number => {
-    if (arr.length === 0) return 1;
-    return arr.reduce((acc, curr) => lcm(acc, curr), 1);
+    if (!arr || arr.length === 0) return 1;
+    return arr.reduce((acc, val) => lcm(acc, val || 1), arr[0] || 1);
 };
 
 /**
  * Calculates Sharia and Civil Law Inheritance
  */
-export function calculateInheritance(options: {
-    deceasedName: string;
-    deceasedGender: Gender;
-    totalEstate: number;
-    debts: number;
-    funeralExpenses: number;
-    wills: number;
-    heirs: HeirDefinition[];
-    madhab: CalculationMadhab;
-    dateOfDeath?: string;
-}): InheritanceCalculation {
-    const {
-        deceasedName,
-        deceasedGender,
-        totalEstate,
-        debts,
-        funeralExpenses,
-        wills,
-        heirs,
-        madhab
-    } = options;
+export function calculateInheritance(
+    optionsOrMadhab: CalculationMadhab | {
+        deceasedName: string;
+        deceasedGender: Gender;
+        civilId?: string;
+        dateOfDeath?: string;
+        notes?: string;
+        assets: EstateAssets;
+        deductions: EstateDeductions;
+        heirs: HeirDefinition[];
+        madhab: CalculationMadhab;
+    },
+    deceasedGenderArg?: Gender,
+    deceasedNameArg?: string,
+    assetsArg?: EstateAssets,
+    deductionsArg?: EstateDeductions,
+    heirsArg?: HeirDefinition[],
+    notesArg?: string
+): InheritanceCalculation {
+    let madhab: CalculationMadhab;
+    let deceasedGender: Gender;
+    let deceasedName: string;
+    let civilId: string | undefined;
+    let dateOfDeath: string | undefined;
+    let notes: string | undefined;
+    let assets: EstateAssets;
+    let deductions: EstateDeductions;
+    let heirs: HeirDefinition[];
 
-    const netEstate = Math.max(0, totalEstate - debts - funeralExpenses - wills);
+    if (typeof optionsOrMadhab === 'object') {
+        madhab = optionsOrMadhab.madhab;
+        deceasedGender = optionsOrMadhab.deceasedGender;
+        deceasedName = optionsOrMadhab.deceasedName;
+        civilId = optionsOrMadhab.civilId;
+        dateOfDeath = optionsOrMadhab.dateOfDeath;
+        notes = optionsOrMadhab.notes;
+        assets = optionsOrMadhab.assets;
+        deductions = optionsOrMadhab.deductions;
+        heirs = optionsOrMadhab.heirs;
+    } else {
+        madhab = optionsOrMadhab;
+        deceasedGender = deceasedGenderArg || 'M';
+        deceasedName = deceasedNameArg || 'المورث الكريم';
+        assets = assetsArg || { cash: 0, realEstate: 0, stocks: 0, jewelry: 0, vehicles: 0, receivables: 0 };
+        deductions = deductionsArg || { securedDebts: 0, funeralExpenses: 0, unsecuredDebts: 0, wills: 0 };
+        heirs = heirsArg || [];
+        notes = notesArg;
+    }
+
+    const totalEstate = Number((
+        (assets.cash || 0) +
+        (assets.realEstate || 0) +
+        (assets.stocks || 0) +
+        (assets.jewelry || 0) +
+        (assets.vehicles || 0) +
+        (assets.receivables || 0) +
+        (assets.endOfService || 0) +
+        (assets.businessLicenses || 0) +
+        (assets.otherAssets || 0)
+    ).toFixed(3));
+
+    // Ordered liquidation according to Kuwait Law:
+    // 1. Secured debts (حقوق الرهن والعين)
+    // 2. Funeral expenses (التجهيز والتكفين)
+    // 3. Unsecured debts (الديون المطلقة والإلهية)
+    // 4. Wills (الوصايا الاختيارية في حدود الثلث)
+    const secured = Math.min(totalEstate, deductions.securedDebts || 0);
+    const remAfterSecured = Math.max(0, totalEstate - secured);
+
+    const funeral = Math.min(remAfterSecured, deductions.funeralExpenses || 0);
+    const remAfterFuneral = Math.max(0, remAfterSecured - funeral);
+
+    const unsecured = Math.min(remAfterFuneral, deductions.unsecuredDebts || 0);
+    const remAfterDebts = Math.max(0, remAfterFuneral - unsecured);
+
+    const maxPermittedWill = remAfterDebts / 3;
+    const actualWill = Math.min(remAfterDebts, deductions.wills || 0);
+    const remAfterWills = Math.max(0, remAfterDebts - actualWill);
+
+    const netEstate = Number(remAfterWills.toFixed(3));
+
     const result: InheritanceCalculation = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: 'case-' + Math.random().toString(36).substring(2, 9),
         deceasedName: deceasedName || 'حالة حصر إرث غير مسماة',
         deceasedGender,
+        civilId,
+        dateOfDeath,
+        notes,
+        assets,
+        deductions,
         totalEstate,
-        debts,
-        funeralExpenses,
-        wills,
         netEstate,
+        debts: (deductions.securedDebts || 0) + (deductions.unsecuredDebts || 0),
+        funeralExpenses: deductions.funeralExpenses || 0,
+        wills: deductions.wills || 0,
+        wasiyyaWajibahAmount: 0,
         madhab,
         baseProblem: 0,
         finalProblem: 0,
@@ -215,664 +374,863 @@ export function calculateInheritance(options: {
         warnings: []
     };
 
-    // Warnings
-    if (wills > totalEstate / 3 && wills > 0) {
-        result.warnings.push('تحذير شرعي وقانوني: قيمة الوصية تتجاوز ثلث التركة المصرح به شرعاً وقانوناً (الأحوال الشخصية الكويتي مادة 290/328). يحتاج تنفيذ الجزء الزائد عن الثلث إلى موافقة صريحة من جميع الورثة الراشدين.');
+    // Warnings on estate liquidation
+    if ((deductions.wills || 0) > maxPermittedWill && maxPermittedWill > 0) {
+        result.warnings.push(`تنبيه قانوني (المادة 290 و 328): قيمة الوصية الاختيارية المحددة (${deductions.wills.toLocaleString()} د.ك) تتجاوز ثلث التركة بعد الديون (${maxPermittedWill.toFixed(3)} د.ك). لا ينفذ الزائد إلا بإجازة صريحة من جميع الورثة الراشدين.`);
     }
 
-    if (netEstate <= 0) {
-        result.warnings.push('التركة مستغرقة بالكامل بالديون أو الوصايا وتجهيز الميت، لا يوجد بقايا مادية للورثة.');
-        result.steps.push('الخطوة الأولى: تم تسديد الديون وتفاصيل التجهيز والوصايا، وتبين أن الديون والالتزامات مستغرقة لكامل التركة.');
+    if (totalEstate <= 0) {
+        result.warnings.push('قيمة التركة الإجمالية المدخلة هي صفر، يرجى إدخال قيم الأصول والممتلكات.');
         return result;
     }
 
-    result.steps.push(`حساب إجمالي التركة المقررة: ${totalEstate.toLocaleString()} د.ك`);
-    result.steps.push(`تسديد الالتزامات المالية والديون وتجهيز الميت: خصم ${ (debts + funeralExpenses + wills).toLocaleString() } د.ك`);
-    result.steps.push(`صافي التركة الصالحة للتقسيم الإرثي: ${netEstate.toLocaleString()} د.ك`);
+    if (netEstate <= 0) {
+        result.warnings.push('التركة مستغرقة بالكامل بالديون وحقوق الرهن ومصاريف التجهيز، لا يتبقى أي مال صالح للقسمة على الورثة.');
+        result.steps.push('مرحلة التصفية: استغرقت ديون التركة وحقوق التجهيز كامل الأعيان والأموال المتروكة.');
+        return result;
+    }
 
-    // Extract active heirs counts
-    const counts: Record<string, { count: number; definition: HeirDefinition }> = {};
+    result.steps.push(`1. حصر إجمالي التركة العينية والنقدية: ${totalEstate.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+    result.steps.push(`2. استقطاع حقوق الرهن والعين: -${secured.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+    result.steps.push(`3. استقطاع مصاريف التجهيز والتكفين بالمعروف: -${funeral.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+    result.steps.push(`4. استيفاء الديون المرسلة والمطلقة: -${unsecured.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+    if (actualWill > 0) {
+        result.steps.push(`5. تنفيذ الوصية الشرعية الاختيارية: -${actualWill.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+    }
+    result.steps.push(`6. صافي التركة الصالحة للتوزيع الشرعي والقضائي: ${netEstate.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك.`);
+
+    // Filter Heirs & Filter Impediments (موانع الإرث كاختلاف الدين أو القتل)
+    const validHeirs: HeirDefinition[] = [];
+    const disqualifiedHeirs: ExcludedHeir[] = [];
+
     heirs.forEach(h => {
-        if (h.count > 0) {
-            counts[h.type] = { count: h.count, definition: h };
+        if (h.count <= 0) return;
+        if (h.specialCondition === 'impediment_religion') {
+            disqualifiedHeirs.push({
+                label: h.label,
+                type: h.type,
+                count: h.count,
+                reason: 'مانع شرعي من الإرث (اختلاف الدين بين الوارث والمورث)',
+                excludedBy: 'مانع شرعي',
+                article: 'المادة (342) من قانون الأحوال الشخصية الكويتي'
+            });
+            result.steps.push(`مانع شرعي: استبعاد [${h.label}] لمانع اختلاف الدين تطبيقاً للمادة 342 أحوال شخصية كويتي.`);
+            return;
         }
+        if (h.specialCondition === 'impediment_homicide') {
+            disqualifiedHeirs.push({
+                label: h.label,
+                type: h.type,
+                count: h.count,
+                reason: 'مانع شرعي وقانوني من الإرث (القتل المانع عمداً وعدواناً)',
+                excludedBy: 'مانع القتل',
+                article: 'المادة (341) من قانون الأحوال الشخصية الكويتي'
+            });
+            result.steps.push(`مانع شرعي: استبعاد [${h.label}] لمانع القتل المانع من الإرث تطبيقاً للمادة 341 أحوال شخصية كويتي.`);
+            return;
+        }
+        validHeirs.push(h);
     });
 
-    const getCount = (type: string) => counts[type]?.count || 0;
+    // Check for Mandatory Will (الوصية الواجبة - المادة 328) for grandchildren of predeceased sons/daughters
+    let estateForDistribution = netEstate;
+    const wasiyyahWajibahShares: CalculatedShare[] = [];
+    const predeceasedGrandchildren = validHeirs.filter(h => h.specialCondition === 'deceased_before' && (h.type === 'grandson' || h.type === 'granddaughter'));
 
-    const hasChildren = (getCount('son') + getCount('daughter') + getCount('grandson') + getCount('granddaughter')) > 0;
-    const hasMaleDescendant = (getCount('son') + getCount('grandson')) > 0;
-    const hasFemaleDescendant = (getCount('daughter') + getCount('granddaughter')) > 0;
+    if (predeceasedGrandchildren.length > 0 && madhab === 'sunni') {
+        const totalGrandchildren = predeceasedGrandchildren.reduce((acc, h) => acc + h.count, 0);
+        // Calculate max 1/3 for wasiyya wajibah
+        const maxWajibah = netEstate / 3;
+        // Estimate hypothetical share
+        const estimatedShare = Math.min(maxWajibah, (netEstate * 0.25));
+        const wasiyyaAmount = Number(estimatedShare.toFixed(3));
+        result.wasiyyaWajibahAmount = wasiyyaAmount;
+        estateForDistribution = Number((netEstate - wasiyyaAmount).toFixed(3));
+
+        predeceasedGrandchildren.forEach(g => {
+            const count = g.count;
+            const portion = (wasiyyaAmount / totalGrandchildren) * count;
+            wasiyyahWajibahShares.push({
+                heirLabel: `${g.label} (وصية واجبة لأولاد المتوفى قبلاً)`,
+                heirType: g.type,
+                count,
+                shareType: 'wasiyya_wajibah',
+                shareLabel: 'وصية واجبة (المادة 328)',
+                shareFractionNum: 1,
+                shareFractionDen: 3,
+                shareValue: wasiyyaAmount / netEstate,
+                amount: Number(portion.toFixed(3)),
+                isExcluded: false,
+                evidence: LEGAL_EVIDENCE_DATABASE.wasiyyah_wajibah
+            });
+        });
+
+        result.steps.push(`احتساب الوصية الواجبة: استقطاع ${wasiyyaAmount.toLocaleString()} د.ك لأولاد الابن/البنت المتوفى قبل المورث وفق المادة 328 أحوال شخصية كويتي.`);
+    }
+
+    // Active heirs for standard distribution (excluding predeceased treated under wasiyyah)
+    const activeHeirs = validHeirs.filter(h => !(h.specialCondition === 'deceased_before' && (h.type === 'grandson' || h.type === 'granddaughter')));
+
+    const counts: Record<string, number> = {};
+    activeHeirs.forEach(h => {
+        counts[h.type] = (counts[h.type] || 0) + h.count;
+    });
+    const getCount = (type: string) => counts[type] || 0;
+
+    const hasSons = getCount('son') > 0;
+    const hasDaughters = getCount('daughter') > 0;
+    const hasGrandsons = getCount('grandson') > 0;
+    const hasGranddaughters = getCount('granddaughter') > 0;
+    const hasChildren = hasSons || hasDaughters || hasGrandsons || hasGranddaughters;
+    const hasMaleDescendant = hasSons || hasGrandsons;
+    const hasFemaleDescendant = hasDaughters || hasGranddaughters;
     const hasFather = getCount('father') > 0;
     const hasMother = getCount('mother') > 0;
-    const siblingsCount = getCount('full_brother') + getCount('full_sister') + 
-                          getCount('paternal_brother') + getCount('paternal_sister') + 
+
+    const siblingsCount = getCount('full_brother') + getCount('full_sister') +
+                          getCount('paternal_brother') + getCount('paternal_sister') +
                           getCount('maternal_brother') + getCount('maternal_sister');
 
-    // Sunnah (Kuwaiti Sunni Personal Status Law) Logic
+    // -------------------------------------------------------------
+    // SUNNI JURISDICTION (المذهب السني - قانون الأحوال الشخصية الكويتي)
+    // -------------------------------------------------------------
     if (madhab === 'sunni') {
-        result.steps.push('تطبيق الفقه السني الكلاسيكي وقانون الأحوال الشخصية الكويتي (قسم التركات في المذهب المالكي والقرآن العظيم).');
+        result.steps.push('تطبيق أحكام المذهب السني طبقاً لقانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984 (المواد 288 إلى 340).');
 
-        // Check Exclusion Rules FIRST (حجب الحرمان)
-        const exclusions: ExcludedHeir[] = [];
+        const exclusions: ExcludedHeir[] = [...disqualifiedHeirs];
 
-        // 1. Father excludes: grandfathers, paternal grandmothers (in Kuwaiti Article 290, plus all brothers and sisters)
+        // 1. Father excludes: Grandfathers, Paternal Grandmothers, all Siblings, Uncles, Cousins
         if (hasFather) {
             if (getCount('paternal_grandfather') > 0) {
-                exclusions.push({ label: 'الجد لـ أب', type: 'paternal_grandfather', count: getCount('paternal_grandfather'), reason: 'يُحجب حجب حرمان لوجود الأب (الأصل المذكر الأقرب)', excludedBy: 'الأب' });
+                exclusions.push({ label: 'الجد لأب', type: 'paternal_grandfather', count: getCount('paternal_grandfather'), reason: 'يُحجب حجب حرمان لوجود الأب (الأصل المذكر الأقرب)', excludedBy: 'الأب', article: 'المادة (298)' });
             }
             if (getCount('paternal_grandmother') > 0) {
-                exclusions.push({ label: 'الجدة لأب', type: 'paternal_grandmother', count: getCount('paternal_grandmother'), reason: 'تُحجب لوجود الأب أو الأم طبقاً للمادة 297', excludedBy: 'الأب' });
+                exclusions.push({ label: 'الجدة لأب', type: 'paternal_grandmother', count: getCount('paternal_grandmother'), reason: 'تُحجب لوجود الأب (المادة 297)', excludedBy: 'الأب', article: 'المادة (297)' });
             }
             ['full_brother', 'full_sister', 'paternal_brother', 'paternal_sister', 'maternal_brother', 'maternal_sister'].forEach(sib => {
                 if (getCount(sib) > 0) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يحجب حجب حرمان مطلق لوجود الأب (الأحوال الشخصية الكويتي مادة 300)', excludedBy: 'الأب' });
+                    const l = activeHeirs.find(h => h.type === sib)?.label || sib;
+                    exclusions.push({ label: l, type: sib, count: getCount(sib), reason: 'يُحجب حجب حرمان مطلق لوجود الأب', excludedBy: 'الأب', article: 'المادة (300 و 301)' });
+                }
+            });
+            ['paternal_uncle', 'paternal_cousin'].forEach(rel => {
+                if (getCount(rel) > 0) {
+                    const l = activeHeirs.find(h => h.type === rel)?.label || rel;
+                    exclusions.push({ label: l, type: rel, count: getCount(rel), reason: 'يُحجب لوجود الأب العصبة الأقرب', excludedBy: 'الأب', article: 'المادة (292)' });
                 }
             });
         }
 
-        // 2. Mother excludes: all grandmothers (paternal & maternal)
+        // 2. Mother excludes: All Grandmothers
         if (hasMother) {
             if (getCount('paternal_grandmother') > 0 && !exclusions.some(x => x.type === 'paternal_grandmother')) {
-                exclusions.push({ label: 'الجدة لأب', type: 'paternal_grandmother', count: getCount('paternal_grandmother'), reason: 'تُحجب لوجود الأم (الأحوال الشخصية الكويتي مادة 297)', excludedBy: 'الأم' });
+                exclusions.push({ label: 'الجدة لأب', type: 'paternal_grandmother', count: getCount('paternal_grandmother'), reason: 'تُحجب لوجود الأم', excludedBy: 'الأم', article: 'المادة (297)' });
             }
             if (getCount('maternal_grandmother') > 0) {
-                exclusions.push({ label: 'الجدة لأم', type: 'maternal_grandmother', count: getCount('maternal_grandmother'), reason: 'تُحجب لوجود الأم (الأحوال الشخصية الكويتي مادة 297)', excludedBy: 'الأم' });
+                exclusions.push({ label: 'الجدة لأم', type: 'maternal_grandmother', count: getCount('maternal_grandmother'), reason: 'تُحجب لوجود الأم', excludedBy: 'الأم', article: 'المادة (297)' });
             }
         }
 
-        // 3. Son excludes: grandsons, granddaughters, all brothers & sisters
-        if (getCount('son') > 0) {
+        // 3. Son excludes: Grandsons, Granddaughters, all Siblings, Uncles, Cousins
+        if (hasSons) {
             if (getCount('grandson') > 0) {
-                exclusions.push({ label: 'ابن ابن', type: 'grandson', count: getCount('grandson'), reason: 'يُحجب لوجود ابن مباشر أقرب للميت', excludedBy: 'الابن المباشر' });
+                exclusions.push({ label: 'ابن الابن', type: 'grandson', count: getCount('grandson'), reason: 'يُحجب لوجود الابن المباشر الأقرب', excludedBy: 'الابن المباشر', article: 'المادة (292)' });
             }
             if (getCount('granddaughter') > 0) {
-                exclusions.push({ label: 'بنت ابن', type: 'granddaughter', count: getCount('granddaughter'), reason: 'تُحجب لوجود ابن مباشر أقرب للميت (مادة 293)', excludedBy: 'الابن المباشر' });
+                exclusions.push({ label: 'بنت الابن', type: 'granddaughter', count: getCount('granddaughter'), reason: 'تُحجب لوجود الابن المباشر الأقرب', excludedBy: 'الابن المباشر', article: 'المادة (293)' });
             }
             ['full_brother', 'full_sister', 'paternal_brother', 'paternal_sister', 'maternal_brother', 'maternal_sister'].forEach(sib => {
                 if (getCount(sib) > 0 && !exclusions.some(x => x.type === sib)) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يحجب لوجود الفرع الوارث المذكر (الابن)', excludedBy: 'الابن المباشر' });
+                    const l = activeHeirs.find(h => h.type === sib)?.label || sib;
+                    exclusions.push({ label: l, type: sib, count: getCount(sib), reason: 'يُحجب لوجود الفرع الوارث المذكر (الابن)', excludedBy: 'الابن', article: 'المادة (300 و 301)' });
+                }
+            });
+            ['paternal_uncle', 'paternal_cousin'].forEach(rel => {
+                if (getCount(rel) > 0 && !exclusions.some(x => x.type === rel)) {
+                    const l = activeHeirs.find(h => h.type === rel)?.label || rel;
+                    exclusions.push({ label: l, type: rel, count: getCount(rel), reason: 'يُحجب بالابن المباشر', excludedBy: 'الابن', article: 'المادة (292)' });
                 }
             });
         }
 
-        // 4. Grandson excludes: brothers/sisters, further grandsons
-        if (getCount('grandson') > 0 && getCount('son') === 0) {
-            ['full_brother', 'full_sister', 'paternal_brother', 'paternal_sister', 'maternal_brother', 'maternal_sister'].forEach(sib => {
-                if (getCount(sib) > 0 && !exclusions.some(x => x.type === sib)) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يحجب لوجود ابن ابن للميت فرع مذكر وارث', excludedBy: 'ابن ابن' });
+        // 4. Two or more daughters exclude granddaughters (unless grandson equalizes them)
+        if (getCount('daughter') >= 2 && !hasSons) {
+            if (getCount('granddaughter') > 0 && getCount('grandson') === 0 && !exclusions.some(x => x.type === 'granddaughter')) {
+                exclusions.push({
+                    label: 'بنات الابن',
+                    type: 'granddaughter',
+                    count: getCount('granddaughter'),
+                    reason: 'تُحجب لاستغراق البنات الصلبيات فرض الثلثين كاملاً وعدم وجود معصب (ابن ابن)',
+                    excludedBy: 'البنات الصلبيات (الثلثان)',
+                    article: 'المادة (294)'
+                });
+            }
+        }
+
+        // 5. Full brother excludes paternal brothers/sisters, uncles, cousins
+        if (getCount('full_brother') > 0 && !exclusions.some(x => x.type === 'full_brother')) {
+            ['paternal_brother', 'paternal_sister', 'paternal_uncle', 'paternal_cousin'].forEach(rel => {
+                if (getCount(rel) > 0 && !exclusions.some(x => x.type === rel)) {
+                    const l = activeHeirs.find(h => h.type === rel)?.label || rel;
+                    exclusions.push({ label: l, type: rel, count: getCount(rel), reason: 'يُحجب بالأخ الشقيق الأقوى قرابة', excludedBy: 'الأخ الشقيق', article: 'المادة (292 و 300)' });
                 }
             });
         }
 
-        // 5. Descendants/Male Ascendants exclude Maternal Brothers & Maternal Sisters (الحجب بالكلالة)
-        if (hasChildren || hasFather || (getCount('paternal_grandfather') > 0 && !hasFather)) {
-            ['maternal_brother', 'maternal_sister'].forEach(sib => {
-                if (getCount(sib) > 0 && !exclusions.some(x => x.type === sib)) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يحجب الأخوة لأم لوجود فرع وارث مطلقاً أو أصل وارث مذكر (مادة 301)', excludedBy: 'الفرع/الأصل الوارث' });
-                }
-            });
-        }
-
-        // 6. Full Brother excludes: Paternal brothers & Sisters, uncles, cousins
-        if (getCount('full_brother') > 0) {
-            ['paternal_brother', 'paternal_sister'].forEach(sib => {
-                if (getCount(sib) > 0 && !exclusions.some(x => x.type === sib)) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يُحجب الأخوة لأب لوجود الأخ الشقيق الأقرب بالدم', excludedBy: 'الأخ الشقيق' });
-                }
-            });
-            ['paternal_uncle', 'paternal_cousin'].forEach(u => {
-                if (getCount(u) > 0) {
-                    exclusions.push({ label: counts[u].definition.label, type: u, count: getCount(u), reason: 'يحجب عم أو ابن عم لوجود العصبة الأقرب (الأخ الشقيق)', excludedBy: 'الأخ الشقيق' });
-                }
-            });
-        }
-
-        // 7. Full Sister if she becomes Assaba with daughters ("الأخوات مع البنات عصبة") excludes Paternal Brother/Sister
-        const isFullSisterAssabaWithDaughters = (getCount('full_sister') > 0 && getCount('daughter') > 0 && getCount('full_brother') === 0 && getCount('son') === 0 && getCount('grandson') === 0);
-        if (isFullSisterAssabaWithDaughters) {
-            ['paternal_brother', 'paternal_sister'].forEach(sib => {
-                if (getCount(sib) > 0 && !exclusions.some(x => x.type === sib)) {
-                    exclusions.push({ label: counts[sib].definition.label, type: sib, count: getCount(sib), reason: 'يُحجب لوجود الأخت الشقيقة التي صارت عصبة مع البنات (قاعدة الباقي)', excludedBy: 'الأخت الشقيقة عصبة مع البنات' });
-                }
-            });
-        }
-
-        // 8. Multiple daughters (2+) and no son or grandson exclude granddaughter (بنت الابن)
-        if (getCount('daughter') >= 2 && getCount('son') === 0 && getCount('grandson') === 0 && getCount('granddaughter') > 0) {
-            exclusions.push({ label: 'بنت ابن', type: 'granddaughter', count: getCount('granddaughter'), reason: 'تحجب لاستغراق البنات الثلثين الشرعيين، وعدم وجود عاصب لها موازٍ أو أسفل منها (العاصب المبارك - مادة 293)', excludedBy: 'البنات (2+)' });
-        }
-
-        // 9. Multiple full sisters (2+) and no full brother/paternal brother exclude paternal sisters (أخوات لأب)
-        if (getCount('full_sister') >= 2 && getCount('full_brother') === 0 && getCount('paternal_brother') === 0 && getCount('paternal_sister') > 0) {
-            exclusions.push({ label: 'أخت لأب', type: 'paternal_sister', count: getCount('paternal_sister'), reason: 'تحجب أخت لأب لاستغراق الشقيقات لثلثي التركة وعدم وجود عاصب (أخ لأب)', excludedBy: 'الشقيقات (2+)' });
-        }
-
-        api_saveExcludedHeirs(exclusions);
-
-        // Define help structures
         const isExcluded = (type: string) => exclusions.some(e => e.type === type);
 
-        // Calculate Fixed Shares (الفروض المقدرة)
-        const fixedShares: { heirType: string; label: string; num: number; den: number; ev: any }[] = [];
+        // Special Scenario: Al-Umariyyatan / Al-Gharrawan (العمريتان: زوج أو زوجة + أم + أب دون أولاد ولا إخوة)
+        const isUmariyyahWithHusband = getCount('husband') > 0 && hasMother && hasFather && !hasChildren && siblingsCount < 2;
+        const isUmariyyahWithWife = getCount('wife') > 0 && hasMother && hasFather && !hasChildren && siblingsCount < 2;
 
-        // HUSBAND
+        // Special Scenario: Al-Mushtarakah / Al-Himariyyah (المشتركة: زوج + أم/جدة + إخوة لأم 2+ + إخوة أشقاء)
+        const isMushtarakah = getCount('husband') > 0 && (hasMother || getCount('maternal_grandmother') > 0) &&
+                             (getCount('maternal_brother') + getCount('maternal_sister')) >= 2 &&
+                             getCount('full_brother') > 0 && !hasChildren && !hasFather;
+
+        const rawShares: {
+            type: string;
+            label: string;
+            count: number;
+            num: number;
+            den: number;
+            shareLabel: string;
+            shareType: CalculatedShare['shareType'];
+            evidence: typeof LEGAL_EVIDENCE_DATABASE[string];
+        }[] = [];
+
+        // 1. Spouses
         if (getCount('husband') > 0 && !isExcluded('husband')) {
-            const hasDesc = hasChildren;
-            fixedShares.push({
-                heirType: 'husband',
+            const num = 1;
+            const den = hasChildren ? 4 : 2;
+            const lbl = hasChildren ? '1/4 فرضاً لوجود الفرع الوارث' : '1/2 فرضاً لانعدام الفرع الوارث';
+            rawShares.push({
+                type: 'husband',
                 label: 'الزوج',
-                num: hasDesc ? 1 : 1,
-                den: hasDesc ? 4 : 2,
-                ev: hasDesc ? LEGAL_EVIDENCE.husband_1_4 : LEGAL_EVIDENCE.husband_1_2
+                count: 1,
+                num,
+                den,
+                shareLabel: lbl,
+                shareType: 'faradh',
+                evidence: hasChildren ? LEGAL_EVIDENCE_DATABASE.husband_1_4 : LEGAL_EVIDENCE_DATABASE.husband_1_2
             });
         }
 
-        // WIVES
         if (getCount('wife') > 0 && !isExcluded('wife')) {
-            const hasDesc = hasChildren;
-            fixedShares.push({
-                heirType: 'wife',
-                label: `الزوجة/الزوجات (العدد: ${getCount('wife')})`,
-                num: hasDesc ? 1 : 1,
-                den: hasDesc ? 8 : 4,
-                ev: hasDesc ? LEGAL_EVIDENCE.wife_1_8 : LEGAL_EVIDENCE.wife_1_4
+            const num = 1;
+            const den = hasChildren ? 8 : 4;
+            const wCount = getCount('wife');
+            const lbl = (hasChildren ? '1/8 فرضاً بالتساوي' : '1/4 فرضاً بالتساوي') + (wCount > 1 ? ` (بين ${wCount} زوجات)` : '');
+            rawShares.push({
+                type: 'wife',
+                label: `الزوجة / الزوجات (العدد: ${wCount})`,
+                count: wCount,
+                num,
+                den,
+                shareLabel: lbl,
+                shareType: 'faradh',
+                evidence: hasChildren ? LEGAL_EVIDENCE_DATABASE.wife_1_8 : LEGAL_EVIDENCE_DATABASE.wife_1_4
             });
         }
 
-        // MOTHER
-        if (getCount('mother') > 0 && !isExcluded('mother')) {
-            const hasMultipleSibs = siblingsCount >= 2;
-            const fatherExistsNonExcluded = hasFather && !isExcluded('father');
-            const spouseExistsNonExcluded = (getCount('husband') > 0 && !isExcluded('husband')) || (getCount('wife') > 0 && !isExcluded('wife'));
-            
-            // Checking Al-Ghrawayn Case (الغراوين/العمريتين): Mother, Father, and one spouse, no children, no siblings
-            const isAlGhrawayn = fatherExistsNonExcluded && spouseExistsNonExcluded && !hasChildren && siblingsCount === 0;
-
-            if (isAlGhrawayn) {
-                // Takes 1/3 of remainder. In fraction terms, we will represent this separately during base calculation
-                // Let's list mother is having a special share which we evaluate manually.
-                fixedShares.push({
-                    heirType: 'mother',
-                    label: 'الأم (حالة الغراوين - ثلث الباقي)',
-                    num: 1, // Will handle special subtraction
-                    den: 3, 
-                    ev: LEGAL_EVIDENCE.mother_1_3_residue
+        // 2. Mother
+        if (hasMother && !isExcluded('mother')) {
+            if (isUmariyyahWithHusband || isUmariyyahWithWife) {
+                // ثلث الباقي
+                rawShares.push({
+                    type: 'mother',
+                    label: 'الأم (المسألة العمرية)',
+                    count: 1,
+                    num: isUmariyyahWithHusband ? 1 : 1,
+                    den: isUmariyyahWithHusband ? 6 : 4, // (1-1/2)*1/3 = 1/6 ; (1-1/4)*1/3 = 1/4
+                    shareLabel: 'ثلث الباقي بعد فرض الزوجية (المسألة العمرية)',
+                    shareType: 'special',
+                    evidence: LEGAL_EVIDENCE_DATABASE.mother_1_3_residue
                 });
-                result.steps.push('تطبيق حالة العمرية (الغراوية): لأن الورثة هم الأب والأم وأحد الزوجين فقط، ترث الأم ثلث الباقي بعد نصيب الزوجية للعدالة الفقهية.');
-            } else if (hasChildren || hasMultipleSibs) {
-                fixedShares.push({
-                    heirType: 'mother',
+                result.steps.push('المسألة العمرية (الغراوان): الأم تأخذ ثلث الباقي بعد فرض الزوجية حفظاً لقاعدة التفضيل الشرعي للأب.');
+            } else if (hasChildren || siblingsCount >= 2) {
+                rawShares.push({
+                    type: 'mother',
                     label: 'الأم',
+                    count: 1,
                     num: 1,
                     den: 6,
-                    ev: LEGAL_EVIDENCE.mother_1_6
+                    shareLabel: '1/6 فرضاً لوجود الفرع الوارث أو جمع من الإخوة',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.mother_1_6
                 });
             } else {
-                fixedShares.push({
-                    heirType: 'mother',
+                rawShares.push({
+                    type: 'mother',
                     label: 'الأم',
+                    count: 1,
                     num: 1,
                     den: 3,
-                    ev: LEGAL_EVIDENCE.mother_1_3
+                    shareLabel: '1/3 فرضاً كاملاً لعدم الفرع الوارث وجمع الإخوة',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.mother_1_3
                 });
             }
         }
 
-        // FATHER
-        let isFatherAssaba = false;
-        let isFatherFixedWithAssaba = false;
-        if (getCount('father') > 0 && !isExcluded('father')) {
-            if (hasMaleDescendant) {
-                fixedShares.push({
-                    heirType: 'father',
-                    label: 'الأب',
+        // 3. Grandmothers (if mother absent)
+        if (!hasMother) {
+            const pgm = getCount('paternal_grandmother') > 0 && !isExcluded('paternal_grandmother');
+            const mgm = getCount('maternal_grandmother') > 0 && !isExcluded('maternal_grandmother');
+            if (pgm && mgm) {
+                rawShares.push({
+                    type: 'grandmothers',
+                    label: 'الجدات (لأب ولأم)',
+                    count: 2,
                     num: 1,
                     den: 6,
-                    ev: LEGAL_EVIDENCE.father_1_6
+                    shareLabel: '1/6 فرضاً يقسم بالسوية بين الجدتين',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.grandmother_1_6
                 });
-            } else if (hasFemaleDescendant) {
-                fixedShares.push({
-                    heirType: 'father',
-                    label: 'الأب (فرض السدس مع التعصيب)',
-                    num: 1,
-                    den: 6,
-                    ev: LEGAL_EVIDENCE.father_1_6
-                });
-                isFatherFixedWithAssaba = true;
-            } else {
-                isFatherAssaba = true;
-            }
-        }
-
-        // GRANDFATHER
-        let isGrandfatherAssaba = false;
-        let isGrandfatherFixedWithAssaba = false;
-        if (getCount('paternal_grandfather') > 0 && !isExcluded('paternal_grandfather')) {
-            if (hasMaleDescendant) {
-                fixedShares.push({
-                    heirType: 'paternal_grandfather',
-                    label: 'الجد الصحيح',
-                    num: 1,
-                    den: 6,
-                    ev: LEGAL_EVIDENCE.father_1_6
-                });
-            } else if (hasFemaleDescendant) {
-                fixedShares.push({
-                    heirType: 'paternal_grandfather',
-                    label: 'الجد الصحيح (فرض وسدس مع التعصيب)',
-                    num: 1,
-                    den: 6,
-                    ev: LEGAL_EVIDENCE.father_1_6
-                });
-                isGrandfatherFixedWithAssaba = true;
-            } else {
-                isGrandfatherAssaba = true;
-            }
-        }
-
-        // GRANDMOTHERS
-        if (getCount('paternal_grandmother') > 0 && !isExcluded('paternal_grandmother') && getCount('maternal_grandmother') > 0 && !isExcluded('maternal_grandmother')) {
-            // Both share the 1/6
-            fixedShares.push({
-                heirType: 'grandmothers_shared',
-                label: 'الجدتان (لأب ولأم معا بالتساوي)',
-                num: 1,
-                den: 6,
-                ev: LEGAL_EVIDENCE.grandmother_1_6
-            });
-        } else {
-            if (getCount('paternal_grandmother') > 0 && !isExcluded('paternal_grandmother')) {
-                fixedShares.push({
-                    heirType: 'paternal_grandmother',
+            } else if (pgm) {
+                rawShares.push({
+                    type: 'paternal_grandmother',
                     label: 'الجدة لأب',
+                    count: 1,
                     num: 1,
                     den: 6,
-                    ev: LEGAL_EVIDENCE.grandmother_1_6
+                    shareLabel: '1/6 فرضاً لانعدام الأم',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.grandmother_1_6
                 });
-            }
-            if (getCount('maternal_grandmother') > 0 && !isExcluded('maternal_grandmother')) {
-                fixedShares.push({
-                    heirType: 'maternal_grandmother',
+            } else if (mgm) {
+                rawShares.push({
+                    type: 'maternal_grandmother',
                     label: 'الجدة لأم',
+                    count: 1,
                     num: 1,
                     den: 6,
-                    ev: LEGAL_EVIDENCE.grandmother_1_6
+                    shareLabel: '1/6 فرضاً لانعدام الأم',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.grandmother_1_6
                 });
             }
         }
 
-        // DAUGHTERS (if no Sons)
-        const hasSons = getCount('son') > 0;
-        if (getCount('daughter') > 0 && !hasSons && !isExcluded('daughter')) {
-            fixedShares.push({
-                heirType: 'daughter',
-                label: `بنت/بنات (العدد: ${getCount('daughter')})`,
-                num: getCount('daughter') === 1 ? 1 : 2,
-                den: getCount('daughter') === 1 ? 2 : 3,
-                ev: getCount('daughter') === 1 ? LEGAL_EVIDENCE.daughter_1_2 : LEGAL_EVIDENCE.daughter_2_3
-            });
+        // 4. Father
+        if (hasFather && !isExcluded('father')) {
+            if (isUmariyyahWithHusband) {
+                // Father takes remainder (2/6 = 1/3)
+                rawShares.push({
+                    type: 'father',
+                    label: 'الأب (المسألة العمرية)',
+                    count: 1,
+                    num: 2,
+                    den: 6,
+                    shareLabel: 'الباقي تعصيباً (ضعف نصيب الأم في العمرية)',
+                    shareType: 'assaba_nafs',
+                    evidence: LEGAL_EVIDENCE_DATABASE.father_assaba
+                });
+            } else if (isUmariyyahWithWife) {
+                // Father takes remainder (2/4 = 1/2)
+                rawShares.push({
+                    type: 'father',
+                    label: 'الأب (المسألة العمرية)',
+                    count: 1,
+                    num: 2,
+                    den: 4,
+                    shareLabel: 'الباقي تعصيباً (ضعف نصيب الأم في العمرية)',
+                    shareType: 'assaba_nafs',
+                    evidence: LEGAL_EVIDENCE_DATABASE.father_assaba
+                });
+            } else if (hasMaleDescendant) {
+                rawShares.push({
+                    type: 'father',
+                    label: 'الأب',
+                    count: 1,
+                    num: 1,
+                    den: 6,
+                    shareLabel: '1/6 فرضاً لوجود الفرع الوارث المذكر',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.father_1_6
+                });
+            }
+            // If only female descendant, father gets 1/6 faradh + Asaba (handled in residue phase)
+            // If no descendants, father is pure Asaba (handled in residue phase)
         }
 
-        // GRANDDAUGHTERS (if no son/daughter/grandson)
-        if (getCount('granddaughter') > 0 && !hasSons && getCount('daughter') === 0 && getCount('grandson') === 0 && !isExcluded('granddaughter')) {
-            fixedShares.push({
-                heirType: 'granddaughter',
-                label: `بنات الابن (العدد: ${getCount('granddaughter')})`,
-                num: getCount('granddaughter') === 1 ? 1 : 2,
-                den: getCount('granddaughter') === 1 ? 2 : 3,
-                ev: getCount('daughter') === 1 ? LEGAL_EVIDENCE.daughter_1_2 : LEGAL_EVIDENCE.daughter_2_3
-            });
-        } else if (getCount('granddaughter') > 0 && getCount('daughter') === 1 && !hasSons && getCount('grandson') === 0 && !isExcluded('granddaughter')) {
-            // Takes 1/6 (completion of 2/3)
-            fixedShares.push({
-                heirType: 'granddaughter',
-                label: `بنات الابن (فرض السدس الساعي لتكملة الثلثين)`,
+        // 5. Daughters (when no sons)
+        if (hasDaughters && !hasSons && !isExcluded('daughter')) {
+            const dCount = getCount('daughter');
+            if (dCount === 1) {
+                rawShares.push({
+                    type: 'daughter',
+                    label: 'البنت الصلبية (الواحدة)',
+                    count: 1,
+                    num: 1,
+                    den: 2,
+                    shareLabel: '1/2 فرضاً لانفرادها وعدم المعصب',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.daughter_1_2
+                });
+            } else {
+                rawShares.push({
+                    type: 'daughter',
+                    label: `البنات الصلبيات (العدد: ${dCount})`,
+                    count: dCount,
+                    num: 2,
+                    den: 3,
+                    shareLabel: '2/3 فرضاً بالتساوي لتعددهن وعدم المعصب',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.daughter_2_3
+                });
+            }
+        }
+
+        // 6. Granddaughter (when 1 daughter and no sons/grandsons)
+        if (getCount('daughter') === 1 && !hasSons && getCount('granddaughter') > 0 && getCount('grandson') === 0 && !isExcluded('granddaughter')) {
+            const gdCount = getCount('granddaughter');
+            rawShares.push({
+                type: 'granddaughter',
+                label: `بنات الابن (العدد: ${gdCount})`,
+                count: gdCount,
                 num: 1,
                 den: 6,
-                ev: LEGAL_EVIDENCE.grandmother_1_6
-            });
-            result.steps.push('بنت الابن ترث السدس تكملة للثلثين لوجود بنت واحدة مباشرة مستحقة للنصف.');
-        }
-
-        // FULL SISTERS (if no brother, ascendant or descendant)
-        const hasFullBrothers = getCount('full_brother') > 0;
-        if (getCount('full_sister') > 0 && !hasFullBrothers && !hasChildren && !hasFather && !isExcluded('full_sister')) {
-            fixedShares.push({
-                heirType: 'full_sister',
-                label: `شقيقة/شقيقات (العدد: ${getCount('full_sister')})`,
-                num: getCount('full_sister') === 1 ? 1 : 2,
-                den: getCount('full_sister') === 1 ? 2 : 3,
-                ev: getCount('full_sister') === 1 ? LEGAL_EVIDENCE.sister_1_2 : LEGAL_EVIDENCE.sister_2_3
+                shareLabel: '1/6 فرضاً تكملة للثلثين مع البنت الواحدة',
+                shareType: 'faradh',
+                evidence: LEGAL_EVIDENCE_DATABASE.granddaughter_1_6_takmila
             });
         }
 
-        // PATERNAL SISTERS
-        const hasPaternalBrothers = getCount('paternal_brother') > 0;
-        if (getCount('paternal_sister') > 0 && !hasPaternalBrothers && !hasFullBrothers && getCount('full_sister') === 0 && !hasChildren && !hasFather && !isExcluded('paternal_sister')) {
-            fixedShares.push({
-                heirType: 'paternal_sister',
-                label: `أخت لأب/أخوات لأب (العدد: ${getCount('paternal_sister')})`,
-                num: getCount('paternal_sister') === 1 ? 1 : 2,
-                den: getCount('paternal_sister') === 1 ? 2 : 3,
-                ev: getCount('paternal_sister') === 1 ? LEGAL_EVIDENCE.sister_1_2 : LEGAL_EVIDENCE.sister_2_3
-            });
-        } else if (getCount('paternal_sister') > 0 && getCount('full_sister') === 1 && !hasPaternalBrothers && !hasFullBrothers && !hasChildren && !hasFather && !isExcluded('paternal_sister')) {
-            fixedShares.push({
-                heirType: 'paternal_sister',
-                label: 'أخت لأب (فرض السدس تكملة الثلثين مع وجود شقيقة واحدة)',
-                num: 1,
-                den: 6,
-                ev: LEGAL_EVIDENCE.grandmother_1_6
-            });
+        // 7. Maternal Siblings (when no ascendant male, no descendants)
+        const matCount = getCount('maternal_brother') + getCount('maternal_sister');
+        if (matCount > 0 && !hasFather && getCount('paternal_grandfather') === 0 && !hasChildren) {
+            if (!isMushtarakah) {
+                if (matCount === 1) {
+                    rawShares.push({
+                        type: 'maternal_sibling',
+                        label: 'الأخ / الأخت لأم (الواحد)',
+                        count: 1,
+                        num: 1,
+                        den: 6,
+                        shareLabel: '1/6 فرضاً لانفراده وعدم الحاجب',
+                        shareType: 'faradh',
+                        evidence: LEGAL_EVIDENCE_DATABASE.maternal_sibling_1_6
+                    });
+                } else {
+                    rawShares.push({
+                        type: 'maternal_sibling',
+                        label: `الإخوة والأخوات لأم (العدد: ${matCount})`,
+                        count: matCount,
+                        num: 1,
+                        den: 3,
+                        shareLabel: '1/3 فرضاً بالتساوي بين الذكر والأنثى',
+                        shareType: 'faradh',
+                        evidence: LEGAL_EVIDENCE_DATABASE.maternal_sibling_1_3
+                    });
+                }
+            }
         }
 
-        // MATERNAL BROTHERS & SISTERS (Shared in 1/3 or single gets 1/6)
-        const activeMaternalSiblingsCount = (isExcluded('maternal_brother') ? 0 : getCount('maternal_brother')) + (isExcluded('maternal_sister') ? 0 : getCount('maternal_sister'));
-        if (activeMaternalSiblingsCount > 0) {
-            fixedShares.push({
-                heirType: 'maternal_siblings',
-                label: `الإخوة لأم (العدد: ${activeMaternalSiblingsCount})`,
-                num: activeMaternalSiblingsCount === 1 ? 1 : 1,
-                den: activeMaternalSiblingsCount === 1 ? 6 : 3,
-                ev: activeMaternalSiblingsCount === 1 ? LEGAL_EVIDENCE.maternal_sibling_1_6 : LEGAL_EVIDENCE.maternal_sibling_1_3
-            });
+        // 8. Full Sisters (when no sons, grandsons, father, grandfather, and no full brothers)
+        if (getCount('full_sister') > 0 && getCount('full_brother') === 0 && !hasChildren && !hasFather && getCount('paternal_grandfather') === 0 && !isExcluded('full_sister')) {
+            const sCount = getCount('full_sister');
+            if (sCount === 1) {
+                rawShares.push({
+                    type: 'full_sister',
+                    label: 'الأخت الشقيقة (الواحدة)',
+                    count: 1,
+                    num: 1,
+                    den: 2,
+                    shareLabel: '1/2 فرضاً لانفرادها وعدم الحاجب أو المعصب',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.sister_1_2
+                });
+            } else {
+                rawShares.push({
+                    type: 'full_sister',
+                    label: `الأخوات الشقيقات (العدد: ${sCount})`,
+                    count: sCount,
+                    num: 2,
+                    den: 3,
+                    shareLabel: '2/3 فرضاً بالتساوي لتعددهن وعدم المعصب',
+                    shareType: 'faradh',
+                    evidence: LEGAL_EVIDENCE_DATABASE.sister_2_3
+                });
+            }
         }
 
-        // MATHEMATICAL ANALYSIS (LCM & Shares of Problem)
-        const denominators = fixedShares.map(s => s.den);
+        // Compute denominators and Base Problem (أصل المسألة)
+        const denominators = rawShares.map(s => s.den);
         const baseProblem = lcmMultiple(denominators);
         result.baseProblem = baseProblem;
 
-        result.steps.push(`حساب المضاعف المشترك الأصغر لمقامات الفروض الشرعية: أصل المسألة هو المخرج الأساسي ${baseProblem}`);
+        // Sum of fixed portions (مجموع السهام الفرضية)
+        let totalFaradhUnits = 0;
+        rawShares.forEach(s => {
+            totalFaradhUnits += (baseProblem / s.den) * s.num;
+        });
 
-        // Calculate fractions relative to baseProblem
-        let sumFardhParts = 0;
-        const heirPartsMap: Record<string, { numParts: number; originalShare: any }> = {};
+        const finalShares: CalculatedShare[] = [...wasiyyahWajibahShares];
 
-        // Treat special Al-Ghrawayn Mother case
-        const containsAlGhrawaynMother = fixedShares.some(s => s.heirType === 'mother' && s.label.includes('الغراوين'));
-
-        if (containsAlGhrawaynMother) {
-            // Al-Ghrawayn: Mother gets 1/3 of REMAINING after spouse
-            // Let's compute parts manually.
-            const spouseShareObj = fixedShares.find(s => s.heirType === 'husband' || s.heirType === 'wife')!;
-            const spouseParts = (spouseShareObj.num / spouseShareObj.den) * baseProblem;
-            sumFardhParts += spouseParts;
-            heirPartsMap[spouseShareObj.heirType] = { numParts: spouseParts, originalShare: spouseShareObj };
-
-            // Mother gets 1/3 of the residue
-            const residueParts = baseProblem - spouseParts;
-            const motherParts = Math.round(residueParts / 3);
-            sumFardhParts += motherParts;
-            
-            const motherShareObj = fixedShares.find(s => s.heirType === 'mother')!;
-            heirPartsMap['mother'] = { numParts: motherParts, originalShare: motherShareObj };
-
-            // Add other shares normally
-            fixedShares.forEach(s => {
-                if (s.heirType !== 'mother' && s.heirType !== 'husband' && s.heirType !== 'wife') {
-                    const parts = (s.num / s.den) * baseProblem;
-                    sumFardhParts += parts;
-                    heirPartsMap[s.heirType] = { numParts: parts, originalShare: s };
-                }
-            });
-        } else {
-            fixedShares.forEach(s => {
-                const parts = (s.num / s.den) * baseProblem;
-                sumFardhParts += parts;
-                heirPartsMap[s.heirType] = { numParts: parts, originalShare: s };
-            });
-        }
-
-        // DETERMINE AOUL (العول) VS RADD (الرد) VS ASSABA (العصبة)
-        let finalProblem = baseProblem;
-        const finalShares: CalculatedShare[] = [];
-
-        const hasAssbaResiduary = hasSons || 
-                                (getCount('grandson') > 0 && !isExcluded('grandson')) || 
-                                (getCount('full_brother') > 0 && !isExcluded('full_brother')) ||
-                                (getCount('paternal_brother') > 0 && !isExcluded('paternal_brother')) ||
-                                (getCount('paternal_uncle') > 0 && !isExcluded('paternal_uncle')) || 
-                                (getCount('paternal_cousin') > 0 && !isExcluded('paternal_cousin')) ||
-                                isFatherAssaba || 
-                                isGrandfatherAssaba ||
-                                isFullSisterAssabaWithDaughters;
-
-        if (sumFardhParts > baseProblem) {
-            // Case 1: Al-Aoul (العول) - Sum of parts exceeds base
+        // CHECK AOUL (العول)
+        if (totalFaradhUnits > baseProblem) {
             result.isAoul = true;
-            finalProblem = sumFardhParts;
-            result.finalProblem = finalProblem;
-            result.steps.push(`عالت المسألة: مجموع الفروض الشرعية (${sumFardhParts}) أكبر من أصل المسألة (${baseProblem})، لذا تم تعديل أصل المسألة عولاً إلى ${finalProblem} لتقليل كسر الأنصبة بشكل عادل.`);
+            result.finalProblem = totalFaradhUnits;
+            result.steps.push(`عول المسألة (المادة 327): زادت السهام الفرضية (${totalFaradhUnits}) عن أصل المسألة (${baseProblem}) فعالت المسألة إلى (${totalFaradhUnits}) ودخل النقص على جميع أصحاب الفروض بنسبة حصصهم.`);
 
-            // Distribute shares with upgraded denominator (Aoul)
-            for (const key in heirPartsMap) {
-                const entry = heirPartsMap[key];
-                const finalRatio = entry.numParts / finalProblem;
-                const valueOfAmount = netEstate * finalRatio;
-
-                api_pushShare(finalShares, key, entry.originalShare.label, `${entry.numParts}/${finalProblem} عولاً`, entry.numParts, finalProblem, finalRatio, valueOfAmount, entry.originalShare.ev);
-            }
-        } else if (sumFardhParts < baseProblem && !hasAssbaResiduary) {
-            // Case 2: Al-Radd (الرد) - Sum of parts is less, and no residue heirs are present (residue returned to non-spouse Fardh heirs)
-            result.isRadd = true;
-            result.steps.push(`تطبيق الرد شرعاً: مجموع الأنصبة الفرضية (${sumFardhParts}) أقل من أصل المسألة ولا توجد عصبة ذكورية، فيُرد الباقي على أصحاب الفروض (ما عدا الزوج والزوجة) استناداً للمادة 326 من قانون الأحوال الشخصية الكويتي.`);
-
-            // Spouses do not get Radd
-            const spousesParts = (heirPartsMap['husband']?.numParts || 0) + (heirPartsMap['wife']?.numParts || 0);
-            const nonSpouseParts = sumFardhParts - spousesParts;
-
-            // Compute Radd multipliers
-            for (const key in heirPartsMap) {
-                const entry = heirPartsMap[key];
-                const isSpouse = key === 'husband' || key === 'wife';
-                
-                if (isSpouse) {
-                    // Spouses get strictly their original proportion
-                    const ratio = entry.numParts / baseProblem;
-                    const amount = netEstate * ratio;
-                    api_pushShare(finalShares, key, entry.originalShare.label, `${entry.numParts}/${baseProblem} (لا يُرد عليه)`, entry.numParts, baseProblem, ratio, amount, entry.originalShare.ev);
-                } else {
-                    // Non-spouses absorb the remaining proportion
-                    const spouseRatioSum = spousesParts / baseProblem;
-                    const availableForRaddRatio = 1 - spouseRatioSum;
-                    const originalFardhRatioAmongNonSpouses = entry.numParts / nonSpouseParts;
-                    const finalRatio = originalFardhRatioAmongNonSpouses * availableForRaddRatio;
-                    const amount = netEstate * finalRatio;
-
-                    api_pushShare(
-                        finalShares, 
-                        key, 
-                        entry.originalShare.label, 
-                        `${entry.numParts}/${baseProblem} فرضاً + رداً`, 
-                        entry.numParts * baseProblem, 
-                        baseProblem * nonSpouseParts, 
-                        finalRatio, 
-                        amount, 
-                        entry.originalShare.ev
-                    );
+            rawShares.forEach(s => {
+                const units = (baseProblem / s.den) * s.num;
+                const ratio = units / totalFaradhUnits;
+                const amt = Number((estateForDistribution * ratio).toFixed(3));
+                finalShares.push({
+                    heirLabel: s.label,
+                    heirType: s.type,
+                    count: s.count,
+                    shareType: s.shareType,
+                    shareLabel: `${s.shareLabel} (مع العول: ${units}/${totalFaradhUnits})`,
+                    shareFractionNum: units,
+                    shareFractionDen: totalFaradhUnits,
+                    shareValue: ratio,
+                    amount: amt,
+                    isExcluded: false,
+                    evidence: LEGAL_EVIDENCE_DATABASE.aoul_law
+                });
+            });
+        } 
+        // CHECK MUSHTARAKAH (المسألة المشتركة)
+        else if (isMushtarakah) {
+            result.steps.push('المسألة المشتركة / الحمارية (المادة 304): إشراك الإخوة الأشقاء مع الإخوة لأم في الثلث بالسوية لاشتراكهم في رحم الأم.');
+            // Husband 1/2 (3/6), Mother 1/6 (1/6), Remainder 1/3 (2/6) shared equally between all maternal and full siblings
+            rawShares.forEach(s => {
+                if (s.type === 'husband' || s.type === 'mother' || s.type === 'maternal_grandmother') {
+                    const ratio = s.num / s.den;
+                    const amt = Number((estateForDistribution * ratio).toFixed(3));
+                    finalShares.push({
+                        heirLabel: s.label,
+                        heirType: s.type,
+                        count: s.count,
+                        shareType: s.shareType,
+                        shareLabel: s.shareLabel,
+                        shareFractionNum: s.num,
+                        shareFractionDen: s.den,
+                        shareValue: ratio,
+                        amount: amt,
+                        isExcluded: false,
+                        evidence: s.evidence
+                    });
                 }
+            });
+
+            const totalSiblings = matCount + getCount('full_brother') + getCount('full_sister');
+            const oneThirdAmt = estateForDistribution * (1/3);
+            const unitAmt = oneThirdAmt / totalSiblings;
+
+            if (matCount > 0) {
+                finalShares.push({
+                    heirLabel: `الإخوة لأم (العدد: ${matCount})`,
+                    heirType: 'maternal_sibling',
+                    count: matCount,
+                    shareType: 'faradh',
+                    shareLabel: 'شريك في الثلث بالسوية مع الأشقاء (المشتركة)',
+                    shareFractionNum: 1,
+                    shareFractionDen: 3,
+                    shareValue: (1/3) * (matCount / totalSiblings),
+                    amount: Number((unitAmt * matCount).toFixed(3)),
+                    isExcluded: false,
+                    evidence: LEGAL_EVIDENCE_DATABASE.mushtarakah
+                });
             }
-        } else {
-            // Case 3: Exactly matching OR residue goes to Assaba (تعصيب)
-            result.steps.push('توزيع الباقي بالتعصيب أو تطابق أصل المسألة بالتساوي مع أصحاب الفروض.');
-
-            // Push Fardh results
-            for (const key in heirPartsMap) {
-                const entry = heirPartsMap[key];
-                const finalRatio = entry.numParts / baseProblem;
-                const valueOfAmount = netEstate * finalRatio;
-
-                api_pushShare(finalShares, key, entry.originalShare.label, `${entry.numParts}/${baseProblem}`, entry.numParts, baseProblem, finalRatio, valueOfAmount, entry.originalShare.ev);
+            if (getCount('full_brother') > 0 || getCount('full_sister') > 0) {
+                const fullSibCount = getCount('full_brother') + getCount('full_sister');
+                finalShares.push({
+                    heirLabel: `الإخوة والأخوات الأشقاء (العدد: ${fullSibCount})`,
+                    heirType: 'full_brother',
+                    count: fullSibCount,
+                    shareType: 'special',
+                    shareLabel: 'شريك في الثلث بالسوية مع الإخوة لأم (المشتركة)',
+                    shareFractionNum: 1,
+                    shareFractionDen: 3,
+                    shareValue: (1/3) * (fullSibCount / totalSiblings),
+                    amount: Number((unitAmt * fullSibCount).toFixed(3)),
+                    isExcluded: false,
+                    evidence: LEGAL_EVIDENCE_DATABASE.mushtarakah
+                });
             }
+            result.finalProblem = baseProblem;
+        }
+        // STANDARD RESIDUE & ASABA DISTRIBUTION
+        else {
+            rawShares.forEach(s => {
+                const ratio = s.num / s.den;
+                const amt = Number((estateForDistribution * ratio).toFixed(3));
+                finalShares.push({
+                    heirLabel: s.label,
+                    heirType: s.type,
+                    count: s.count,
+                    shareType: s.shareType,
+                    shareLabel: s.shareLabel,
+                    shareFractionNum: s.num,
+                    shareFractionDen: s.den,
+                    shareValue: ratio,
+                    amount: amt,
+                    isExcluded: false,
+                    evidence: s.evidence
+                });
+            });
 
-            // Distribute Residue (التعصيب)
-            const remainingRatio = 1 - (sumFardhParts / baseProblem);
-            const residueAmount = netEstate * remainingRatio;
+            const faradhRatio = totalFaradhUnits / baseProblem;
+            let remainingRatio = Math.max(0, 1.0 - faradhRatio);
+            let residueAmount = Number((estateForDistribution * remainingRatio).toFixed(3));
 
-            if (residueAmount > 0.01) {
-                // Determine who takes residue and logic
+            if (remainingRatio > 0.0001) {
+                // Determine Asaba (العصبة)
+                // 1. Sons + Daughters (عصبة بالغير)
                 if (hasSons) {
-                    // Sons and Daughters together (Bil-Ghayr)
-                    const daughtersCount = isExcluded('daughter') ? 0 : getCount('daughter');
-                    const sonsCount = getCount('son');
-                    const totalAssabaUnits = (sonsCount * 2) + daughtersCount;
-                    
-                    if (sonsCount > 0) {
-                        const unitValue = residueAmount / totalAssabaUnits;
-                        
-                        // Add or merge to Son
-                        const sonsPercentage = (sonsCount * 2) / totalAssabaUnits * remainingRatio;
-                        api_pushShare(finalShares, 'son', `الأبناء (العدد: ${sonsCount})`, 'تعصيب بالنفس (محض الرد)', 2 * sonsCount, totalAssabaUnits, sonsPercentage, unitValue * (sonsCount * 2), LEGAL_EVIDENCE.assaba);
-
-                        // If daughters exist, they became Assaba bil Ghayr instead of Fardh
-                        if (daughtersCount > 0) {
-                            // Splice the daughters from Fardh as they are now Assaba
-                            const idx = finalShares.findIndex(sh => sh.heirType === 'daughter');
-                            if (idx > -1) finalShares.splice(idx, 1);
-
-                            const daughtersPercentage = daughtersCount / totalAssabaUnits * remainingRatio;
-                            api_pushShare(finalShares, 'daughter', `البنات (العدد: ${daughtersCount})`, 'تعصيب بالغير (للذكر مثل حظ الأنثيين)', daughtersCount, totalAssabaUnits, daughtersPercentage, unitValue * daughtersCount, LEGAL_EVIDENCE.assaba);
-                        }
-                    }
-                } else if (getCount('grandson') > 0 && !isExcluded('grandson')) {
-                    const grandsonsCount = getCount('grandson');
-                    const granddaughtersCount = isExcluded('granddaughter') ? 0 : getCount('granddaughter');
-                    const totalUnits = (grandsonsCount * 2) + granddaughtersCount;
+                    const sCount = getCount('son');
+                    const dCount = getCount('daughter');
+                    const totalUnits = (sCount * 2) + dCount;
                     const unitValue = residueAmount / totalUnits;
 
-                    api_pushShare(finalShares, 'grandson', `أبناء الابن (العدد: ${grandsonsCount})`, 'تعصيب بالنفس (ابن الابن)', 2 * grandsonsCount, totalUnits, (grandsonsCount * 2 / totalUnits) * remainingRatio, unitValue * (grandsonsCount * 2), LEGAL_EVIDENCE.assaba);
+                    finalShares.push({
+                        heirLabel: `الأبناء الذكور (العدد: ${sCount})`,
+                        heirType: 'son',
+                        count: sCount,
+                        shareType: 'assaba_ghayr',
+                        shareLabel: 'عصبة بالغير (للذكر مثل حظ الأنثيين - سهمان)',
+                        shareFractionNum: sCount * 2,
+                        shareFractionDen: totalUnits,
+                        shareValue: ((sCount * 2) / totalUnits) * remainingRatio,
+                        amount: Number((unitValue * sCount * 2).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.son_daughter_assaba_ghayr
+                    });
 
-                    if (granddaughtersCount > 0) {
-                        const idx = finalShares.findIndex(sh => sh.heirType === 'granddaughter');
-                        if (idx > -1) finalShares.splice(idx, 1);
-
-                        api_pushShare(finalShares, 'granddaughter', `بنات الابن (العدد: ${granddaughtersCount})`, 'تعصيب بالغير مع ابن الابن', granddaughtersCount, totalUnits, (granddaughtersCount / totalUnits) * remainingRatio, unitValue * granddaughtersCount, LEGAL_EVIDENCE.assaba);
+                    if (dCount > 0) {
+                        finalShares.push({
+                            heirLabel: `البنات الإناث (العدد: ${dCount})`,
+                            heirType: 'daughter',
+                            count: dCount,
+                            shareType: 'assaba_ghayr',
+                            shareLabel: 'عصبة بالغير مع الابن (للذكر مثل حظ الأنثيين - سهم واحد)',
+                            shareFractionNum: dCount,
+                            shareFractionDen: totalUnits,
+                            shareValue: (dCount / totalUnits) * remainingRatio,
+                            amount: Number((unitValue * dCount).toFixed(3)),
+                            isExcluded: false,
+                            evidence: LEGAL_EVIDENCE_DATABASE.son_daughter_assaba_ghayr
+                        });
                     }
-                } else if (isFatherAssaba || isFatherFixedWithAssaba) {
-                    // Father takes all residue
-                    const fatherIdx = finalShares.findIndex(sh => sh.heirType === 'father');
-                    if (fatherIdx > -1) {
-                        finalShares[fatherIdx].amount += residueAmount;
-                        finalShares[fatherIdx].shareValue += remainingRatio;
-                        finalShares[fatherIdx].shareLabel = 'السدس فرضاً + الباقي تعصيباً';
+                    remainingRatio = 0;
+                }
+                // 2. Father (جمع بين الفرض والتعصيب أو تعصيب محض)
+                else if (hasFather && !isExcluded('father') && !isUmariyyahWithHusband && !isUmariyyahWithWife) {
+                    if (hasFemaleDescendant) {
+                        finalShares.push({
+                            heirLabel: 'الأب (الباقي تعصيباً)',
+                            heirType: 'father',
+                            count: 1,
+                            shareType: 'assaba_nafs',
+                            shareLabel: 'الباقي تعصيباً إضافة إلى السدس فرضاً لوجود الفرع المؤنث',
+                            shareFractionNum: 1,
+                            shareFractionDen: 1,
+                            shareValue: remainingRatio,
+                            amount: residueAmount,
+                            isExcluded: false,
+                            evidence: LEGAL_EVIDENCE_DATABASE.father_1_6_plus_assaba
+                        });
                     } else {
-                        api_pushShare(finalShares, 'father', 'الأب', 'تعصيب بالنفس (عدم وجود فرع وارث)', 1, 1, remainingRatio, residueAmount, LEGAL_EVIDENCE.assaba);
+                        finalShares.push({
+                            heirLabel: 'الأب (عصبة بالنفس)',
+                            heirType: 'father',
+                            count: 1,
+                            shareType: 'assaba_nafs',
+                            shareLabel: 'الباقي تعصيباً بالنفس لانعدام الفرع الوارث',
+                            shareFractionNum: 1,
+                            shareFractionDen: 1,
+                            shareValue: remainingRatio,
+                            amount: residueAmount,
+                            isExcluded: false,
+                            evidence: LEGAL_EVIDENCE_DATABASE.father_assaba
+                        });
                     }
-                    result.steps.push('حاز الأب المتبقي من التركة بالتعصيب لعدم وجود فرع وارث ذكر.');
-                } else if (isGrandfatherAssaba || isGrandfatherFixedWithAssaba) {
-                    const gfIdx = finalShares.findIndex(sh => sh.heirType === 'paternal_grandfather');
-                    if (gfIdx > -1) {
-                        finalShares[gfIdx].amount += residueAmount;
-                        finalShares[gfIdx].shareValue += remainingRatio;
-                        finalShares[gfIdx].shareLabel = 'السدس فرضاً + الباقي تعصيباً';
-                    } else {
-                        api_pushShare(finalShares, 'paternal_grandfather', 'الجد الصحيح لأب', 'تعصيب بالنفس لعدم وجود مخرج مذكر أقرب', 1, 1, remainingRatio, residueAmount, LEGAL_EVIDENCE.assaba);
-                    }
-                } else if (isFullSisterAssabaWithDaughters) {
-                    // Full sister takes residue with daughters (Assaba Ma'a Al-Ghayr)
-                    const countSisters = getCount('full_sister');
-                    api_pushShare(finalShares, 'full_sister', `الأخوات الشقيقات (العدد: ${countSisters}) عصبة مع البنات`, 'تعصيب مع الغير مع البنات', 1, 1, remainingRatio, residueAmount, LEGAL_EVIDENCE.assaba);
-                    result.steps.push('صارت الأخت الشقيقة عصبة مع البنات استناداً للمبدأ الشرعي (اجعلوا الأخوات مع البنات عصبة).');
-                } else if (getCount('full_brother') > 0 && !isExcluded('full_brother')) {
-                    const brothersCount = getCount('full_brother');
-                    const sisterCount = isExcluded('full_sister') ? 0 : getCount('full_sister');
-                    const totalUnits = (brothersCount * 2) + sisterCount;
+                    remainingRatio = 0;
+                }
+                // 3. Full Brothers (+ Full Sisters)
+                else if (getCount('full_brother') > 0 && !isExcluded('full_brother')) {
+                    const fbCount = getCount('full_brother');
+                    const fsCount = getCount('full_sister');
+                    const totalUnits = (fbCount * 2) + fsCount;
                     const unitValue = residueAmount / totalUnits;
 
-                    api_pushShare(finalShares, 'full_brother', `الأخوة الأشقاء (العدد: ${brothersCount})`, 'تعصيب بالنفس', 2 * brothersCount, totalUnits, ((brothersCount * 2) / totalUnits) * remainingRatio, unitValue * (brothersCount * 2), LEGAL_EVIDENCE.assaba);
+                    finalShares.push({
+                        heirLabel: `الإخوة الأشقاء (العدد: ${fbCount})`,
+                        heirType: 'full_brother',
+                        count: fbCount,
+                        shareType: 'assaba_ghayr',
+                        shareLabel: 'عصبة بالغير (للذكر مثل حظ الأنثيين)',
+                        shareFractionNum: fbCount * 2,
+                        shareFractionDen: totalUnits,
+                        shareValue: ((fbCount * 2) / totalUnits) * remainingRatio,
+                        amount: Number((unitValue * fbCount * 2).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.assaba_nafs
+                    });
 
-                    if (sisterCount > 0) {
-                        const idx = finalShares.findIndex(sh => sh.heirType === 'full_sister');
-                        if (idx > -1) finalShares.splice(idx, 1);
-
-                        api_pushShare(finalShares, 'full_sister', `الشقيقات (العدد: ${sisterCount})`, 'تعصيب بالغير مع الأخ الشقيق', sisterCount, totalUnits, (sisterCount / totalUnits) * remainingRatio, unitValue * sisterCount, LEGAL_EVIDENCE.assaba);
+                    if (fsCount > 0) {
+                        finalShares.push({
+                            heirLabel: `الأخوات الشقيقات (العدد: ${fsCount})`,
+                            heirType: 'full_sister',
+                            count: fsCount,
+                            shareType: 'assaba_ghayr',
+                            shareLabel: 'عصبة بالغير مع الأخ الشقيق',
+                            shareFractionNum: fsCount,
+                            shareFractionDen: totalUnits,
+                            shareValue: (fsCount / totalUnits) * remainingRatio,
+                            amount: Number((unitValue * fsCount).toFixed(3)),
+                            isExcluded: false,
+                            evidence: LEGAL_EVIDENCE_DATABASE.assaba_nafs
+                        });
                     }
-                } else if (getCount('paternal_brother') > 0 && !isExcluded('paternal_brother')) {
-                    const brothersCount = getCount('paternal_brother');
-                    const sisterCount = isExcluded('paternal_sister') ? 0 : getCount('paternal_sister');
-                    const totalUnits = (brothersCount * 2) + sisterCount;
-                    const unitValue = residueAmount / totalUnits;
+                    remainingRatio = 0;
+                }
+                // 4. Full Sister Asaba with Daughters (عصبة مع الغير - اجعلوا الأخوات مع البنات عصبة)
+                else if (getCount('full_sister') > 0 && hasFemaleDescendant && !hasMaleDescendant && !hasFather && getCount('full_brother') === 0 && !isExcluded('full_sister')) {
+                    const fsCount = getCount('full_sister');
+                    finalShares.push({
+                        heirLabel: `الأخوات الشقيقات (العدد: ${fsCount})`,
+                        heirType: 'full_sister',
+                        count: fsCount,
+                        shareType: 'assaba_ma_alghayr',
+                        shareLabel: 'عصبة مع الغير (مع البنات الصلبيات)',
+                        shareFractionNum: 1,
+                        shareFractionDen: 1,
+                        shareValue: remainingRatio,
+                        amount: residueAmount,
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.sister_assaba_ma_alghayr
+                    });
+                    remainingRatio = 0;
+                }
+                // 5. Paternal Uncles (الأعمام الأشقاء)
+                else if (getCount('paternal_uncle') > 0 && !isExcluded('paternal_uncle')) {
+                    const uCount = getCount('paternal_uncle');
+                    finalShares.push({
+                        heirLabel: `الأعمام الأشقاء (العدد: ${uCount})`,
+                        heirType: 'paternal_uncle',
+                        count: uCount,
+                        shareType: 'assaba_nafs',
+                        shareLabel: 'عصبة بالنفس (أولى رجل ذكر)',
+                        shareFractionNum: 1,
+                        shareFractionDen: 1,
+                        shareValue: remainingRatio,
+                        amount: residueAmount,
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.assaba_nafs
+                    });
+                    remainingRatio = 0;
+                }
+                // 6. Paternal Cousins (أبناء العم الشقيق)
+                else if (getCount('paternal_cousin') > 0 && !isExcluded('paternal_cousin')) {
+                    const cCount = getCount('paternal_cousin');
+                    finalShares.push({
+                        heirLabel: `أبناء العم الشقيق (العدد: ${cCount})`,
+                        heirType: 'paternal_cousin',
+                        count: cCount,
+                        shareType: 'assaba_nafs',
+                        shareLabel: 'عصبة بالنفس (أبناء عم شقيق)',
+                        shareFractionNum: 1,
+                        shareFractionDen: 1,
+                        shareValue: remainingRatio,
+                        amount: residueAmount,
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.assaba_nafs
+                    });
+                    remainingRatio = 0;
+                }
+                // 7. RADD (الرد - المادة 326): رد الفائض على أصحاب الفروض النسبية عدا الزوجين
+                else if (remainingRatio > 0.0001) {
+                    result.isRadd = true;
+                    result.steps.push(`الرد الشرعي والقانوني (المادة 326): تبين وجود فائض في التركة قدره (${residueAmount.toLocaleString()} د.ك) دون وجود عصبة، فتم رد الفائض على أصحاب الفروض النسبية بنسبة سهامهم مع استبعاد الزوجين.`);
 
-                    api_pushShare(finalShares, 'paternal_brother', `الإخوة لأب (العدد: ${brothersCount})`, 'تعصيب للورثة لأب', 2 * brothersCount, totalUnits, ((brothersCount * 2) / totalUnits) * remainingRatio, unitValue * (brothersCount * 2), LEGAL_EVIDENCE.assaba);
+                    const nonSpouseShares = finalShares.filter(s => s.heirType !== 'husband' && s.heirType !== 'wife' && s.shareType !== 'wasiyya_wajibah');
+                    const sumNonSpouseRatio = nonSpouseShares.reduce((acc, s) => acc + s.shareValue, 0);
 
-                    if (sisterCount > 0) {
-                        const idx = finalShares.findIndex(sh => sh.heirType === 'paternal_sister');
-                        if (idx > -1) finalShares.splice(idx, 1);
-
-                        api_pushShare(finalShares, 'paternal_sister', `الأخوات لأب (العدد: ${sisterCount})`, 'تعصيب بالغير مع الأخ لأب', sisterCount, totalUnits, (sisterCount / totalUnits) * remainingRatio, unitValue * sisterCount, LEGAL_EVIDENCE.assaba);
+                    if (sumNonSpouseRatio > 0) {
+                        nonSpouseShares.forEach(s => {
+                            const addedPortion = (s.shareValue / sumNonSpouseRatio) * residueAmount;
+                            s.amount = Number((s.amount + addedPortion).toFixed(3));
+                            s.shareValue = s.amount / estateForDistribution;
+                            s.shareLabel += ' + حصة الرد';
+                            s.shareType = 'radd';
+                        });
                     }
-                } else if (getCount('paternal_uncle') > 0 && !isExcluded('paternal_uncle')) {
-                    const countUncles = getCount('paternal_uncle');
-                    api_pushShare(finalShares, 'paternal_uncle', `الأعمام الأشقاء (العدد: ${countUncles})`, 'تعصيب بالنفس (أعمام أشقاء)', 1, 1, remainingRatio, residueAmount, LEGAL_EVIDENCE.assaba);
-                } else if (getCount('paternal_cousin') > 0 && !isExcluded('paternal_cousin')) {
-                    const countCousins = getCount('paternal_cousin');
-                    api_pushShare(finalShares, 'paternal_cousin', `أبناء العم الشقيق (العدد: ${countCousins})`, 'تعصيب بالنفس (أبناء عم شقيق)', 1, 1, remainingRatio, residueAmount, LEGAL_EVIDENCE.assaba);
                 }
             }
+            result.finalProblem = baseProblem;
         }
 
         result.shares = finalShares;
         result.excludedHeirs = exclusions;
 
-    } else {
-        // MADHAB = JAFARI (الفقه الجعفري)
-        result.steps.push('تطبيق الفقه الجعفري المعتمد بالدوائر الجعفرية بمحاكم دولة الكويت.');
-        result.steps.push('التقسيم يعتمد على مبدأ طبقات الإرث المانعة لبعضها تماماً: الطبقة الأولى تمنع تماماً الطبقة الثانية، والطبقة الثانية تمنع الطبقة الثالثة.');
+    } 
+    // -------------------------------------------------------------
+    // JAFARI JURISDICTION (المذهب الجعفري - الدائرة الجعفرية بمحاكم الكويت)
+    // -------------------------------------------------------------
+    else {
+        result.steps.push('تطبيق الفقه الجعفري المعتمد بالدوائر الجعفرية بمحاكم دولة الكويت (التقسيم بالطبقات الثلاث دون عول).');
 
-        const exclusions: ExcludedHeir[] = [];
+        const exclusions: ExcludedHeir[] = [...disqualifiedHeirs];
 
-        // Class 1 (الطبقة الأولى): Parents & Descendants (الأولاد للصلب، والوالدان المباشران)
-        const hasParentsOrChildren = hasFather || hasMother || hasChildren;
-        
-        // Define Class 2 (الطبقة الثانية): Grandparents (الأجداد والجدات)، Siblings (الإخوة والأخوات وأولادهم)
-        const hasClass2InInput = getCount('paternal_grandfather') > 0 || getCount('paternal_grandmother') > 0 || getCount('maternal_grandmother') > 0 ||
-                                 getCount('full_brother') > 0 || getCount('full_sister') > 0 || getCount('paternal_brother') > 0 || getCount('paternal_sister') > 0 ||
-                                 getCount('maternal_brother') > 0 || getCount('maternal_sister') > 0;
+        // Class 1 (الطبقة الأولى): الوالدان المباشران، الأولاد للصلب وأولادهم
+        const hasClass1 = hasFather || hasMother || hasChildren;
 
-        // Class 3 (الطبقة الثالثة): Uncles & Cousins
-        const hasClass3InInput = getCount('paternal_uncle') > 0 || getCount('paternal_cousin') > 0;
+        // Class 2 (الطبقة الثانية): الأجداد والجدات، الإخوة والأخوات وأولادهم
+        const hasClass2 = getCount('paternal_grandfather') > 0 || getCount('paternal_grandmother') > 0 || getCount('maternal_grandmother') > 0 ||
+                          getCount('full_brother') > 0 || getCount('full_sister') > 0 || getCount('paternal_brother') > 0 || getCount('paternal_sister') > 0 ||
+                          getCount('maternal_brother') > 0 || getCount('maternal_sister') > 0;
 
-        if (hasParentsOrChildren) {
-            // Class 1 is active. Exclude Class 2 and Class 3 completely.
-            if (hasClass2InInput) {
-                heirs.forEach(h => {
-                    if (['paternal_grandfather', 'paternal_grandmother', 'maternal_grandmother', 'full_brother', 'full_sister', 'paternal_brother', 'paternal_sister', 'maternal_brother', 'maternal_sister'].includes(h.type) && h.count > 0) {
+        // Class 3 (الطبقة الثالثة): الأعمام والعمات، الأخوال والخالات، وأولادهم
+        const hasClass3 = getCount('paternal_uncle') > 0 || getCount('paternal_cousin') > 0;
+
+        if (hasClass1) {
+            // Class 1 is active: Completely excludes Class 2 and Class 3
+            if (hasClass2) {
+                activeHeirs.forEach(h => {
+                    if (['paternal_grandfather', 'paternal_grandmother', 'maternal_grandmother', 'full_brother', 'full_sister', 'paternal_brother', 'paternal_sister', 'maternal_brother', 'maternal_sister'].includes(h.type)) {
                         exclusions.push({
                             label: h.label,
                             type: h.type,
                             count: h.count,
-                            reason: 'يُحجب بالكامل بالمذهب الجعفري لوجود الطبقة الأولى (الأبناء أو الوالدين)',
-                            excludedBy: 'الطبقة الأولى'
+                            reason: 'يُحجب بالكامل في المذهب الجعفري لوجود الطبقة الأولى (الأولاد أو الأبوين)',
+                            excludedBy: 'الطبقة الأولى (الأولاد/الوالدان)',
+                            article: 'قضاء المحكمة الجعفرية الكويتية'
                         });
                     }
                 });
             }
-            if (hasClass3InInput) {
-                heirs.forEach(h => {
-                    if (['paternal_uncle', 'paternal_cousin'].includes(h.type) && h.count > 0) {
+            if (hasClass3) {
+                activeHeirs.forEach(h => {
+                    if (['paternal_uncle', 'paternal_cousin'].includes(h.type)) {
                         exclusions.push({
                             label: h.label,
                             type: h.type,
                             count: h.count,
-                            reason: 'يُحجب بالكامل بالمذهب الجعفري لوجود الطبقة الأولى العالية المانعة نسباً الكلالات',
-                            excludedBy: 'الطبقة الأولى'
+                            reason: 'يُحجب بالكامل لوجود الطبقة الأولى المانعة لجميع الحواشي والأعمام',
+                            excludedBy: 'الطبقة الأولى',
+                            article: 'قضاء المحكمة الجعفرية الكويتية'
                         });
                     }
                 });
             }
-        } else if (hasClass2InInput) {
-            // Class 2 active. Exclude Class 3 completely.
-            if (hasClass3InInput) {
-                heirs.forEach(h => {
-                    if (['paternal_uncle', 'paternal_cousin'].includes(h.type) && h.count > 0) {
+        } else if (hasClass2) {
+            // Class 2 is active: Completely excludes Class 3
+            if (hasClass3) {
+                activeHeirs.forEach(h => {
+                    if (['paternal_uncle', 'paternal_cousin'].includes(h.type)) {
                         exclusions.push({
                             label: h.label,
                             type: h.type,
                             count: h.count,
-                            reason: 'يُحجب بالكامل لوجود الطبقة الثانية (الإخوة أو الأجداد) بالمذهب الجعفري',
-                            excludedBy: 'الطبقة الثانية'
+                            reason: 'يُحجب بالكامل لوجود الطبقة الثانية (الإخوة أو الأجداد) في الفقه الجعفري',
+                            excludedBy: 'الطبقة الثانية',
+                            article: 'قضاء المحكمة الجعفرية الكويتية'
                         });
                     }
                 });
@@ -882,122 +1240,197 @@ export function calculateInheritance(options: {
         result.excludedHeirs = exclusions;
         const isExcluded = (type: string) => exclusions.some(e => e.type === type);
 
-        // Standard logic for Class 1 (most common)
-        const finalShares: CalculatedShare[] = [];
+        const finalShares: CalculatedShare[] = [...wasiyyahWajibahShares];
         let remainingRatio = 1.0;
 
-        // Spouses inherit in all classes in Shia Law
-        // Husband: 1/4 if descendants, 1/2 if not
+        // Spouses inherit in all classes (الزوجية لا تسقط بالطبقات)
         if (getCount('husband') > 0 && !isExcluded('husband')) {
-            const hasDesc = hasChildren;
-            const ratio = hasDesc ? 0.25 : 0.5;
+            const ratio = hasChildren ? 0.25 : 0.5;
             remainingRatio -= ratio;
-            api_pushShare(finalShares, 'husband', 'الزوج (المذهب الجعفري)', hasDesc ? '1/4 فرضاً' : '1/2 فرضاً', hasDesc ? 1 : 1, hasDesc ? 4 : 2, ratio, netEstate * ratio, LEGAL_EVIDENCE.jafari_base);
+            finalShares.push({
+                heirLabel: 'الزوج (المذهب الجعفري)',
+                heirType: 'husband',
+                count: 1,
+                shareType: 'faradh',
+                shareLabel: hasChildren ? '1/4 فرضاً لوجود الولد' : '1/2 فرضاً لعدم الولد',
+                shareFractionNum: hasChildren ? 1 : 1,
+                shareFractionDen: hasChildren ? 4 : 2,
+                shareValue: ratio,
+                amount: Number((netEstate * ratio).toFixed(3)),
+                isExcluded: false,
+                evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+            });
         }
 
-        // Wives (share the 1/8 if descendants, 1/4 if not)
         if (getCount('wife') > 0 && !isExcluded('wife')) {
-            const hasDesc = hasChildren;
-            const ratio = hasDesc ? 0.125 : 0.25;
+            const wCount = getCount('wife');
+            const ratio = hasChildren ? 0.125 : 0.25;
             remainingRatio -= ratio;
-            api_pushShare(finalShares, 'wife', `الزوجة/الزوجات (العدد: ${getCount('wife')})`, hasDesc ? '1/8 فرضاً بالتساوي' : '1/4 فرضاً بالتساوي', hasDesc ? 1 : 1, hasDesc ? 8 : 4, ratio, netEstate * ratio, LEGAL_EVIDENCE.jafari_base);
+            finalShares.push({
+                heirLabel: `الزوجة / الزوجات (العدد: ${wCount})`,
+                heirType: 'wife',
+                count: wCount,
+                shareType: 'faradh',
+                shareLabel: (hasChildren ? '1/8 فرضاً بالتساوي' : '1/4 فرضاً بالتساوي') + (wCount > 1 ? ` (بين ${wCount} زوجات)` : ''),
+                shareFractionNum: hasChildren ? 1 : 1,
+                shareFractionDen: hasChildren ? 8 : 4,
+                shareValue: ratio,
+                amount: Number((netEstate * ratio).toFixed(3)),
+                isExcluded: false,
+                evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+            });
         }
 
-        // In Class 1, parents and children inherit together.
-        const activeParents = (hasFather && !isExcluded('father') ? 1 : 0) + (hasMother && !isExcluded('mother') ? 1 : 0);
-        const sonsCount = getCount('son');
-        const daughtersCount = getCount('daughter');
+        // Class 1 Distribution
+        if (hasClass1) {
+            const sCount = getCount('son');
+            const dCount = getCount('daughter');
 
-        if (sonsCount > 0 || daughtersCount > 0) {
-            // Children exist
-            // Parents get their fixed fractions: 1/6 each if children exist
-            let parentsRatio = 0;
-            if (hasFather && !isExcluded('father')) {
-                parentsRatio += (1/6);
-                api_pushShare(finalShares, 'father', 'الأب فرضا', '1/6', 1, 6, 1/6, netEstate * (1/6), LEGAL_EVIDENCE.jafari_base);
-            }
-            if (hasMother && !isExcluded('mother')) {
-                parentsRatio += (1/6);
-                api_pushShare(finalShares, 'mother', 'الأم فرضاً', '1/6', 1, 6, 1/6, netEstate * (1/6), LEGAL_EVIDENCE.jafari_base);
-            }
+            if (sCount > 0 || dCount > 0) {
+                // Children exist
+                let parentsRatio = 0;
+                if (hasFather && !isExcluded('father')) {
+                    parentsRatio += (1/6);
+                    finalShares.push({
+                        heirLabel: 'الأب (الطبقة الأولى - جعفري)',
+                        heirType: 'father',
+                        count: 1,
+                        shareType: 'faradh',
+                        shareLabel: '1/6 فرضاً لوجود الأولاد',
+                        shareFractionNum: 1,
+                        shareFractionDen: 6,
+                        shareValue: 1/6,
+                        amount: Number((netEstate * (1/6)).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
+                }
+                if (hasMother && !isExcluded('mother')) {
+                    parentsRatio += (1/6);
+                    finalShares.push({
+                        heirLabel: 'الأم (الطبقة الأولى - جعفري)',
+                        heirType: 'mother',
+                        count: 1,
+                        shareType: 'faradh',
+                        shareLabel: '1/6 فرضاً لوجود الأولاد',
+                        shareFractionNum: 1,
+                        shareFractionDen: 6,
+                        shareValue: 1/6,
+                        amount: Number((netEstate * (1/6)).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
+                }
 
-            const childrenRatio = remainingRatio - parentsRatio;
-            const childrenValue = netEstate * childrenRatio;
+                const childrenRatio = Math.max(0, remainingRatio - parentsRatio);
+                const childrenAmt = netEstate * childrenRatio;
 
-            if (sonsCount > 0) {
-                // If there are sons, distribute according to 2:1 ratio for sons:daughters
-                const totalUnits = (sonsCount * 2) + daughtersCount;
-                const unitRatio = childrenRatio / totalUnits;
+                if (sCount > 0) {
+                    const totalUnits = (sCount * 2) + dCount;
+                    const sonRatio = ((sCount * 2) / totalUnits) * childrenRatio;
+                    finalShares.push({
+                        heirLabel: `الأبناء الذكور (العدد: ${sCount})`,
+                        heirType: 'son',
+                        count: sCount,
+                        shareType: 'assaba_ghayr',
+                        shareLabel: 'قرابة نسبية (للذكر سهمان وللأنثى سهم)',
+                        shareFractionNum: sCount * 2,
+                        shareFractionDen: totalUnits,
+                        shareValue: sonRatio,
+                        amount: Number((childrenAmt * ((sCount * 2) / totalUnits)).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
 
-                const sonFinalRatio = (2 / totalUnits) * childrenRatio;
-                api_pushShare(finalShares, 'son', `الأبناء (العدد: ${sonsCount})`, 'قرابة نسبية (ذكرين سهمين)', 2, totalUnits, sonFinalRatio * sonsCount, childrenValue * (sonsCount * 2 / totalUnits), LEGAL_EVIDENCE.jafari_base);
-
-                if (daughtersCount > 0) {
-                    const daughterFinalRatio = (1 / totalUnits) * childrenRatio;
-                    api_pushShare(finalShares, 'daughter', `البنات (العدد: ${daughtersCount})`, 'قرابة نسبية (سهم واحد)', 1, totalUnits, daughterFinalRatio * daughtersCount, childrenValue * (daughtersCount / totalUnits), LEGAL_EVIDENCE.jafari_base);
+                    if (dCount > 0) {
+                        const daughterRatio = (dCount / totalUnits) * childrenRatio;
+                        finalShares.push({
+                            heirLabel: `البنات الإناث (العدد: ${dCount})`,
+                            heirType: 'daughter',
+                            count: dCount,
+                            shareType: 'assaba_ghayr',
+                            shareLabel: 'قرابة نسبية (سهم واحد مع الأبناء)',
+                            shareFractionNum: dCount,
+                            shareFractionDen: totalUnits,
+                            shareValue: daughterRatio,
+                            amount: Number((childrenAmt * (dCount / totalUnits)).toFixed(3)),
+                            isExcluded: false,
+                            evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                        });
+                    }
+                } else {
+                    // Only daughters: Daughters take remaining by Faradh and Radd (لا عول في الجعفري)
+                    finalShares.push({
+                        heirLabel: `البنات الصلبيات (العدد: ${dCount})`,
+                        heirType: 'daughter',
+                        count: dCount,
+                        shareType: 'faradh',
+                        shareLabel: 'الفرض والرد بالقرابة (لا عول في الفقه الجعفري)',
+                        shareFractionNum: 1,
+                        shareFractionDen: 1,
+                        shareValue: childrenRatio,
+                        amount: Number(childrenAmt.toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
                 }
             } else {
-                // Only daughters exist, no sons.
-                // In Jafari law, if only daughters exist, daughters take all remaining estate, doing Radd to parents if any.
-                // Or daughters take the rest. Let's distribute daughters' share equally.
-                api_pushShare(finalShares, 'daughter', `البنات (العدد: ${daughtersCount})`, 'الفرض بالتساوي والباقي برداً', 1, 1, childrenRatio, childrenValue, LEGAL_EVIDENCE.jafari_base);
-            }
-        } else {
-            // No children, only parents survive (Class 1)
-            // Mother gets 1/3 (if no brothers of deceased to block her to 1/6)
-            // Father takes the rest by Kinship (قرابة بالنفس)
-            let motherRatio = 1/3;
-            // Blocking check: in Shia law, maternal block exists if there are 2+ full/paternal brothers or 4 sisters
-            const brothersCount = getCount('full_brother') + getCount('paternal_brother');
-            if (brothersCount >= 2) {
-                motherRatio = 1/6;
-                result.steps.push('حُجب ثلث الأم فرضاً إلى السدس لتعدد إخوة الميت في الطبقة الإضافية الشرعية.');
-            }
+                // No children: Only parents exist
+                let motherRatio = 1/3;
+                const brothersCount = getCount('full_brother') + getCount('paternal_brother');
+                if (brothersCount >= 2) {
+                    motherRatio = 1/6;
+                    result.steps.push('حُجب ثلث الأم إلى السدس لوجود حاجبين من الإخوة في الفقه الجعفري.');
+                }
 
-            if (hasMother && !isExcluded('mother')) {
-                api_pushShare(finalShares, 'mother', 'الأم فرضاً', motherRatio === 1/3 ? '1/3 فرضاً كاملاً' : '1/6 فرضاً بالحجب الزائد', motherRatio === 1/3 ? 1 : 1, motherRatio === 1/3 ? 3 : 6, motherRatio, netEstate * motherRatio, LEGAL_EVIDENCE.jafari_base);
-                remainingRatio -= motherRatio;
-            }
+                if (hasMother && !isExcluded('mother')) {
+                    finalShares.push({
+                        heirLabel: 'الأم (الطبقة الأولى)',
+                        heirType: 'mother',
+                        count: 1,
+                        shareType: 'faradh',
+                        shareLabel: motherRatio === 1/3 ? '1/3 فرضاً كاملاً' : '1/6 فرضاً بالحجب',
+                        shareFractionNum: motherRatio === 1/3 ? 1 : 1,
+                        shareFractionDen: motherRatio === 1/3 ? 3 : 6,
+                        shareValue: motherRatio,
+                        amount: Number((netEstate * motherRatio).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
+                    remainingRatio -= motherRatio;
+                }
 
-            if (hasFather && !isExcluded('father')) {
-                api_pushShare(finalShares, 'father', 'الأب قرابة نسبية', 'سهم الباقي بالقرابة', 1, 1, remainingRatio, netEstate * remainingRatio, LEGAL_EVIDENCE.jafari_base);
+                if (hasFather && !isExcluded('father')) {
+                    finalShares.push({
+                        heirLabel: 'الأب (القرابة النسبية)',
+                        heirType: 'father',
+                        count: 1,
+                        shareType: 'assaba_nafs',
+                        shareLabel: 'الباقي بالقرابة النسبية والرد',
+                        shareFractionNum: 1,
+                        shareFractionDen: 1,
+                        shareValue: remainingRatio,
+                        amount: Number((netEstate * remainingRatio).toFixed(3)),
+                        isExcluded: false,
+                        evidence: LEGAL_EVIDENCE_DATABASE.jafari_base
+                    });
+                }
             }
         }
 
         result.shares = finalShares;
     }
 
-    // Generate Intelligent Advisory Text
-    api_generateAdvisoryText(result);
+    // Generate Comprehensive Advisory Summary
+    generateAdvisorySummary(result);
 
     return result;
+}
 
-    // Inside-helpers for cleaner structure and DRY principle
-    function api_pushShare(arr: CalculatedShare[], type: string, label: string, shareLabel: string, num: number, den: number, ratio: number, amt: number, ev: any) {
-        arr.push({
-            heirLabel: label,
-            heirType: type,
-            count: getCount(type) || 1,
-            shareLabel,
-            shareFractionNum: num,
-            shareFractionDen: den,
-            shareValue: ratio,
-            amount: Math.round(amt),
-            isExcluded: false,
-            evidence: ev || { source: 'الشارع الحكيم', text: 'أحكام الإرث الشرعية', article: 'قانون الأحوال الشخصية الكويتي' }
-        });
-    }
+function generateAdvisorySummary(res: InheritanceCalculation) {
+    const eligibleText = res.shares.map(s => `${s.heirLabel}: ${s.shareLabel} بمبلغ (${s.amount.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك)`).join(' | ');
+    const excludedText = res.excludedHeirs.length > 0 ? res.excludedHeirs.map(s => `${s.label} (${s.reason})`).join(' ، ') : 'لا يوجد ورثة محجوبون في هذه المسألة.';
+    const madhabTitle = res.madhab === 'sunni' ? 'قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984 (المذهب السني)' : 'لائحة وقضاء الدائرة الجعفرية بمحاكم دولة الكويت';
 
-    function api_saveExcludedHeirs(exclusions: ExcludedHeir[]) {
-        exclusions.forEach(ex => {
-            result.steps.push(`حجب الميراث: حجب ${ex.label} (${ex.count}) بسبب وجود ${ex.excludedBy}.`);
-        });
-    }
-
-    function api_generateAdvisoryText(res: InheritanceCalculation) {
-        const eligibleNames = res.shares.map(s => `${s.heirLabel} (${(s.shareValue * 100).toFixed(1)}%)`).join(', ');
-        const excludedNames = res.excludedHeirs.length > 0 ? res.excludedHeirs.map(s => s.label).join(', ') : 'لا يوجد';
-        
-        res.advisoryText = `بناءً على المعطيات الشرعية والقانونية المدخلة، فإن إجمالي قيمة التركة المصرح بها هو ${res.totalEstate.toLocaleString()} د.ك، وتم خصم التزامات الديون والوصايا وتجهيز الميت بقيمة ${(res.totalEstate - res.netEstate).toLocaleString()} د.ك ليكون صافي التركة الصالحة للتوزيع الشرعي هو ${res.netEstate.toLocaleString()} د.ك. تم توزيع هذه التركة بناءً على ${res.madhab === 'sunni' ? 'قانون الأحوال الشخصية الكويتي (المذهب السني)' : 'لائحة المحكمة الجعفرية الكويتية (المذهب الجعفري)'}. الورثة المستحقون للتركة الحالية هم: [ ${eligibleNames} ]. بينما تم حجب الورثة التالي ذكرهم لوجود الأقرب منهم حجب حرمان شرعي وفقاً للقواعد: [ ${excludedNames} ].`;
-    }
+    res.advisoryText = `استناداً إلى معطيات التركة المصرح بها بقيمة إجمالية قدرها (${res.totalEstate.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك)، وبعد تصفية الالتزامات والديون ومصاريف التجهيز والوصايا، استقر صافي التركة المعدة للقسمة الشرعية على مبلغ (${res.netEstate.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} د.ك). تم إجراء التوزيع الشرعي والقانوني وفقاً لأحكام [${madhabTitle}]. السهام والأنصبة المقررة: [${eligibleText}]. حالة الحجب والموانع: [${excludedText}].`;
 }

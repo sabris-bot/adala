@@ -154,61 +154,61 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
     <div className="space-y-6" dir={isAr ? 'rtl' : 'ltr'}>
       
       {/* Dynamic Summary Cards Grid (Bento Style) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border p-4.5 rounded-[20px] flex items-center justify-between border-slate-150">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-right">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-[2rem] flex items-center justify-between transition-all duration-300 shadow-sm">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase">{isAr ? 'متوسط الأداء الكادري' : 'Average Score'}</span>
-            <span className="text-xl font-black text-[#00796B] font-sans">{averageOverallScore.toFixed(2)} <span className="text-[10px] text-slate-400">/ 5.0</span></span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-450 font-black block uppercase">{isAr ? 'متوسط الأداء الكادري' : 'Average Score'}</span>
+            <span className="text-xl font-black text-[#00796B] dark:text-emerald-400 font-sans">{averageOverallScore.toFixed(2)} <span className="text-[10px] text-slate-400 dark:text-slate-450">/ 5.0</span></span>
           </div>
-          <Award className="w-10 h-10 text-[#00796B] bg-[#E0F2F1] p-2 rounded-xl" />
+          <Award className="w-10 h-10 text-[#00796B] dark:text-emerald-400 bg-[#E0F2F1] dark:bg-[#00796B]/20 p-2 rounded-2xl" />
         </div>
 
-        <div className="bg-white border p-4.5 rounded-[20px] flex items-center justify-between border-slate-150">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-[2rem] flex items-center justify-between transition-all duration-300 shadow-sm">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase">{isAr ? 'نسبة إنجاز خطط التطوير' : 'Plans Progress'}</span>
-            <span className="text-xl font-black text-[#00796B] font-sans">
+            <span className="text-[10px] text-slate-400 dark:text-slate-450 font-black block uppercase">{isAr ? 'نسبة إنجاز خطط التطوير' : 'Plans Progress'}</span>
+            <span className="text-xl font-black text-emerald-600 dark:text-emerald-400 font-sans">
               {developmentPlans.length > 0 
                 ? (developmentPlans.reduce((sum, p) => sum + (p.progress || 0), 0) / developmentPlans.length).toFixed(0)
                 : '82'
               }%
             </span>
           </div>
-          <CheckCircle2 className="w-10 h-10 text-emerald-600 bg-emerald-50 p-2 rounded-xl" />
+          <CheckCircle2 className="w-10 h-10 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 p-2 rounded-2xl" />
         </div>
 
-        <div className="bg-white border p-4.5 rounded-[20px] flex items-center justify-between border-slate-150">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-[2rem] flex items-center justify-between transition-all duration-300 shadow-sm">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase">{isAr ? 'الملفات المعتمدة المغلقة' : 'Certified Dossiers'}</span>
-            <span className="text-xl font-black text-slate-800 font-mono">{totalCertifiedCount} / {appraisals.length}</span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-450 font-black block uppercase">{isAr ? 'الملفات المعتمدة المغلقة' : 'Certified Dossiers'}</span>
+            <span className="text-xl font-black text-slate-800 dark:text-white font-mono">{totalCertifiedCount} / {appraisals.length}</span>
           </div>
-          <TrendingUp className="w-10 h-10 text-[#004D40] bg-[#E0F2F1] p-2 rounded-xl" />
+          <TrendingUp className="w-10 h-10 text-[#004D40] dark:text-teal-400 bg-[#E0F2F1] dark:bg-[#004D40]/20 p-2 rounded-2xl" />
         </div>
 
-        <div className="bg-white border p-4.5 rounded-[20px] flex items-center justify-between border-slate-150">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-5 rounded-[2rem] flex items-center justify-between transition-all duration-300 shadow-sm">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold block uppercase">{isAr ? 'مستهدد الأهداف المبرمة' : 'Target Goals'}</span>
-            <span className="text-xl font-black text-[#00796B] font-mono">{goals.length || 5} <span className="text-[10px] text-slate-400">{isAr ? 'أهداف نشطة' : 'Active'}</span></span>
+            <span className="text-[10px] text-slate-400 dark:text-slate-450 font-black block uppercase">{isAr ? 'مستهدف الأهداف المبرمة' : 'Target Goals'}</span>
+            <span className="text-xl font-black text-[#00796B] dark:text-emerald-400 font-mono">{goals.length || 5} <span className="text-[10px] text-slate-400 dark:text-slate-450">{isAr ? 'أهداف نشطة' : 'Active'}</span></span>
           </div>
-          <div className="w-10 h-10 text-[#00796B] bg-[#E0F2F1] rounded-xl flex items-center justify-center font-bold text-xs font-mono">KPI</div>
+          <div className="w-10 h-10 text-[#00796B] dark:text-emerald-400 bg-[#E0F2F1] dark:bg-[#00796B]/20 rounded-2xl flex items-center justify-center font-black text-[10px] font-mono">KPI</div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 text-right">
         
         {/* KPI Averages of core competencies */}
-        <div className="bg-white border rounded-[22px] p-5 border-slate-150">
-          <h4 className="text-xs font-black text-slate-800 mb-4 flex items-center gap-1.5 border-b pb-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#00796B]" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-6 shadow-sm transition-all duration-300">
+          <h4 className="text-xs font-black text-slate-900 dark:text-white mb-4 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#00796B] dark:bg-emerald-500 animate-pulse" />
             <span>{isAr ? 'تحليل معدل أداء الكفاءات الاستشارية (KPIs)' : 'Core Advisory Competency Average (KPI)'}</span>
           </h4>
           <div className="h-64 font-sans text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={kpiAverages} margin={{ left: -20, bottom: 0, top: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis dataKey="name" stroke="#94A3B8" />
-                <YAxis domain={[0, 5]} stroke="#94A3B8" />
-                <Tooltip />
-                <Bar dataKey="value" fill="#00796B" radius={[4, 4, 0, 0]}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
+                <XAxis dataKey="name" stroke="#94A3B8" tick={{ fontSize: 9, fontWeight: 'bold' }} />
+                <YAxis domain={[0, 5]} stroke="#94A3B8" tick={{ fontSize: 9, fontWeight: 'bold' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#00796B', borderRadius: '12px', color: '#fff', fontSize: '11px', textAlign: 'right' }} />
+                <Bar dataKey="value" fill="#00796B" radius={[6, 6, 0, 0]}>
                   {kpiAverages.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
@@ -219,19 +219,19 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
         </div>
 
         {/* History progression scale */}
-        <div className="bg-white border rounded-[22px] p-5 border-slate-150">
-          <h4 className="text-xs font-black text-slate-800 mb-4 flex items-center gap-1.5 border-b pb-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#004D40]" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-6 shadow-sm transition-all duration-300">
+          <h4 className="text-xs font-black text-slate-900 dark:text-white mb-4 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#004D40] dark:bg-emerald-400 animate-pulse" />
             <span>{isAr ? 'تطور مستويات الأداء التراكمي عبر الزمن' : 'Performance Trajectory Evolution Over Time'}</span>
           </h4>
           <div className="h-64 font-sans text-[10px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={historicalTrends} margin={{ left: -20, bottom: 0, top: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
-                <XAxis dataKey="period" stroke="#94A3B8" />
-                <YAxis domain={[1, 5]} stroke="#94A3B8" />
-                <Tooltip />
-                <Legend />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148, 163, 184, 0.15)" />
+                <XAxis dataKey="period" stroke="#94A3B8" tick={{ fontSize: 9, fontWeight: 'bold' }} />
+                <YAxis domain={[1, 5]} stroke="#94A3B8" tick={{ fontSize: 9, fontWeight: 'bold' }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#00796B', borderRadius: '12px', color: '#fff', fontSize: '11px', textAlign: 'right' }} />
+                <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 'bold' }} />
                 <Line type="monotone" dataKey="average" name={isAr ? 'متوسط النتيجة الكلية للفترة' : 'Cumulative Score Avg'} stroke="#00796B" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
               </LineChart>
             </ResponsiveContainer>
@@ -239,9 +239,9 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
         </div>
 
         {/* Ratio of Achievement (Goals & Target progress) */}
-        <div className="bg-white border rounded-[22px] p-5 border-slate-150">
-          <h4 className="text-xs font-black text-slate-800 mb-4 flex items-center gap-1.5 border-b pb-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-6 shadow-sm transition-all duration-300">
+          <h4 className="text-xs font-black text-slate-900 dark:text-white mb-4 flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 dark:bg-emerald-400 animate-pulse" />
             <span>{isAr ? 'مسارات ونسبة تحقيق الأهداف الاستباقية' : 'Goal Proactive Achievement Quotient'}</span>
           </h4>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 font-sans text-[10px]">
@@ -258,10 +258,10 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
                     dataKey="value"
                   >
                     {goalAchievement.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={index === 0 ? '#00796B' : '#E2E8F0'} />
+                      <Cell key={`cell-${index}`} fill={index === 0 ? '#00796B' : 'rgba(148, 163, 184, 0.2)'} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={{ backgroundColor: '#1e293b', borderColor: '#00796B', borderRadius: '12px', color: '#fff', fontSize: '11px', textAlign: 'right' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -269,13 +269,13 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
               {goalAchievement.map((entry, index) => (
                 <div key={entry.name} className="flex justify-between items-center text-xs font-bold font-sans">
                   <div className="flex items-center gap-2">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: index === 0 ? '#00796B' : '#E2E8F0' }} />
-                    <span className="text-slate-650">{entry.name}</span>
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: index === 0 ? '#00796B' : 'rgba(148, 163, 184, 0.3)' }} />
+                    <span className="text-slate-650 dark:text-slate-300">{entry.name}</span>
                   </div>
-                  <span className="font-mono text-[#00796B] text-sm">{entry.value}</span>
+                  <span className="font-mono text-[#00796B] dark:text-emerald-400 text-sm">{entry.value}</span>
                 </div>
               ))}
-              <div className="border-t pt-3 font-sans text-[11px] font-semibold text-slate-450 leading-relaxed">
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-3 font-sans text-[11px] font-semibold text-slate-450 dark:text-slate-400 leading-relaxed">
                 {isAr ? '✔ تم تسجيل وربط مسار الأداء بـ ٣ إنجازات بموجب قانون العمل الكويتي.' : '✔ Registered in sync with Kuwait Ministry of Social Affairs regulations.'}
               </div>
             </div>
@@ -283,15 +283,15 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
         </div>
 
         {/* Narrative analytics - qualitative analysis */}
-        <div className="bg-white border rounded-[22px] p-5 border-slate-150 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-[2rem] p-6 shadow-sm transition-all duration-300 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-3.5" dir="rtl">
-            <span className="text-[9.5px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1 rounded inline-block uppercase">
+            <span className="text-[9.5px] font-black text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100/30 dark:border-emerald-500/20 px-3 py-1 rounded-md inline-block uppercase">
               {isAr ? '👍 أبرز مفاصل القوة الفعالة' : '👍 TOP OUTSTANDING STRENGTHS'}
             </span>
             <div className="space-y-2">
               {dynamicStrengths.map((str, idx) => (
-                <div key={idx} className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-semibold text-slate-700 leading-normal flex items-start gap-1.5">
-                  <span className="text-emerald-500 font-black">✔</span>
+                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800 rounded-2xl text-[11px] font-bold text-slate-700 dark:text-slate-300 leading-normal flex items-start gap-1.5">
+                  <span className="text-emerald-500 dark:text-emerald-400 font-black">✔</span>
                   <span>{str}</span>
                 </div>
               ))}
@@ -299,13 +299,13 @@ export const PerformanceReportsSuite: React.FC<PerformanceReportsSuiteProps> = (
           </div>
 
           <div className="space-y-3.5 text-right" dir="rtl">
-            <span className="text-[9.5px] font-black text-amber-700 bg-amber-50 border border-amber-100 px-3 py-1 rounded inline-block uppercase">
+            <span className="text-[9.5px] font-black text-amber-700 dark:text-amber-400 bg-amber-50/60 dark:bg-amber-500/10 border border-amber-100/30 dark:border-amber-500/20 px-3 py-1 rounded-md inline-block uppercase">
               {isAr ? '⚠️ مجالات التطوير وإدارات الرقابة' : '⚠️ RECOMMENDED TRAINING PATHS'}
             </span>
             <div className="space-y-2">
               {improvementAreas.map((imp, idx) => (
-                <div key={idx} className="p-2.5 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-semibold text-slate-700 leading-normal flex items-start gap-1.5">
-                  <span className="text-amber-500 font-black">⚡</span>
+                <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950/40 border border-slate-150 dark:border-slate-800 rounded-2xl text-[11px] font-bold text-slate-700 dark:text-slate-300 leading-normal flex items-start gap-1.5">
+                  <span className="text-amber-500 dark:text-amber-400 font-black"> must-know </span>
                   <span>{imp}</span>
                 </div>
               ))}

@@ -146,6 +146,8 @@ export const PaperAirplaneIcon = createIcon(<path strokeLinecap="round" strokeLi
 export const GlobeAltIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9s2.015-9 4.5-9m0 0a9.004 9.004 0 018.716 2.253M12 3a9.004 9.004 0 00-8.716 2.253m0 0A8.966 8.966 0 0112 6c1.725 0 3.32-.487 4.674-1.332m-9.348 0A8.966 8.966 0 0012 6c1.725 0 3.32-.487 4.674-1.332" />);
 export const ArrowPathIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />);
 export const ArrowUpRightIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0V15.75" />);
+export const ArrowTopRightOnSquareIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />);
+export const ArrowRightOnRectangleIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l3 3m0 0l-3 3m3-3H2.25" />);
 export const ArrowDownRightIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M4.5 4.5l15 15m0 0V8.25m0 11.25H8.25" />);
 export const MinusCircleIcon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />);
 export const Bars3Icon = createIcon(<path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />);
@@ -476,6 +478,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     icon: BuildingOffice2Icon,
     children: [
         { name: 'العقارات والوحدات', translationKey: 'properties_units', path: '/property-management', icon: HomeIcon },
+        { name: 'التفتيش الميداني للعقار', translationKey: 'field_inspection', path: '/property-management/inspections', icon: CameraIcon },
         { name: 'تسوية الديون', translationKey: 'debt_settlement', path: '/property-management/debt-settlement', icon: BanknotesIcon },
         { name: 'صيانة العقارات', translationKey: 'maintenance', path: '/property-management/maintenance', icon: WrenchScrewdriverIcon },
         { name: 'وثائق العقارات', translationKey: 'property_documents', path: '/property-management/property-documents', icon: FolderIcon },
@@ -520,6 +523,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     sectionHeader: 'الأدوات الرقمية',
     sectionTranslationKey: 'digital_tools',
     children: [
+        { name: 'المنظومة القضائية الرقمية (دبي)', translationKey: 'smart_judicial_system', path: '/smart-judicial-system', icon: GavelIcon },
         { name: 'الرول الآلي', translationKey: 'automated_docket', path: '/automated-docket', icon: CalendarDaysIcon },
         { name: 'بحث بوابة العدل', translationKey: 'moj_search', path: '/moj-search', icon: MagnifyingGlassIcon },
         { name: 'تتبع الأطراف', translationKey: 'party_tracking', path: '/party-tracking', icon: MapPinIcon },
@@ -554,10 +558,16 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     icon: DocumentDuplicateIcon
   },
   {
-    name: 'منظومة الطباعة والصكوك',
+    name: 'استوديو السندات',
     translationKey: 'deeds_printing_studio',
     path: '/deeds-print',
     icon: PrinterIcon
+  },
+  {
+    name: 'منشئ التوكيلات الرسمية',
+    translationKey: 'kuwait_poa_generator',
+    path: '/kuwait-poa',
+    icon: IdentificationIcon
   },
   {
     name: 'الإدارة المالية',

@@ -29,6 +29,7 @@ import { useJurisdiction } from '../components/JurisdictionContext';
 import PrintHeader from '../components/ui/PrintHeader';
 import { initialCases } from '../data/caseData';
 import { geminiService } from '../services/geminiService';
+import { GanttChartCalendar } from '../components/ui/GanttChartCalendar';
 import { 
   CaseStatus, 
   CasePriority, 
@@ -380,7 +381,7 @@ const getStatusColor = (status: DeadlineStatus) => {
 export default function LegalDeadlinesPage() {
   
   // Tabs State
-  const [activeTab, setActiveTab] = useState<'calculator' | 'prescription' | 'tracked' | 'insights'>('calculator');
+  const [activeTab, setActiveTab] = useState<'calculator' | 'prescription' | 'tracked' | 'insights' | 'gantt'>('calculator');
   
   // Common states
   const [searchTerm, setSearchTerm] = useState('');
@@ -1023,9 +1024,32 @@ export default function LegalDeadlinesPage() {
           <BellAlertIcon className="w-4 h-4" />
           سيناريوهات ومثائل استرشادية
         </button>
+        <button
+          onClick={() => { setActiveTab('gantt'); setAiAnalysisText(''); }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+            activeTab === 'gantt' 
+              ? 'bg-amber-500 text-slate-950 font-bold shadow-md' 
+              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+          }`}
+        >
+          <CalendarIcon className="w-4 h-4" />
+          تقويم Gantt المرئي وتضارب المواعيد
+        </button>
       </div>
 
       <AnimatePresence mode="wait">
+        
+        {/* TAB 0: GANTT CHART CALENDAR & CONFLICT DETECTION */}
+        {activeTab === 'gantt' && (
+          <motion.div
+            key="gantt"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+          >
+            <GanttChartCalendar />
+          </motion.div>
+        )}
         
         {/* TAB 1: JUDICIAL & PROCEDURAL CALCULATOR */}
         {activeTab === 'calculator' && (

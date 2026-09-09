@@ -28,7 +28,9 @@ import {
     UserPlus,
     Moon,
     Sun,
-    ExternalLink
+    ExternalLink,
+    Mic,
+    MicOff
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -46,6 +48,10 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const [isListening, setIsListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string>('');
 
   // Unified global search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +84,103 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const startVoiceSearch = () => {
+    const isAr = i18n.language === 'ar';
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceError(isAr ? 'البحث الصوتي غير مدعوم في هذا المتصفح' : 'Voice search is not supported in this browser');
+      setTimeout(() => setVoiceError(null), 3000);
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = i18n.language === 'ar' ? 'ar-KW' : 'en-US';
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setVoiceStatus(isAr ? 'جاري الاستماع... تحدّث الآن' : 'Listening... Speak now');
+        setVoiceError(null);
+      };
+
+      recognition.onerror = (event: any) => {
+        console.error('Speech recognition error', event);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          setVoiceError(isAr ? 'يرجى السماح بالوصول للميكروفون' : 'Please allow microphone access');
+        } else {
+          setVoiceError(isAr ? 'حدث خطأ في التعرف على الصوت' : 'Voice recognition error');
+        }
+        setTimeout(() => {
+          setVoiceError(null);
+          setVoiceStatus('');
+        }, 3000);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript && transcript.trim()) {
+          const queryText = transcript.trim();
+          setSearchQuery(queryText);
+          setIsSearchFocused(true);
+          setVoiceStatus(isAr ? `تم التقاط: "${queryText}"` : `Captured: "${queryText}"`);
+
+          // Look up instant exact matches
+          const { items } = GlobalSearchEngine.search({ searchTerm: queryText });
+          
+          if (items.length > 0) {
+            // Find if there is an exact or very strong match (e.g., matching caseNumber or name exactly)
+            const exactMatch = items.find(
+              item => 
+                item.number.toLowerCase() === queryText.toLowerCase() ||
+                item.name.toLowerCase() === queryText.toLowerCase() ||
+                (item.client && item.client.toLowerCase() === queryText.toLowerCase())
+            );
+
+            if (exactMatch) {
+              setVoiceStatus(isAr ? `جاري الانتقال لـ: ${exactMatch.name}` : `Navigating to: ${exactMatch.name}`);
+              setTimeout(() => {
+                navigate(exactMatch.link);
+                setIsSearchFocused(false);
+                setVoiceStatus('');
+              }, 1500);
+            } else {
+              setVoiceStatus(isAr ? `جاري الانتقال لنتائج البحث...` : `Navigating to search results...`);
+              setTimeout(() => {
+                navigate(`/search?q=${encodeURIComponent(queryText)}`);
+                setIsSearchFocused(false);
+                setVoiceStatus('');
+              }, 1500);
+            }
+          } else {
+            setVoiceStatus(isAr ? `جاري الانتقال لنتائج البحث...` : `Navigating to search results...`);
+            setTimeout(() => {
+              navigate(`/search?q=${encodeURIComponent(queryText)}`);
+              setIsSearchFocused(false);
+              setVoiceStatus('');
+            }, 1500);
+          }
+        }
+      };
+
+      recognition.start();
+    } catch (e) {
+      console.error(e);
+      setVoiceError(isAr ? 'فشل بدء تشغيل التعرف على الصوت' : 'Failed to start speech recognition');
+      setIsListening(false);
+      setTimeout(() => {
+        setVoiceError(null);
+        setVoiceStatus('');
+      }, 3000);
+    }
+  };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,10 +309,29 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
               onFocus={() => setIsSearchFocused(true)}
               onBlur={() => setTimeout(() => setIsSearchFocused(false), 250)}
               placeholder={t('search_placeholder', { defaultValue: "ابحث في النظام..." })}
-              className="w-full ps-11 pe-12 py-2.5 bg-gray-50 dark:bg-dm-background border border-gray-100 dark:border-gray-700 rounded-2xl 
+              className="w-full ps-11 pe-24 py-2.5 bg-gray-50 dark:bg-dm-background border border-gray-100 dark:border-gray-700 rounded-2xl 
                          text-xs text-gray-700 dark:text-dm-text placeholder-gray-400
                          focus:ring-4 focus:ring-primary/5 focus:border-primary/20 transition-all text-right font-bold"
             />
+            {/* Microphone Voice Search Button */}
+            <div className="absolute inset-y-0 end-12 flex items-center">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  startVoiceSearch();
+                }}
+                className={`p-1.5 rounded-lg transition-all flex items-center justify-center ${
+                  isListening 
+                    ? 'bg-rose-500 text-white animate-pulse shadow-md ring-4 ring-rose-500/20' 
+                    : 'text-gray-400 hover:text-primary hover:bg-gray-100 dark:hover:bg-dm-background'
+                }`}
+                title={i18n.language === 'ar' ? 'البحث الصوتي الذكي' : 'Smart Voice Search'}
+              >
+                <Mic className="w-3.5 h-3.5" />
+              </button>
+            </div>
             <div className="absolute inset-y-0 end-3 flex items-center select-none pointer-events-none">
                <div className="px-1.5 py-0.5 bg-white dark:bg-dm-card border border-gray-100 dark:border-gray-800 rounded-md shadow-sm">
                   <span className="text-[9px] font-black text-gray-300 font-mono tracking-tighter">⌘K</span>
@@ -217,6 +339,25 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, isSidebarOpen }) => {
             </div>
           </div>
         </form>
+
+        {/* Voice Search Status Overlay */}
+        <AnimatePresence>
+          {(isListening || voiceStatus || voiceError) && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className={`absolute right-0 left-0 -bottom-10 mx-auto px-4 py-1.5 rounded-xl text-[10px] font-black text-center shadow-lg border flex items-center justify-center gap-1.5 z-40 ${
+                voiceError
+                  ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-900/40'
+                  : 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-accent border-primary/20 bg-white'
+              }`}
+            >
+              {isListening && <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />}
+              <span>{voiceError || voiceStatus}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Live Search Floating List */}
         <AnimatePresence>

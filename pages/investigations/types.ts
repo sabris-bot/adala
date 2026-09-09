@@ -39,12 +39,16 @@ export interface InvestigationSessionQuestion {
 export interface InvestigationSession {
     id: string;
     sessionDate: string;
+    sessionTime?: string;
     partyName: string;
-    partyType: 'employee' | 'witness'; // الموظف المتهم أو الشاهد
+    partyType: 'employee' | 'witness'; // الموظف المشكو بحقه أو الشاهد
     questions: InvestigationSessionQuestion[];
     notes?: string;
     digitalSignature?: string; // توقيع إلكتروني للطرف
-    isOathTaken?: boolean; // حلف اليمين (للشهود)
+    isOathTaken?: boolean; // حلف اليمين (للشهود أو إثبات الأقوال للمادة 115)
+    investigatorName?: string; // اسم المحقق
+    investigatorSignatureData?: string; // صورة التوقيع أو توقيع خطي مولد للمحقق
+    partySignatureData?: string; // صورة التوقيع أو توقيع خطي مولد للمستجوب
 }
 
 export interface InvestigationCase {
@@ -53,6 +57,7 @@ export interface InvestigationCase {
     subject: string;
     employeeId: string;
     employeeName: string;
+    civilId?: string;
     employeeJobTitle: string;
     employeeDepartment: string;
     investigator: string;
@@ -67,6 +72,7 @@ export interface InvestigationCase {
     sessions: InvestigationSession[];
     recommendation: string;
     proposedPenalty: string;
+    deductionDays?: number;
     approvedByInvestigator: boolean;
     approvedByLegalManager: boolean;
     approvedByGeneralManager: boolean;
@@ -74,4 +80,11 @@ export interface InvestigationCase {
     customDocTemplateContent?: string;
     category?: string; // تصنيف المخالفة الرئيسي
     safeguards?: LegalSafeguards; // صمام الأمان والضمانات
+    facts?: string; // وقائع ومجريات التحقيق التفصيلية
+    parties?: string; // أطراف التحقيق الأخرى أو المذكورة
+    associatedDates?: string; // التواريخ القانونية المرتبطة بالواقعة
+    confidentialNotes?: string; // ملاحظات سرية وخاصة بالمحامي
+    legalReferences?: string[];
+    isTransferredToDisciplinary?: boolean; // هل تم ترحيل القرار لسجل الجزاءات والتظلمات
+    transferredRecordNumber?: string;
 }

@@ -1,219 +1,281 @@
-import React, { useMemo } from 'react';
-import { Investigation } from '../../types';
+import React, { useMemo, useState } from 'react';
 import { OFFICE_NAME } from '../../constants';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
-import { PrinterIcon } from 'lucide-react';
+import { Printer, ShieldCheck, QrCode, FileText, CheckCircle2, FileCheck, Scale, Award } from 'lucide-react';
+import { InvestigationCase } from './types';
 
 interface InvestigationPrintModalProps {
-    investigation: Investigation | null;
+    investigation: InvestigationCase | null;
     onClose: () => void;
 }
 
 export const InvestigationPrintModal: React.FC<InvestigationPrintModalProps> = ({ investigation, onClose }) => {
-    if (!investigation) return null;
+    const [printDocType, setPrintDocType] = useState<'transcript' | 'resolution' | 'summons'>('transcript');
 
-    // Load dynamic office name to keep it synchronized with the rest of any printable items
-    const officeNameAr = useMemo(() => {
-        try {
-            const savedOffice = localStorage.getItem('profile_office_info');
-            if (savedOffice) {
-                const parsed = JSON.parse(savedOffice);
-                if (parsed.name) return parsed.name;
-            }
-        } catch (e) {
-            console.error('Failed to load dynamic office name in InvestigationPrintModal', e);
-        }
-        return OFFICE_NAME;
-    }, []);
+    if (!investigation) return null;
 
     const formatDate = (dateStr?: string) => {
         if (!dateStr) return 'غير محدد';
-        return new Date(dateStr).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+        try {
+            return new Date(dateStr).toLocaleDateString('ar-KW', { year: 'numeric', month: 'long', day: 'numeric' });
+        } catch {
+            return dateStr;
+        }
     };
 
     const handlePrint = () => {
         const printContent = document.getElementById("printable-prosecution-report");
         if (printContent) {
-            const printWindow = window.open('', '', 'height=700,width=900');
+            const printWindow = window.open('', '', 'height=800,width=1000');
             if (printWindow) {
-                printWindow.document.write('<html><head><title>محضر التحقيق الإداري الرسمي</title>');
+                printWindow.document.write('<!DOCTYPE html><html dir="rtl" lang="ar"><head><title>مكتب المحامي صبري شطا - محضر التحقيق الرسمي</title>');
                 printWindow.document.write('<style>');
                 printWindow.document.write(`
-                    body { font-family: "Georgia", serif; direction: rtl; padding: 50px; color: #1e293b; background-color: #fff; line-height: 1.6; }
-                    .prosecution-border { border: 4px double #0f172a; padding: 30px; border-radius: 8px; position: relative; }
-                    .watermark { position: absolute; transform: translate(-50%, -50%) rotate(-45deg); opacity: 0.05; font-size: 80px; font-weight: 900; top: 50%; left: 50%; color: #ef4444; text-transform: uppercase; z-index: 100; pointer-events: none; white-space: nowrap; }
-                    .header-flex { display: flex; justify-content: space-between; border-bottom: 2px solid #0f172a; padding-bottom: 15px; margin-bottom: 25px; }
-                    .central-seal { text-align: center; font-size: 26px; font-weight: 900; letter-spacing: 1px; margin-bottom: 30px; text-shadow: 1px 1px #e2e8f0; }
-                    .meta-block { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 35px; background: #f8fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 6px; }
-                    .details-title { font-weight: 900; border-right: 4px solid #1e293b; padding-right: 12px; margin: 25px 0 15px 0; background: #f1f5f9; padding-top: 5px; padding-bottom: 5px; }
-                    .session-item { border: 1px solid #cbd5e1; border-radius: 6px; padding: 20px; margin-bottom: 25px; background: #fff; }
-                    .qa-block { margin-top: 15px; margin-right: 20px; border-right: 2px solid #cbd5e1; padding-right: 15px; }
-                    .stamp-grid { display: flex; justify-content: space-between; margin-top: 50px; }
-                    .stamp-circle { width: 100px; height: 100px; border: 2px dashed #94a3b8; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #94a3b8; }
+                    @import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Tajawal:wght@400;500;700;900&display=swap');
+                    * { box-sizing: border-box; margin: 0; padding: 0; }
+                    body { font-family: 'Tajawal', sans-serif; direction: rtl; padding: 35px; color: #0f172a; background-color: #fff; line-height: 1.6; }
+                    .print-container { border: 2px solid #0f172a; padding: 30px; border-radius: 4px; position: relative; }
+                    .gold-stripe { height: 5px; background: linear-gradient(90deg, #C19A5B, #dfba73, #C19A5B); margin: 15px 0 25px 0; border-radius: 2px; }
+                    .header-flex { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 15px; }
+                    .seal-box { border: 2px solid #C19A5B; padding: 12px; border-radius: 8px; text-align: center; width: 140px; background: #faf8f5; }
+                    .title-center { text-align: center; margin: 20px 0; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-weight: 900; font-size: 18px; }
+                    .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; background: #f8fafc; padding: 15px; border-radius: 6px; border: 1px solid #e2e8f0; font-size: 13px; }
+                    .qa-item { border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px; margin-bottom: 12px; background: #fff; }
+                    .q-text { font-weight: bold; color: #0f172a; margin-bottom: 6px; font-size: 13px; }
+                    .a-text { font-weight: normal; color: #334155; padding-right: 15px; font-size: 13px; }
+                    .signatures-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 40px; text-align: center; font-size: 12px; }
+                    .signature-box { border-top: 1px solid #0f172a; padding-top: 8px; margin-top: 50px; font-weight: bold; }
+                    @media print {
+                        body { padding: 15px; }
+                        button { display: none; }
+                    }
                 `);
                 printWindow.document.write('</style></head><body>');
                 printWindow.document.write(printContent.innerHTML);
                 printWindow.document.write('</body></html>');
                 printWindow.document.close();
-                printWindow.print();
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                }, 400);
             }
         }
     };
 
     return (
-        <Modal isOpen={!!investigation} onClose={onClose} title="محضر تحقيق رسمي (جاهز للطباعة)" size="xl">
-            <div className="p-1" dir="rtl">
-                <div id="printable-prosecution-report" className="relative p-8 bg-white text-slate-900 border-4 border-double border-slate-950 font-serif text-right max-h-[70vh] overflow-y-auto">
-                    {/* Watermark */}
-                    <div className="watermark select-none pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rotate-[-40deg] opacity-[0.03] text-rose-600 text-7xl font-black whitespace-nowrap tracking-widest z-0">
-                        سِرّي للغاية وموثق
+        <Modal isOpen={!!investigation} onClose={onClose} title="محرر ومحرك الطباعة الرسمي (صيغة معتمدة)" size="xl">
+            <div className="space-y-4 text-right" style={{ direction: 'rtl' }}>
+                
+                {/* Document Type Selector Bar */}
+                <div className="flex items-center justify-between bg-slate-100 p-2 rounded-xl border border-slate-200">
+                    <div className="flex items-center gap-1.5">
+                        <button
+                            onClick={() => setPrintDocType('transcript')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                printDocType === 'transcript' ? 'bg-slate-900 text-amber-400 shadow-xs' : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            <FileText className="w-3.5 h-3.5 ml-1 inline-block" />
+                            محضر التحقيق وسماع الأقوال
+                        </button>
+                        <button
+                            onClick={() => setPrintDocType('resolution')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                printDocType === 'resolution' ? 'bg-slate-900 text-amber-400 shadow-xs' : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            <Scale className="w-3.5 h-3.5 ml-1 inline-block" />
+                            مذكرة القرار والتوصية التأديبية
+                        </button>
+                        <button
+                            onClick={() => setPrintDocType('summons')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                printDocType === 'summons' ? 'bg-slate-900 text-amber-400 shadow-xs' : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                        >
+                            <FileCheck className="w-3.5 h-3.5 ml-1 inline-block" />
+                            إعلان استدعاء رسمي للجلسة
+                        </button>
                     </div>
 
-                    <div className="relative z-10">
-                        {/* Legal Header */}
-                        <div className="header-flex flex justify-between items-start border-b-2 border-slate-950 pb-4 mb-6 text-sm">
-                            <div className="space-y-1">
-                                <h2 className="text-xl font-black">{officeNameAr}</h2>
-                                <p className="text-xs font-bold text-[#134D41]">عدالة - منظومة الإدارة القانونية المتكاملة v3 | الإدارة القانونية</p>
-                                <p className="text-[10px] text-slate-400">موطد بأحكام المرسوم بقانون رقم 6 لسنة 2010</p>
-                            </div>
-                            <div className="text-left font-mono text-xs">
-                                <p><strong>رقم التحقيق:</strong> {investigation.investigationNumber}</p>
-                                <p><strong>تاريخ بدء الاستدلال:</strong> {new Date(investigation.startDate).toLocaleDateString('ar-EG')}</p>
-                                <p><strong>حالة القضية:</strong> {investigation.status}</p>
-                            </div>
-                        </div>
-
-                        {/* Title Section */}
-                        <div className="central-seal text-center py-4 mb-6 bg-slate-50 border rounded-xl">
-                            <h1 className="text-2xl font-black underline underline-offset-4 tracking-wide text-slate-900">محضر تفصيلي للتحقيق الإداري الرسمي</h1>
-                            <p className="text-[10px] text-slate-400 mt-2 font-black">(محرر وموثق في السجلات الإدارية بوزارة العدل والعمل الكويتية)</p>
-                        </div>
-
-                        {/* Metadata block */}
-                        <div className="meta-block grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 border rounded-xl mb-6">
-                            <div>
-                                <p><strong>أولاً: رئيس سلطة التحقيق:</strong> {investigation.investigator}</p>
-                                <p className="mt-2"><strong>ثانياً: موضوع ووقائع الملف:</strong> {investigation.subject}</p>
-                                <p className="mt-2"><strong>ثالثاً: الموظف المحال للتحقيق:</strong> {investigation.employeeName || "غير محدد"}</p>
-                            </div>
-                            <div>
-                                <p><strong>رابعاً: الإدارية والوظيفية:</strong> {investigation.employeeDepartment || "الإدارة العمالية"}</p>
-                                <p className="mt-2"><strong>خامساً: مقدم الشكوى والادعاء:</strong> {investigation.complainantName || "بدون اسم مباشر"}</p>
-                                <p className="mt-2"><strong>سادساً: المسمى الوظيفي للمتهم:</strong> {investigation.employeeJobTitle || "وظيفة إدارية"}</p>
-                            </div>
-                        </div>
-
-                        {/* Legal References */}
-                        {(investigation.legalReferences && investigation.legalReferences.length > 0) && (
-                            <div className="mb-6">
-                                <h3 className="details-title font-bold text-base bg-slate-50 py-1 pr-2 border-r-4 border-slate-900 mb-2">الأسانيد القانونية ومخالفة لوائح المنشأة:</h3>
-                                <div className="flex flex-wrap gap-2 pr-4 text-xs font-sans text-slate-700 font-bold">
-                                    {investigation.legalReferences.map((refStr, idx) => (
-                                        <span key={idx} className="bg-slate-100 border px-3 py-1.5 rounded-lg">■ {refStr}</span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Narrative Summary */}
-                        <div className="mb-6">
-                            <h3 className="details-title font-bold text-base bg-slate-50 py-1 pr-2 border-r-4 border-slate-900 mb-2">وقائع الاستدلال والدفوع الثبوتية (ملخص الواقعة):</h3>
-                            <p className="text-sm leading-relaxed text-slate-800 pr-4 whitespace-pre-wrap">{investigation.summary || "لم يتم تدوين ملخص وقائع شامل حتى الآن."}</p>
-                        </div>
-
-                        {/* Sessions Logs */}
-                        <div className="mb-6">
-                            <h3 className="details-title font-bold text-base bg-slate-50 py-1 pr-2 border-r-4 border-slate-900 mb-4">جلسات التحقيق التفصيلية وسؤال وإجابات الأطراف المعنية:</h3>
-                            {investigation.sessions.map((session, sIdx) => (
-                                <div key={session.id} className="session-item mb-4 border p-4 rounded-xl bg-slate-50/50">
-                                    <div className="flex justify-between items-center bg-slate-200/50 p-2 rounded-lg font-bold text-xs mb-3">
-                                        <span>الجلسة رقم ({sIdx + 1}) - تاريخ: {formatDate(session.sessionDate)} | التوقيت: {session.sessionTime || "10:00 صباحاً"}</span>
-                                        <span>المستجوب: {session.partyName} ({session.partyType})</span>
-                                    </div>
-                                    <div className="space-y-4 pr-3">
-                                        {session.questions.map((q, qIdx) => (
-                                            <div key={q.id}>
-                                                <p className="font-bold text-slate-900 text-sm">سؤال ({qIdx + 1}): {q.questionText}</p>
-                                                <p className="mr-8 mt-1 text-slate-700 italic border-r-2 border-slate-300 pr-3">{q.answerText || "(لم يرد بأي إجابة قانونية)"}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {/* Embedded Signatures within this session */}
-                                    <div className="grid grid-cols-2 gap-6 mt-6 border-t pt-4 text-[11px] font-sans font-black text-slate-500 text-center">
-                                        <div className="flex flex-col items-center">
-                                            <p className="mb-2">توقيع المستجوب / الشاهد بيده</p>
-                                            {session.partySignature ? (
-                                                <img src={session.partySignature} alt="Party Signature" className="h-12 object-contain bg-slate-100 p-1 border rounded" />
-                                            ) : (
-                                                <p className="text-xs text-slate-400 italic">........................</p>
-                                            )}
-                                        </div>
-                                        <div className="flex flex-col items-center">
-                                            <p className="mb-2">توقيع المحقق المعتمد</p>
-                                            {session.investigatorSignature ? (
-                                                <img src={session.investigatorSignature} alt="Investigator Signature" className="h-12 object-contain bg-slate-100 p-1 border rounded" />
-                                            ) : (
-                                                <p className="text-xs text-slate-400 italic">........................</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                            {investigation.sessions.length === 0 && (
-                                <p className="text-center text-slate-400 py-6 text-xs italic">لم يتم إلحاق أي جلسات تحقيق رسمية بهذا الملف بعد.</p>
-                            )}
-                        </div>
-
-                        {/* Evidence section */}
-                        {(investigation.evidence && investigation.evidence.length > 0) && (
-                            <div className="mb-6">
-                                <h3 className="details-title font-bold text-base bg-slate-50 py-1 pr-2 border-r-4 border-slate-900 mb-2">أحراز الإثبات والمرفقات المعتمدة (القرائن الفنية):</h3>
-                                <ul className="list-decimal list-inside text-xs pr-4 space-y-1.5 font-sans font-bold text-slate-800">
-                                    {investigation.evidence.map((ev, evIdx) => (
-                                        <li key={ev.id} className="bg-slate-50 p-2 rounded border">
-                                            <span>{ev.name} ({ev.type}) ({ev.dateAdded})</span>
-                                            {ev.notes && <span className="block text-[10px] text-slate-500 mt-1 font-sans">{ev.notes}</span>}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Final Recommendation */}
-                        {investigation.recommendation && (
-                            <div className="mt-8 border-4 border-slate-950 p-6 bg-slate-50 rounded-xl">
-                                <h3 className="text-lg font-black mb-3 underline underline-offset-4 decoration-2">الرأي والتوصيات القانونية الختامية:</h3>
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{investigation.recommendation}</p>
-                            </div>
-                        )}
-
-                        {/* Signatures & seals section */}
-                        <div className="stamp-grid flex justify-between items-end pt-12 text-sm border-t border-slate-200 mt-12">
-                            <div className="text-center w-48">
-                                <p className="font-bold mb-10">مدير الإدارة القانونية</p>
-                                <p className="text-xs text-slate-400">.............................</p>
-                            </div>
-                            <div className="stamp-circle">
-                                ختم لجنة التحقيق
-                            </div>
-                            <div className="text-center w-48">
-                                <p className="font-bold mb-10">التصديق العام والوزاري</p>
-                                <p className="text-xs text-slate-400">.............................</p>
-                            </div>
-                        </div>
-
-                        <div className="mt-16 pt-3 border-t text-[10px] text-slate-400 text-center font-mono">
-                            منهج عدالة القانوني للدفاع والنيابة الكونية للأفراد - الكود الاستدلالي الرقمي: ADF-GEN-{investigation.id}
-                        </div>
-                    </div>
+                    <Button
+                        size="sm"
+                        variant="primary"
+                        className="bg-amber-600 hover:bg-amber-700 text-slate-950 font-black text-xs px-4 py-2 rounded-xl"
+                        onClick={handlePrint}
+                    >
+                        <Printer className="w-4 h-4 ml-1.5 inline-block" />
+                        طباعة المستند الرسمي (PDF)
+                    </Button>
                 </div>
 
-                <div className="flex justify-end gap-3 mt-4 pt-4 border-t">
-                    <Button variant="outline" onClick={onClose}>إغلاق</Button>
-                    <Button variant="primary" onClick={handlePrint} leftIcon={<PrinterIcon className="w-4 h-4" />}>بدء الطباعة القانونية</Button>
+                {/* Printable Document Preview Canvas */}
+                <div id="printable-prosecution-report" className="relative p-8 bg-white text-slate-900 border-2 border-slate-900 font-sans text-right max-h-[65vh] overflow-y-auto rounded-lg shadow-inner">
+                    
+                    {/* Official Kuwait Law Office Header */}
+                    <div className="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+                        <div className="space-y-1 text-right">
+                            <h1 className="text-lg font-black text-slate-950">مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</h1>
+                            <h2 className="text-xs font-bold text-slate-700">دولة الكويت • قطاع الامتثال والتحقيقات الإدارية والعمالية</h2>
+                            <p className="text-[10px] font-bold text-emerald-800">منظومة الإدارة القانونية والامتثال «عدالة»</p>
+                            <p className="text-[9px] text-slate-400">محرر وفق أحكام القانون رقم 6 لسنة 2010 بشأن العمل في القطاع الأهلي</p>
+                        </div>
+
+                        {/* Digital Verification & QR Seal */}
+                        <div className="border border-amber-600/60 bg-amber-50/40 p-2.5 rounded-xl text-center space-y-1 w-36 shrink-0">
+                            <div className="w-10 h-10 mx-auto bg-slate-900 text-amber-400 rounded-lg flex items-center justify-center font-mono font-bold text-xs">
+                                QR
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-slate-700 block">{investigation.caseNumber}</span>
+                            <span className="text-[8px] font-bold text-emerald-700 block">✓ موثق إلكترونياً</span>
+                        </div>
+                    </div>
+
+                    {/* Kuwait Gold Stripe Accent */}
+                    <div className="h-1 w-full bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600 my-3 rounded-full" />
+
+                    {/* Title block depending on document type */}
+                    {printDocType === 'transcript' && (
+                        <>
+                            <div className="text-center py-2 bg-slate-50 border border-slate-200 rounded-lg my-4">
+                                <h2 className="text-base font-black text-slate-900">محضر رسمي لسماع أقوال واستجواب</h2>
+                                <p className="text-[10px] text-slate-500 font-bold">جلسة تحقيق إداري مستوفية لكافة الضمانات اللائحية</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs my-3">
+                                <div>
+                                    <p><strong>رقم التحقيق:</strong> <span className="font-mono">{investigation.caseNumber}</span></p>
+                                    <p className="mt-1"><strong>المحقق المختص:</strong> {investigation.investigator}</p>
+                                    <p className="mt-1"><strong>المشكو في حقه:</strong> {investigation.employeeName} ({investigation.employeeJobTitle})</p>
+                                </div>
+                                <div>
+                                    <p><strong>تاريخ بدء التحقيق:</strong> {formatDate(investigation.startDate)}</p>
+                                    <p className="mt-1"><strong>الرقم المدني:</strong> <span className="font-mono">{investigation.civilId || '292000000000'}</span></p>
+                                    <p className="mt-1"><strong>الإدارة / القسم:</strong> {investigation.employeeDepartment}</p>
+                                </div>
+                            </div>
+
+                            <div className="my-4 text-xs space-y-1">
+                                <h3 className="font-black text-slate-900 bg-slate-100 p-1.5 rounded border-r-4 border-slate-900">موضوع وبلاغ الواقعة:</h3>
+                                <p className="p-2 text-slate-800 leading-relaxed font-sans">{investigation.subject}</p>
+                            </div>
+
+                            <div className="my-4 text-xs space-y-1">
+                                <h3 className="font-black text-slate-900 bg-slate-100 p-1.5 rounded border-r-4 border-slate-900">سرد الوقائع والاستدلالات:</h3>
+                                <p className="p-2 text-slate-800 leading-relaxed font-sans">{investigation.facts || "تم الاستماع لأقوال الأطراف وتثبيت الإفادات بالمحضر."}</p>
+                            </div>
+
+                            {/* Q&A Transcripts */}
+                            <div className="my-4 space-y-2">
+                                <h3 className="font-black text-xs text-slate-900 bg-slate-100 p-1.5 rounded border-r-4 border-slate-900">نص تفريغ الأسئلة والأجوبة (الاستجواب):</h3>
+                                {(investigation.sessions && investigation.sessions.length > 0) ? (
+                                    investigation.sessions.map((sess, sIdx) => (
+                                        <div key={sIdx} className="space-y-2 pt-2">
+                                            <div className="text-[11px] font-bold text-amber-900 bg-amber-50 p-1.5 rounded border border-amber-200">
+                                                الجلسة رقم ({sIdx + 1}) مع: {sess.partyName} ({sess.partyType === 'employee' ? 'المستجوب المشكو في حقه' : 'الشاهد'})
+                                            </div>
+                                            {sess.questions?.map((q, qIdx) => (
+                                                <div key={qIdx} className="border border-slate-200 rounded p-2.5 text-xs space-y-1 bg-white">
+                                                    <p className="font-bold text-slate-900">{q.question}</p>
+                                                    <p className="text-slate-700 pr-4">{q.answer}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-xs text-slate-500 p-2">لم يتم تدوين جلسات استجواب بالملف بعد.</p>
+                                )}
+                            </div>
+                        </>
+                    )}
+
+                    {printDocType === 'resolution' && (
+                        <>
+                            <div className="text-center py-2 bg-slate-50 border border-slate-200 rounded-lg my-4">
+                                <h2 className="text-base font-black text-slate-900">مذكرة الرأي القانوني والقرار التأديبي المعتمد</h2>
+                                <p className="text-[10px] text-slate-500 font-bold">بموجب المادتين 35 و 102 من قانون العمل الكويتي رقم 6 لسنة 2010</p>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 bg-slate-50/80 p-3 rounded-lg border border-slate-200 text-xs my-3">
+                                <div>
+                                    <p><strong>رقم القرار:</strong> <span className="font-mono">{investigation.caseNumber}</span></p>
+                                    <p className="mt-1"><strong>الموظف الصادر بحقه الجزاء:</strong> {investigation.employeeName}</p>
+                                    <p className="mt-1"><strong>المسمى الوظيفي:</strong> {investigation.employeeJobTitle}</p>
+                                </div>
+                                <div>
+                                    <p><strong>تاريخ صدور القرار:</strong> {formatDate(investigation.endDate || investigation.startDate)}</p>
+                                    <p className="mt-1"><strong>الرقم المدني:</strong> <span className="font-mono">{investigation.civilId || '292000000000'}</span></p>
+                                    <p className="mt-1"><strong>الإدارة:</strong> {investigation.employeeDepartment}</p>
+                                </div>
+                            </div>
+
+                            <div className="my-4 text-xs space-y-2">
+                                <h3 className="font-black text-slate-900 bg-slate-100 p-1.5 rounded border-r-4 border-slate-900">التكييف القانوني والأسباب:</h3>
+                                <p className="p-2 text-slate-800 leading-relaxed font-sans">
+                                    {investigation.recommendation || "ثبت للجنة التحقيق قيام الموظف بالمخالفة المنسوبة إليه بعد سماع دفاعه ومواجهته بالأدلة، مما يستوجب توقيع الجزاء المناسب لائحياً."}
+                                </p>
+                            </div>
+
+                            <div className="my-4 text-xs space-y-2">
+                                <h3 className="font-black text-slate-900 bg-slate-100 p-1.5 rounded border-r-4 border-slate-900">منطوق القرار التأديبي:</h3>
+                                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs font-bold text-amber-950">
+                                    {investigation.proposedPenalty || "توقيع الجزاء اللائحي المقرر وفقاً لسلم المخالفات"}
+                                </div>
+                            </div>
+
+                            <div className="my-4 text-[11px] text-slate-600 bg-slate-50 p-3 rounded border">
+                                <strong>تنبيه قانوني بشأن التظلم (المادة 102):</strong> يحق للموظف التظلم من هذا القرار خلال 20 يوماً من تاريخ إخطاره به رسمياً أمام لجنة التظلمات المركزية بالمنشأة.
+                            </div>
+                        </>
+                    )}
+
+                    {printDocType === 'summons' && (
+                        <>
+                            <div className="text-center py-2 bg-slate-50 border border-slate-200 rounded-lg my-4">
+                                <h2 className="text-base font-black text-slate-900">إعلان رسمي واستدعاء لحضور جلسة تحقيق</h2>
+                                <p className="text-[10px] text-slate-500 font-bold">وفقاً لأحكام المادة 35 من قانون العمل رقم 6 لسنة 2010</p>
+                            </div>
+
+                            <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 text-xs leading-relaxed space-y-3 my-4">
+                                <p><strong>إلى السيد / السيدة:</strong> {investigation.employeeName} المحترم</p>
+                                <p><strong>المسمى الوظيفي:</strong> {investigation.employeeJobTitle} • <strong>الإدارة:</strong> {investigation.employeeDepartment}</p>
+                                <p className="pt-2">
+                                    بناءً على الشكوى الإدارية المقيدة برقم (<span className="font-mono font-bold">{investigation.caseNumber}</span>)، يرجى الحضور إلى مقر قطاع الامتثال والتحقيقات بمكتب صبري شطا للمحاماة، وذلك في تمام الساعة العاشرة صباحاً، للإدلاء بأقوالكم وسماع دفاعكم بشأن واقعة:
+                                </p>
+                                <div className="p-2.5 bg-white border rounded font-bold text-slate-900">
+                                    "{investigation.subject}"
+                                </div>
+                                <p className="text-[10px] text-rose-700 font-bold">
+                                    * يعتبر هذا الإخطار استدعاءً رسمياً، وفي حال عدم الحضور دون عذر معتمد سيتم استكمال التحقيق وفقاً للمستندات القائمة.
+                                </p>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Official Signatures Block */}
+                    <div className="grid grid-cols-3 gap-4 pt-10 border-t border-slate-300 text-center text-xs">
+                        <div className="space-y-12">
+                            <p className="font-bold text-slate-900">المحقق الإداري المختص</p>
+                            <p className="text-[11px] font-mono text-slate-600 border-t border-slate-300 pt-1 mx-4">
+                                {investigation.investigator || 'أ. صبري شطا'}
+                            </p>
+                        </div>
+
+                        <div className="space-y-12">
+                            <p className="font-bold text-slate-900">الموظف / المستجوب</p>
+                            <p className="text-[11px] font-mono text-slate-600 border-t border-slate-300 pt-1 mx-4">
+                                {investigation.employeeName}
+                            </p>
+                        </div>
+
+                        <div className="space-y-12">
+                            <p className="font-bold text-slate-900">اعتماد إدارة المنشأة</p>
+                            <p className="text-[11px] font-mono text-slate-600 border-t border-slate-300 pt-1 mx-4">
+                                الختم الرسمي والتوقيع
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </Modal>

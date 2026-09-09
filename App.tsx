@@ -5,11 +5,9 @@ import Sidebar from './components/layout/Sidebar';
 import Header from './components/layout/Header';
 import Footer from './components/layout/Footer';
 import MainContent from './components/layout/MainContent';
-import { useCaseTask } from './components/CaseTaskContext';
 import { notificationService } from './services/notificationService';
-import { BellAlertIcon, XCircleIcon, ExclamationTriangleIcon } from './constants'; // Icons
-import { AdminTaskStatus, LeaseAgreementStatus, NotificationPriority, NotificationCategory } from './types';
-import { mockLeaseAgreements } from './data/propertyData';
+import { ExclamationTriangleIcon } from './constants';
+import { NotificationPriority, NotificationCategory } from './types';
 
 // Error Boundary Component
 interface EBProps { children: ReactNode; }
@@ -24,22 +22,32 @@ class AppErrorBoundary extends Component<EBProps, EBState> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-10 text-center">
-          <div className="bg-white p-10 rounded-3xl shadow-2xl border border-rose-100 max-w-lg">
-            <div className="bg-rose-100 text-rose-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <ExclamationTriangleIcon className="w-10 h-10" />
+        <div className="flex flex-col items-center justify-center min-h-[60vh] p-6 text-center">
+          <div className="bg-white dark:bg-dm-card p-8 rounded-2xl shadow-xl border border-rose-200 dark:border-rose-900/50 max-w-lg w-full">
+            <div className="bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5">
+              <ExclamationTriangleIcon className="w-8 h-8" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 mb-2">عصراً، حدث خطأ غير متوقع</h2>
-            <p className="text-slate-500 mb-8 leading-relaxed">نأسف، يبدو أن هناك مشكلة فنية تمنع عرض هذا القسم حالياً. تم تسجيل الخطأ للمراجعة.</p>
-            <div className="bg-slate-50 p-4 rounded-xl text-left font-mono text-[10px] text-rose-500 overflow-auto mb-8 max-h-32">
-              {this.state.error?.toString()}
+            <h2 className="text-xl font-black text-slate-900 dark:text-white mb-2">عفواً، حدث تنبيه فني غير متوقع</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 leading-relaxed">
+              نأسف لحدوث هذا الاستثناء. تم عزل الخطأ لضمان استقرار بقية أقسام النظام. يمكنك إعادة المحاولة أو الانتقال للصفحة الرئيسية.
+            </p>
+            <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl text-left font-mono text-[11px] text-rose-600 dark:text-rose-400 overflow-auto mb-6 max-h-28 border border-slate-200 dark:border-slate-800" dir="ltr">
+              {this.state.error?.message || this.state.error?.toString()}
             </div>
-            <button 
-              onClick={() => window.location.href = '/dashboard'}
-              className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/10"
-            >
-              العودة للرئيسية
-            </button>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => this.setState({ hasError: false })}
+                className="flex-1 bg-accent-dark hover:bg-accent text-white py-3 rounded-xl font-bold transition-all shadow-md text-sm"
+              >
+                إعادة المحاولة
+              </button>
+              <button 
+                onClick={() => window.location.href = '/dashboard'}
+                className="flex-1 bg-primary hover:bg-primary-light text-white py-3 rounded-xl font-bold transition-all shadow-md text-sm"
+              >
+                الرئيسية
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -55,6 +63,7 @@ import CaseDetailsPage from './pages/CaseDetailsPage';
 import ContractAnalysisPage from './pages/ContractAnalysisPage';
 import LegalResourcesPage from './pages/LegalResourcesPage'; // Added import
 import SettingsPage from './pages/SettingsPage';
+import AdvancedAutomationPage from './pages/AdvancedAutomationPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ProfilePage from './pages/ProfilePage';
 import AiAssistantPage from './pages/AiAssistantPage';
@@ -80,6 +89,7 @@ import AutomatedDocketPage from './pages/AutomatedDocketPage'; // New Automated 
 import MojSearchPage from './pages/MojSearchPage'; // New MOJ Search Page
 import GlobalSearchPage from './pages/GlobalSearchPage'; // New Global System-wide Search Page
 import LitigationToolsPage from './pages/LitigationToolsPage';
+import SmartJudicialSystemPage from './pages/SmartJudicialSystemPage';
 
 
 // Employee Affairs Sub-modules
@@ -97,12 +107,15 @@ import PayrollManagementPage from './pages/PayrollManagementPage';
 import PropertyMaintenancePage from './pages/PropertyMaintenancePage';
 import PropertySpecificReportsPage from './pages/PropertySpecificReportsPage';
 import PropertyDocumentsPage from './pages/PropertyDocumentsPage';
+import { PropertyFieldInspectionPage } from './pages/PropertyFieldInspectionPage';
 
 // New Tools Pages
 import LegalDeadlinesPage from './pages/LegalDeadlinesPage';
+import LegalGanttChartPage from './pages/LegalGanttChartPage';
 import LegalFinancialCalculatorPage from './pages/LegalFinancialCalculatorPage';
 import InheritanceCalculatorPage from './pages/InheritanceCalculatorPage';
 import { DeedsPrintingStudioPage } from './pages/DeedsPrintingStudioPage';
+import KuwaitPoaGeneratorPage from './pages/KuwaitPoaGeneratorPage';
 
 
 // Removed old manual toast components
@@ -159,8 +172,6 @@ const AppContent: React.FC = () => {
     const interval = setInterval(checkVersion, 15 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
-
-  const { hearings, tasks } = useCaseTask();
 
   useEffect(() => {
     // Update theme
@@ -254,22 +265,44 @@ const AppContent: React.FC = () => {
                 <Route path="/employee-affairs/leave-management" element={<LeaveManagementPage />} />
                 <Route path="/employee-affairs/loans" element={<LoanManagementPage />} />
                 <Route path="/employee-affairs/disciplinary" element={<DisciplinaryActionsPage />} />
+                <Route path="/employee-affairs/disciplinary-actions" element={<DisciplinaryActionsPage />} />
                 <Route path="/employee-affairs/investigations" element={<InvestigationsPage />} />
                 <Route path="/employee-affairs/performance" element={<EmployeePerformancePage />} />
                 <Route path="/employee-affairs/requests" element={<EmployeeRequestsPage />} />
                 <Route path="/employee-affairs/recruitment" element={<RecruitmentHiringPage />} />
                 <Route path="/employee-affairs/contracts" element={<EmployeeContractsPage />} />
                 <Route path="/employee-affairs/payroll" element={<PayrollManagementPage />} />
+
+                {/* HR Aliases for direct /hr access */}
+                <Route path="/hr" element={<EmployeeAffairsPage />} />
+                <Route path="/hr/profiles" element={<EmployeeProfilePage />} />
+                <Route path="/hr/end-of-service" element={<EndOfServicePage />} />
+                <Route path="/hr/leave-management" element={<LeaveManagementPage />} />
+                <Route path="/hr/loans" element={<LoanManagementPage />} />
+                <Route path="/hr/disciplinary" element={<DisciplinaryActionsPage />} />
+                <Route path="/hr/disciplinary-actions" element={<DisciplinaryActionsPage />} />
+                <Route path="/hr/investigations" element={<InvestigationsPage />} />
+                <Route path="/hr/performance" element={<EmployeePerformancePage />} />
+                <Route path="/hr/requests" element={<EmployeeRequestsPage />} />
+                <Route path="/hr/recruitment" element={<RecruitmentHiringPage />} />
+                <Route path="/hr/contracts" element={<EmployeeContractsPage />} />
+                <Route path="/hr/payroll" element={<PayrollManagementPage />} />
                 
                 <Route path="/litigation-tools" element={<LitigationToolsPage initialTab="dashboard" />} />
+                <Route path="/court-hearing-simulator" element={<LitigationToolsPage initialTab="court_hearing_simulator" />} />
+                <Route path="/hearing-simulator" element={<LitigationToolsPage initialTab="court_hearing_simulator" />} />
+                <Route path="/litigation-simulator" element={<LitigationToolsPage initialTab="litigation_simulator" />} />
+                <Route path="/smart-judicial-system" element={<SmartJudicialSystemPage />} />
                 <Route path="/kba" element={<KuwaitBarAssociationPage />} /> 
                 <Route path="/legal-representation" element={<LegalRepresentationPage />} /> 
                 <Route path="/notifications" element={<NotificationsManagementPage />} /> 
                 <Route path="/legal-forms" element={<LegalFormsPage />} />
                 <Route path="/deeds-print" element={<DeedsPrintingStudioPage />} />
+                <Route path="/kuwait-poa" element={<KuwaitPoaGeneratorPage />} />
                 <Route path="/resources" element={<LegalResourcesPage />} /> 
                 
                 <Route path="/property-management" element={<PropertyManagementPage />} />
+                <Route path="/property-management/inspections" element={<PropertyFieldInspectionPage />} />
                 <Route path="/property-management/debt-settlement" element={<DebtSettlementPage />} />
                 <Route path="/property-management/maintenance" element={<PropertyMaintenancePage />} />
                 <Route path="/property-management/reports" element={<PropertySpecificReportsPage />} />
@@ -290,14 +323,20 @@ const AppContent: React.FC = () => {
                 <Route path="/admin-tools" element={<AdminToolsPage />} />
                 <Route path="/admin-tools/tasks" element={<TaskManagementPage />} />
                 <Route path="/admin-tools/contacts" element={<ContactsPage />} />
+                <Route path="/admin-tools/gantt" element={<LegalGanttChartPage />} />
+                <Route path="/gantt-chart" element={<LegalGanttChartPage />} />
+                <Route path="/legal-gantt-chart" element={<LegalGanttChartPage />} />
                 
                 <Route path="/tools/legal-deadlines" element={<LegalDeadlinesPage />} />
                 <Route path="/tools/court-fees" element={<LegalFinancialCalculatorPage />} />
                 <Route path="/tools/legal-interests" element={<LegalFinancialCalculatorPage />} />
                 <Route path="/tools/legal-financial-calc" element={<LegalFinancialCalculatorPage />} />
                 <Route path="/tools/inheritance" element={<InheritanceCalculatorPage />} />
+                <Route path="/inheritance" element={<InheritanceCalculatorPage />} />
 
                 <Route path="/settings" element={<SettingsPage toggleDarkMode={toggleDarkMode} isDarkMode={isDarkMode} />} /> 
+                <Route path="/settings/automation" element={<AdvancedAutomationPage />} />
+                <Route path="/automation-rules" element={<AdvancedAutomationPage />} /> 
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>

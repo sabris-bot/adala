@@ -203,8 +203,71 @@ const ViewMaintenanceRequestModal: React.FC<{ request: MaintenanceRequest | null
     );
 };
 
+const QuickStatusUpdateModal: React.FC<{
+    request: MaintenanceRequest | null;
+    onClose: () => void;
+    onUpdateStatus: (id: string, newStatus: MaintenanceStatus, notes?: string, vendor?: string) => void;
+}> = ({ request, onClose, onUpdateStatus }) => {
+    const [status, setStatus] = useState<MaintenanceStatus>(request?.status || MaintenanceStatus.IN_PROGRESS);
+    const [notes, setNotes] = useState('');
+    const [vendor, setVendor] = useState(request?.assignedToVendorName || '');
+
+    useEffect(() => {
+        if (request) {
+            setStatus(request.status);
+            setVendor(request.assignedToVendorName || '');
+        }
+    }, [request]);
+
+    if (!request) return null;
+
+    return (
+        <Modal isOpen={!!request} onClose={onClose} title={`تحديث حالة بلاغ الصيانة #${request.id}`} size="md">
+            <div className="space-y-4 text-xs">
+                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                    <p className="font-bold text-slate-800 dark:text-slate-100">{request.propertyName} - {request.propertyUnitName || 'العقار ككل'}</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-0.5">{request.description}</p>
+                </div>
+
+                <div>
+                    <label className="font-bold text-slate-700 dark:text-slate-300 block mb-1">الحالة الجديدة للطلب:</label>
+                    <Select
+                        value={status}
+                        options={maintenanceStatusOptions}
+                        onChange={(e) => setStatus(e.target.value as MaintenanceStatus)}
+                    />
+                </div>
+
+                <Input
+                    label="المقاول / الفني المسند إليه"
+                    value={vendor}
+                    onChange={(e) => setVendor(e.target.value)}
+                    placeholder="اسم الشركة أو الفني المختص"
+                />
+
+                <TextArea
+                    label="ملاحظات التحديث / تفاصيل الإنجاز"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="أدخل أي ملاحظات حول جاري العمل أو استكمال الصيانة..."
+                    rows={3}
+                />
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
+                    <Button size="sm" onClick={() => {
+                        onUpdateStatus(request.id, status, notes, vendor);
+                        onClose();
+                    }}>حفظ الحالة الجديدة</Button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 
 const PropertyMaintenancePage: React.FC = () => {
+  const { addToast } = useToast();
   const [requests, setRequests] = useState<MaintenanceRequest[]>(mockMaintenanceRequests);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<MaintenanceStatus | ''>('');
@@ -215,6 +278,7 @@ const PropertyMaintenancePage: React.FC = () => {
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<Partial<MaintenanceRequest> | null>(null);
   const [viewingRequest, setViewingRequest] = useState<MaintenanceRequest | null>(null);
+  const [statusUpdateRequest, setStatusUpdateRequest] = useState<MaintenanceRequest | null>(null);
 
   const filteredRequests = useMemo(() => {
     return requests.filter(req =>
@@ -237,8 +301,29 @@ const PropertyMaintenancePage: React.FC = () => {
   const handleDeleteRequest = useCallback((id: string) => {
     if (window.confirm('هل أنت متأكد أنك تريد حذف طلب الصيانة هذا؟')) {
       setRequests(prev => prev.filter(r => r.id !== id));
+      addToast({ type: 'info', title: 'تم الحذف', message: 'تم حذف بلاغ الصيانة بنجاح.' });
     }
-  }, []);
+  }, [addToast]);
+
+  const handleQuickStatusUpdate = (id: string, newStatus: MaintenanceStatus, notes?: string, vendor?: string) => {
+      setRequests(prev => prev.map(req => {
+          if (req.id === id) {
+              return {
+                  ...req,
+                  status: newStatus,
+                  completionNotes: notes ? `${req.completionNotes || ''}\n${notes}` : req.completionNotes,
+                  assignedToVendorName: vendor || req.assignedToVendorName,
+                  updatedAt: new Date().toISOString()
+              };
+          }
+          return req;
+      }));
+      addToast({
+          type: 'success',
+          title: 'تم تحديث حالة الصيانة',
+          message: `تم تغيير حالة الطلب بنجاح إلى: ${newStatus}`
+      });
+  };
 
   const handleFormSubmit = (data: MaintenanceRequest) => {
     if (editingRequest?.id) {
@@ -247,6 +332,16 @@ const PropertyMaintenancePage: React.FC = () => {
       setRequests(prev => [{ ...data, id: `mreq-${Date.now()}` }, ...prev]);
     }
     setIsFormModalOpen(false); setEditingRequest(null);
+  };
+
+  const getPriorityRowStyle = (priority: MaintenancePriority) => {
+      if (priority === MaintenancePriority.URGENT || priority === MaintenancePriority.HIGH) {
+          return 'bg-rose-50/70 hover:bg-rose-100/80 border-r-4 border-r-rose-600 font-medium';
+      }
+      if (priority === MaintenancePriority.MEDIUM) {
+          return 'bg-amber-50/40 hover:bg-amber-100/50 border-r-4 border-r-amber-500';
+      }
+      return 'hover:bg-slate-50 border-r-4 border-r-slate-200';
   };
 
   return (
@@ -264,7 +359,7 @@ const PropertyMaintenancePage: React.FC = () => {
       <Card className="bg-blue-50 border-blue-200">
         <div className="flex items-start">
           <InformationCircleIcon className="w-6 h-6 text-blue-600 me-3 mt-1 flex-shrink-0"/>
-          <p className="text-sm text-blue-700">أدر طلبات الصيانة بكفاءة. سجل تفاصيل المشكلة، عين مقاولين، تتبع التكاليف، وحافظ على عقاراتك في أفضل حال.</p>
+          <p className="text-sm text-blue-700">أدر طلبات الصيانة بكفاءة. جدول تفاعلي يوضح حالة كل بلاغ صيانة (قيد الانتظار، جاري العمل، مكتمل) مع تلوين الصفوف بالأولويات وزر التحديث السريع للحالة.</p>
         </div>
       </Card>
       <Card>
@@ -279,36 +374,54 @@ const PropertyMaintenancePage: React.FC = () => {
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 text-xs">
-            <thead className="bg-gray-100">
+            <thead className="bg-slate-100 dark:bg-slate-800">
               <tr>
-                {['العقار/الوحدة', 'الفئة', 'الأولوية', 'الحالة', 'المُبلغ', 'تاريخ الطلب', 'المقاول', 'التكلفة (تقدير/فعلي)', 'إجراءات'].map(h=><th key={h} className="px-2 py-2 text-right font-medium">{h}</th>)}
+                {['العقار/الوحدة', 'الفئة', 'الأولوية', 'الحالة الحالية', 'المُبلغ', 'تاريخ الطلب', 'المقاول', 'التكلفة (تقدير/فعلي)', 'تحديث سريع', 'إجراءات'].map(h=><th key={h} className="px-3 py-2.5 text-right font-black text-slate-700 dark:text-slate-200">{h}</th>)}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {filteredRequests.map(req => (
-                <tr key={req.id} className="hover:bg-gray-50">
-                  <td className="px-2 py-1.5 font-medium">{req.propertyName}{req.propertyUnitName ? ` / ${req.propertyUnitName}` : ''}</td>
-                  <td className="px-2 py-1.5">{req.category}</td>
-                  <td className="px-2 py-1.5">{req.priority}</td>
-                  <td className="px-2 py-1.5"><MaintenanceStatusBadge status={req.status}/></td>
-                  <td className="px-2 py-1.5">{req.reportedBy}</td>
-                  <td className="px-2 py-1.5">{formatDate(req.requestDate)}</td>
-                  <td className="px-2 py-1.5">{req.assignedToVendorName || '-'}</td>
-                  <td className="px-2 py-1.5">{formatCurrency(req.estimatedCost)} / {formatCurrency(req.cost)}</td>
-                  <td className="px-2 py-1.5 space-x-1 space-x-reverse">
+                <tr key={req.id} className={`transition-colors ${getPriorityRowStyle(req.priority)}`}>
+                  <td className="px-3 py-2 font-black">{req.propertyName}{req.propertyUnitName ? ` / ${req.propertyUnitName}` : ''}</td>
+                  <td className="px-3 py-2 font-medium">{req.category}</td>
+                  <td className="px-3 py-2">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black ${
+                          req.priority === MaintenancePriority.URGENT || req.priority === MaintenancePriority.HIGH ? 'bg-rose-600 text-white' :
+                          req.priority === MaintenancePriority.MEDIUM ? 'bg-amber-500 text-slate-950' : 'bg-slate-200 text-slate-700'
+                      }`}>
+                          {req.priority}
+                      </span>
+                  </td>
+                  <td className="px-3 py-2"><MaintenanceStatusBadge status={req.status}/></td>
+                  <td className="px-3 py-2 font-medium">{req.reportedBy}</td>
+                  <td className="px-3 py-2 font-mono">{formatDate(req.requestDate)}</td>
+                  <td className="px-3 py-2">{req.assignedToVendorName || '-'}</td>
+                  <td className="px-3 py-2 font-mono">{formatCurrency(req.estimatedCost)} / {formatCurrency(req.cost)}</td>
+                  <td className="px-3 py-2">
+                      <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setStatusUpdateRequest(req)}
+                          className="px-2 py-1 text-[11px] font-black border-primary text-primary hover:bg-primary/10"
+                      >
+                          🔄 تحديث الحالة
+                      </Button>
+                  </td>
+                  <td className="px-3 py-2 space-x-1 space-x-reverse">
                     <Button variant="ghost" size="sm" onClick={() => handleViewRequest(req)} title="عرض"><EyeIcon className="w-3.5 text-blue-600"/></Button>
                     <Button variant="ghost" size="sm" onClick={() => handleEditRequest(req)} title="تعديل"><PencilIcon className="w-3.5 text-yellow-600"/></Button>
                     <Button variant="ghost" size="sm" onClick={() => handleDeleteRequest(req.id)} title="حذف" className="text-danger"><TrashIcon className="w-3.5"/></Button>
                   </td>
                 </tr>
               ))}
-              {filteredRequests.length === 0 && <tr><td colSpan={9} className="text-center py-5 text-gray-500"><FolderIcon className="w-10 h-10 mx-auto mb-1"/>لا توجد طلبات تطابق البحث.</td></tr>}
+              {filteredRequests.length === 0 && <tr><td colSpan={10} className="text-center py-5 text-gray-500"><FolderIcon className="w-10 h-10 mx-auto mb-1"/>لا توجد طلبات تطابق البحث.</td></tr>}
             </tbody>
           </table>
         </div>
       </Card>
       <MaintenanceRequestFormModal isOpen={isFormModalOpen} onClose={() => setIsFormModalOpen(false)} onSubmit={handleFormSubmit} initialData={editingRequest} properties={mockPropertiesForMaintenance} />
       <ViewMaintenanceRequestModal request={viewingRequest} onClose={() => setViewingRequest(null)} />
+      <QuickStatusUpdateModal request={statusUpdateRequest} onClose={() => setStatusUpdateRequest(null)} onUpdateStatus={handleQuickStatusUpdate} />
     </div>
   );
 };

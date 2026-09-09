@@ -212,6 +212,89 @@ const PayrollManagementPage: React.FC = () => {
         }
     };
 
+    const handleSyncDeductions = () => {
+        let loanCount = 0;
+        let discCount = 0;
+
+        // Fetch loans
+        const storedLoans = localStorage.getItem('alwagayan_loans');
+        const loansList = storedLoans ? JSON.parse(storedLoans) : [];
+
+        // Fetch disciplinary logs
+        const storedDisc = localStorage.getItem('alwagayan_disciplinary');
+        const discList = storedDisc ? JSON.parse(storedDisc) : [];
+
+        const updatedPayroll = payroll.map(p => {
+            let loanDeduction = p.deductionLoanRepayment;
+            let generalDeduction = p.deductionGeneral;
+
+            // Find active loans matching employee
+            const empLoans = loansList.filter((l: any) => 
+                (l.employeeName && l.employeeName.trim() === p.employeeName.trim()) && 
+                (l.status === 'Active' || l.status === 'معتمد')
+            );
+
+            if (empLoans.length > 0) {
+                const totalInstallment = empLoans.reduce((sum: number, l: any) => sum + (Number(l.installment || l.monthlyInstallment) || 0), 0);
+                if (totalInstallment > 0) {
+                    loanDeduction = totalInstallment;
+                    loanCount++;
+                }
+            }
+
+            // Find disciplinary deduction
+            const empDiscs = discList.filter((d: any) => 
+                (d.employeeName && d.employeeName.trim() === p.employeeName.trim()) &&
+                (d.status === 'Approved' || d.status === 'معتمد وساري الصرف والخصم')
+            );
+
+            if (empDiscs.length > 0) {
+                // calculate daily rate = baseSalary / 26
+                const dailyRate = p.baseSalary / 26;
+                const totalDiscDays = empDiscs.reduce((sum: number, d: any) => sum + (Number(d.deductionDays) || 1), 0);
+                generalDeduction = Math.round(dailyRate * Math.min(totalDiscDays, 5)); // max 5 days according to Article 60
+                discCount++;
+            }
+
+            return {
+                ...p,
+                deductionLoanRepayment: loanDeduction,
+                deductionGeneral: generalDeduction
+            };
+        });
+
+        setPayroll(updatedPayroll);
+        alert(`تمت المزامنة بنجاح!\n- تم تحديث اقتطاعات القروض لعدد (${loanCount}) موظف.\n- تم ربط الجزاءات والخصم التأديبي لعدد (${discCount}) موظف بموجب المادة 60 من قانون العمل.`);
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['اسم الموظف', 'الرقم المدني', 'الجنسية', 'التأمينات الاجتماعية', 'الراتب الأساسي', 'بدل السكن', 'بدل المواصلات', 'بدلات أخرى', 'مكافآت', 'خصم التأمينات', 'خصم القروض', 'خصومات أخرى', 'الصافي'];
+        const rows = payroll.map(item => [
+            item.employeeName,
+            item.civilId,
+            item.nationality === 'Kuwaiti' ? 'كويتي' : 'وافد',
+            item.pifssRegistered ? 'مسجل' : 'غير مسجل',
+            item.baseSalary,
+            item.allowanceHousing,
+            item.allowanceTransport,
+            item.allowanceSpecial,
+            item.bonusMonthly,
+            calculatePifssDeduction(item),
+            item.deductionLoanRepayment,
+            item.deductionGeneral,
+            calculateNet(item)
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + [headers, ...rows].map(e => e.join(",")).join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `payroll_export_${new Date().toISOString().slice(0, 10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handlePrintPayslip = (item: PayrollItem) => {
         setSelectedPayrollItem(item);
         setIsPayslipModalOpen(true);
@@ -468,7 +551,7 @@ const PayrollManagementPage: React.FC = () => {
                         >
                             {/* Controller bar */}
                             <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-5 rounded-3xl border border-slate-100 shadow-sm">
-                                <div className="relative w-full md:max-w-md">
+                                <div className="relative w-full md:max-w-xs">
                                     <Input
                                         placeholder={translate('ابحث عن اسم الموظف أو المدنية لقيد الراتب...', 'Search payroll items...')}
                                         value={searchTerm}
@@ -480,30 +563,52 @@ const PayrollManagementPage: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <Button 
-                                    size="sm" 
-                                    leftIcon={<PlusCircleIcon className="w-4 h-4" />}
-                                    onClick={() => {
-                                        setEditingPayroll({
-                                            id: '',
-                                            employeeName: '',
-                                            civilId: '',
-                                            nationality: 'Kuwaiti',
-                                            pifssRegistered: true,
-                                            baseSalary: 1000,
-                                            allowanceHousing: 150,
-                                            allowanceTransport: 50,
-                                            allowanceSpecial: 0,
-                                            bonusMonthly: 0,
-                                            deductionGeneral: 0,
-                                            deductionLoanRepayment: 0,
-                                            notes: ''
-                                        });
-                                        setIsFormModalOpen(true);
-                                    }}
-                                >
-                                    {translate('إضافة بند راتب لموظف', 'Add Employee Payroll Item')}
-                                </Button>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        leftIcon={<ArrowPathIcon className="w-4 h-4 text-amber-600" />}
+                                        onClick={handleSyncDeductions}
+                                        className="border-amber-200 bg-amber-50/50 hover:bg-amber-100 text-amber-900 font-bold"
+                                    >
+                                        {translate('مزامنة القروض والجزاءات', 'Sync Loans & Penalties')}
+                                    </Button>
+
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        leftIcon={<ArrowDownTrayIcon className="w-4 h-4 text-emerald-600" />}
+                                        onClick={handleExportCSV}
+                                        className="border-emerald-200 bg-emerald-50/50 hover:bg-emerald-100 text-emerald-900 font-bold"
+                                    >
+                                        {translate('تصدير Excel', 'Export Excel')}
+                                    </Button>
+
+                                    <Button 
+                                        size="sm" 
+                                        leftIcon={<PlusCircleIcon className="w-4 h-4" />}
+                                        onClick={() => {
+                                            setEditingPayroll({
+                                                id: '',
+                                                employeeName: '',
+                                                civilId: '',
+                                                nationality: 'Kuwaiti',
+                                                pifssRegistered: true,
+                                                baseSalary: 1000,
+                                                allowanceHousing: 150,
+                                                allowanceTransport: 50,
+                                                allowanceSpecial: 0,
+                                                bonusMonthly: 0,
+                                                deductionGeneral: 0,
+                                                deductionLoanRepayment: 0,
+                                                notes: ''
+                                            });
+                                            setIsFormModalOpen(true);
+                                        }}
+                                    >
+                                        {translate('إضافة بند راتب لموظف', 'Add Employee Payroll Item')}
+                                    </Button>
+                                </div>
                             </div>
 
                             <div className="overflow-hidden rounded-3xl border border-slate-150 bg-white">

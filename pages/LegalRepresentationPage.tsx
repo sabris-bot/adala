@@ -92,7 +92,7 @@ const initialDelegations: EnhancedDelegation[] = [
         caseType: CaseMainType.REAL_ESTATE,
         courtName: 'محكمة استئناف الإيجارات العاصمة',
         courtLevel: CourtLevel.APPEALS_COURT,
-        judgeName: 'المستشار فيصل الوقيان',
+        judgeName: 'المستشار فيصل الشمري',
         hearingRoom: 'قاعة استئناف 14 - الدور الأرضي',
         priority: RepresentationPriority.HIGH,
         hearingDate: new Date(Date.now() + 12 * 24 * 3600 * 1000).toISOString().split('T')[0], // 12 days later

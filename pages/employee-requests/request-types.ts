@@ -14,6 +14,7 @@ export enum RequestType {
     TRANSFER = 'Department Transfer',                 // طلب نقل
     PROMOTION = 'Promotion Request',                 // طلب ترقية
     DUTY_RESUMPTION = 'Duty Resumption Request',     // طلب مباشرة عمل
+    END_OF_SERVICE = 'End of Service Settlement',   // طلب تسوية نهاية خدمة
     CUSTOM = 'Custom Request',                       // طلب مخصص آخر
 }
 
@@ -105,6 +106,13 @@ export interface EmployeeRequest {
     
     resumptionDate?: string;
     resumptionReferenceCode?: string;
+    
+    // End of Service fields
+    eosReason?: 'resignation' | 'termination' | 'retirement' | 'other';
+    serviceDurationYears?: number;
+    serviceDurationMonths?: number;
+    entitledToFullBonus?: boolean;
+    calculatedIndemnityAmount?: number;
     
     customTitle?: string;
     customContent?: string;

@@ -1,6 +1,11 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { 
+    ResponsiveContainer, PieChart, Pie, Cell, 
+    BarChart, Bar, XAxis, YAxis, Tooltip, Legend, 
+    AreaChart, Area
+} from 'recharts';
 import { Case, CaseStatus, RiskLevel, CaseMainType, CasePriority, CourtLevel, Hearing, CaseFile, ExecutionActionType, ExecutionActionStatus, ExpertActionStatus, ExpertField, ExecutionAction, ExpertAction, LitigationStage, NotificationStatus } from '../types';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -49,6 +54,7 @@ import { useToast } from '../components/ui/Toast';
 import { initialCases } from '../data/caseData';
 import { useJurisdiction } from '../components/JurisdictionContext';
 import { useNavigate } from 'react-router-dom';
+import FloatingAiAssistantWidget from '../components/FloatingAiAssistantWidget';
 
 const initialFilters = {
     internalCaseNumber: '',
@@ -2410,7 +2416,21 @@ const PrintableCaseReportModal: React.FC<PrintableCaseReportModalProps> = ({ isO
 const CaseListPage: React.FC = () => {
     const { t } = useTranslation();
     const { addToast } = useToast();
-    const [cases, setCases] = useState<Case[]>(initialCases);
+    const [cases, setCases] = useState<Case[]>(() => {
+        const stored = localStorage.getItem('qanooni_cases_list');
+        if (stored) {
+            try {
+                return JSON.parse(stored);
+            } catch (error) {
+                console.error("Failed to parse qanooni_cases_list from localStorage:", error);
+            }
+        }
+        return initialCases;
+    });
+
+    useEffect(() => {
+        localStorage.setItem('qanooni_cases_list', JSON.stringify(cases));
+    }, [cases]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filters, setFilters] = useState(initialFilters);
     const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -2427,6 +2447,46 @@ const CaseListPage: React.FC = () => {
         const totalRemaining = cases.reduce((acc, c) => acc + ((c.financials?.totalFees || 0) - (c.financials?.paid || 0)), 0);
         
         return { total, open, closed, totalFees, totalRemaining };
+    }, [cases]);
+
+    const caseStatusChartData = useMemo(() => {
+        const counts: Record<string, number> = {};
+        cases.forEach(c => {
+            counts[c.status] = (counts[c.status] || 0) + 1;
+        });
+
+        return [
+            { name: 'مفتوحة / جارية', value: (counts[CaseStatus.OPEN] || 0) + (counts[CaseStatus.IN_PROGRESS] || 0), color: '#10B981' }, 
+            { name: 'مستأنفة / قيد الطعن', value: counts[CaseStatus.APPEALED] || 0, color: '#EC4899' }, 
+            { name: 'معلقة / قيد الانتظار', value: (counts[CaseStatus.PENDING] || 0) + (counts[CaseStatus.ON_HOLD] || 0), color: '#F59E0B' }, 
+            { name: 'مغلقة منتهية', value: counts[CaseStatus.CLOSED] || 0, color: '#6B7280' }, 
+        ].filter(item => item.value > 0);
+    }, [cases]);
+
+    const hearingStatusChartData = useMemo(() => {
+        const counts: Record<string, number> = {
+            'Scheduled': 0,
+            'Completed': 0,
+            'Postponed': 0,
+            'Cancelled': 0
+        };
+
+        cases.forEach(c => {
+            if (c.hearings) {
+                c.hearings.forEach(h => {
+                    if (h.status) {
+                        counts[h.status] = (counts[h.status] || 0) + 1;
+                    }
+                });
+            }
+        });
+
+        return [
+            { name: 'مجدولة قادمة', count: counts['Scheduled'] || 0, color: '#3B82F6' },
+            { name: 'جلسات مكتملة', count: counts['Completed'] || 0, color: '#10B981' },
+            { name: 'مؤجلة للدراسة', count: counts['Postponed'] || 0, color: '#F59E0B' },
+            { name: 'ملغاة / مشطوبة', count: counts['Cancelled'] || 0, color: '#EF4444' }
+        ];
     }, [cases]);
 
     const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -2608,6 +2668,154 @@ const CaseListPage: React.FC = () => {
                     </div>
                 </div>
             </Card>
+
+            {/* Visual Statistics Dashboard */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print mx-1">
+                {/* Pie Chart Card */}
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-indigo-100/45 dark:hover:border-slate-800 transition-all flex flex-col justify-between">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600">
+                                <ScaleIcon className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div className="text-right">
+                                <h3 className="font-extrabold text-sm text-gray-800">تنوع القضايا والملفات</h3>
+                                <p className="text-[10px] text-gray-400 font-semibold">توزيع كافة المستندات والطعون بحسب حالتها القانونية</p>
+                            </div>
+                        </div>
+                        <span className="text-[10px] bg-emerald-50 text-emerald-700 font-black px-2 py-0.5 rounded-md">
+                            {cases.length} قضايا إجمالاً
+                        </span>
+                    </div>
+
+                    <div className="h-64 relative flex items-center justify-center">
+                        {caseStatusChartData.length === 0 ? (
+                            <div className="text-center py-10 opacity-30 italic text-[11px]">لا يوجد بيانات قضايا للعرض</div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={caseStatusChartData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={85}
+                                        paddingAngle={4}
+                                        dataKey="value"
+                                    >
+                                        {caseStatusChartData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.color} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip 
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                return (
+                                                    <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-805 shadow-xl text-xs font-sans text-right space-y-1">
+                                                        <p className="font-extrabold">{payload[0].name}</p>
+                                                        <p className="text-emerald-400 font-extrabold">العدد الجاري: {payload[0].value} ملف</p>
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }} 
+                                    />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-50 mt-2">
+                        {caseStatusChartData.map((entry, index) => {
+                            const percentage = Math.round((entry.value / (cases.length || 1)) * 100);
+                            return (
+                                <div key={index} className="flex items-center gap-1.5 text-[10px] font-bold text-gray-600">
+                                    <span className="w-2.5 h-2.5 rounded-full shrink-0 animate-pulse" style={{ backgroundColor: entry.color }} />
+                                    <span className="truncate">{entry.name}:</span>
+                                    <span className="text-gray-900 font-mono font-black ms-auto">{entry.value} ({percentage}%)</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Bar Chart Card */}
+                <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:border-indigo-100/45 dark:hover:border-slate-800 transition-all flex flex-col justify-between">
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600">
+                                <GavelIcon className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="text-right">
+                                <h3 className="font-extrabold text-sm text-gray-800">رصد وحالة الجلسات القادمة</h3>
+                                <p className="text-[10px] text-gray-400 font-semibold">توزيع مواعيد رول المحاكمة حسب تقارير الحضور والإنجاز</p>
+                            </div>
+                        </div>
+                        <span className="text-[10px] bg-blue-50 text-blue-700 font-black px-2 py-0.5 rounded-md">
+                            {hearingStatusChartData.reduce((acc, current) => acc + current.count, 0)} جلسات مسجلة
+                        </span>
+                    </div>
+
+                    <div className="h-64 relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                                data={hearingStatusChartData}
+                                margin={{ top: 20, right: 10, left: 10, bottom: 5 }}
+                            >
+                                <XAxis 
+                                    dataKey="name" 
+                                    tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6B7280' }} 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                />
+                                <YAxis 
+                                    tick={{ fontSize: 10, fontWeight: 'bold', fill: '#6B7280' }} 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    allowDecimals={false}
+                                />
+                                <Tooltip 
+                                    content={({ active, payload }) => {
+                                        if (active && payload && payload.length) {
+                                            return (
+                                                <div className="bg-slate-900 text-white p-3 rounded-xl border border-slate-805 shadow-xl text-xs font-sans text-right space-y-1">
+                                                    <p className="font-extrabold">{payload[0].payload.name}</p>
+                                                    <p className="text-blue-400 font-extrabold">عدد الجلسات: {payload[0].value} جلسة</p>
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    }} 
+                                />
+                                <Bar 
+                                    dataKey="count" 
+                                    radius={[8, 8, 0, 0]} 
+                                    maxBarSize={45}
+                                >
+                                    {hearingStatusChartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-1 pt-2 border-t border-gray-50 mt-2">
+                        {hearingStatusChartData.map((entry, index) => {
+                            const totalHearings = hearingStatusChartData.reduce((acc, current) => acc + current.count, 0) || 1;
+                            const percentage = Math.round((entry.count / totalHearings) * 100);
+                            return (
+                                <div key={index} className="flex flex-col items-center justify-center p-1 bg-slate-55 rounded-lg text-center">
+                                    <span className="text-[9px] text-gray-500 font-bold truncate w-full">{entry.name}</span>
+                                    <span className="text-xs font-black font-mono mt-0.5" style={{ color: entry.color }}>
+                                        {entry.count} <span className="text-[8px] font-bold text-gray-400">({percentage}%)</span>
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
 
             {/* Filters & Content Section */}
             <Card className="no-print mx-1 shadow-sm border-gray-100">
@@ -2939,6 +3147,9 @@ const CaseListPage: React.FC = () => {
                 onClose={() => setIsPrintModalOpen(false)} 
                 caseItem={viewingCase} 
             />
+
+            {/* Floating AI Assistant Widget for direct access while browsing cases */}
+            <FloatingAiAssistantWidget currentCase={viewingCase} />
         </div>
     );
 };

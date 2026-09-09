@@ -189,7 +189,7 @@ const mockMojCases: MojCaseRecord[] = [
         ],
         lastAction: 'إصدار الحكم بالبراءة لانتفاء الركن المادي الجنائي للمحررات والنزاع المستقر',
         lastActionDate: '2026-04-18',
-        judge: 'المستشار علي الوقيان',
+        judge: 'المستشار علي الشمري',
         isLinkedToAdalah: false
     },
     {

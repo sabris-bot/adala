@@ -6,9 +6,10 @@ interface PrintHeaderProps {
     title: string;
     subtitle?: string;
     jurisdiction?: any;
+    hideOfficeBranding?: boolean;
 }
 
-const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction }) => {
+const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction, hideOfficeBranding }) => {
     const today = new Date().toLocaleDateString('ar-KW', {
         year: 'numeric',
         month: 'long',
@@ -16,23 +17,25 @@ const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction
     });
 
     // Load dynamic office information to keep printed outputs perfectly synchronized
-    let officeNameAr = OFFICE_NAME;
-    let officeNameEn = "Sabry Shatta Law Firm & Legal Consultations";
+    let officeNameAr = hideOfficeBranding ? "إدارة الموارد البشرية والشؤون الإدارية" : OFFICE_NAME;
+    let officeNameEn = hideOfficeBranding ? "Human Resources & Administrative Affairs" : "Sabry Shatta Law Firm & Legal Consultations";
     let unifiedId = "7766554433";
 
-    try {
-        const savedOffice = localStorage.getItem('profile_office_info');
-        if (savedOffice) {
-            const parsed = JSON.parse(savedOffice);
-            if (parsed.name) officeNameAr = parsed.name;
-            if (parsed.unifiedId) unifiedId = parsed.unifiedId;
-            // Derive English office name based on Arabic Name change
-            if (parsed.name && parsed.name !== OFFICE_NAME) {
-                officeNameEn = parsed.name.replace(/مكتب المحامي/g, "Lawyer").replace(/للمحاماة والاستشارات القانونية/g, "Law Firm & Legal Consultations");
+    if (!hideOfficeBranding) {
+        try {
+            const savedOffice = localStorage.getItem('profile_office_info');
+            if (savedOffice) {
+                const parsed = JSON.parse(savedOffice);
+                if (parsed.name) officeNameAr = parsed.name;
+                if (parsed.unifiedId) unifiedId = parsed.unifiedId;
+                // Derive English office name based on Arabic Name change
+                if (parsed.name && parsed.name !== OFFICE_NAME) {
+                    officeNameEn = parsed.name.replace(/مكتب المحامي/g, "Lawyer").replace(/للمحاماة والاستشارات القانونية/g, "Law Firm & Legal Consultations");
+                }
             }
+        } catch (e) {
+            console.error('Error parsing office info in printable header', e);
         }
-    } catch (e) {
-        console.error('Error parsing office info in printable header', e);
     }
 
     // Generate a unique reference ID for print accountability
@@ -50,9 +53,13 @@ const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction
                     <h2 className="text-lg md:text-xl font-black text-primary leading-tight mb-1 border-none !p-0 !m-0">
                         {officeNameAr}
                     </h2>
-                    <p className="text-[10px] md:text-xs font-black text-gray-600">للمحاماة والاستشارات القانونية والتحكيم</p>
-                    <p className="text-[9px] md:text-xs font-bold text-gray-500 mt-0.5 italic">المقر الرئيسي: مرخص لدى كافة درجات المحاكم</p>
-                    <p className="text-[8px] md:text-xs font-mono text-gray-400 mt-1">الرقم الموحد: {unifiedId}</p>
+                    <p className="text-[10px] md:text-xs font-black text-gray-600">
+                        {hideOfficeBranding ? "قسم شؤون الموظفين والأجور وتسوية المستحقات" : "للمحاماة والاستشارات القانونية والتحكيم"}
+                    </p>
+                    <p className="text-[9px] md:text-xs font-bold text-gray-500 mt-0.5 italic">
+                        {hideOfficeBranding ? "مستند إداري رسمي داخلي معتمد" : "المقر الرئيسي: مرخص لدى كافة درجات المحاكم"}
+                    </p>
+                    {!hideOfficeBranding && <p className="text-[8px] md:text-xs font-mono text-gray-400 mt-1">الرقم الموحد: {unifiedId}</p>}
                 </div>
                 
                 {/* Center: Logo and Branding */}
@@ -94,7 +101,9 @@ const PrintHeader: React.FC<PrintHeaderProps> = ({ title, subtitle, jurisdiction
                         <h2 className="text-sm md:text-base font-bold text-primary leading-tight mb-1 border-none !p-0 !m-0 font-serif line-clamp-2">
                             {officeNameEn}
                         </h2>
-                        <span className="text-[9px] text-gray-500 font-semibold tracking-wide uppercase">Law Firm & Legal consultations</span>
+                        <span className="text-[9px] text-gray-500 font-semibold tracking-wide uppercase">
+                            {hideOfficeBranding ? "Personnel & Payroll Operations Section" : "Law Firm & Legal consultations"}
+                        </span>
                         <div className="mt-2 bg-gray-50 px-2 py-1 border border-gray-200 rounded-lg text-[9px] font-mono text-gray-600 space-y-0.5">
                             <div>Date: {today}</div>
                             <div>Ref: {refId}</div>

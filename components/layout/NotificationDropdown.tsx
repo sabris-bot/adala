@@ -110,7 +110,7 @@ const NotificationDropdown: React.FC<{ onClose: () => void }> = ({ onClose }) =>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                                            <span className="text-[10px] font-black text-primary/70 uppercase tracking-tighter">{notif.category}</span>
+                                            <span className="text-[10px] font-black text-primary/70 uppercase tracking-tighter">{notif.categoryArabic || notif.category}</span>
                                             <span className="text-[9px] text-gray-400 font-medium">{new Date(notif.timestamp).toLocaleTimeString('ar-KW', { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                         <h4 className={`text-xs font-bold truncate ${!notif.isRead ? 'text-gray-900 dark:text-dm-text' : 'text-gray-500'}`}>

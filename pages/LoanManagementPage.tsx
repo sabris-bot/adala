@@ -32,7 +32,7 @@ import { LEGAL_TEMPLATES, fillTemplate, LegalTemplate } from './loan_templates';
 const LoanManagementPage: React.FC = () => {
   const { addToast } = useToast();
   const [lang, setLang] = useState<'ar' | 'en'>('ar');
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'loans' | 'advances' | 'payments' | 'templates' | 'aiCopilot' | 'integrations'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'loans' | 'payments' | 'advances' | 'templates' | 'aiCopilot' | 'integrations'>('dashboard');
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
 
   // Core State Engines
@@ -66,26 +66,12 @@ const LoanManagementPage: React.FC = () => {
   const [formGuarantorName, setFormGuarantorName] = useState<string>('');
   const [formGuarantorCivilId, setFormGuarantorCivilId] = useState<string>('');
   const [formNotes, setFormNotes] = useState<string>('');
+  const [formAllowAdministrativeOverride, setFormAllowAdministrativeOverride] = useState<boolean>(false);
 
   // AI interactive helper states
   const [aiPrompt, setAiPrompt] = useState<string>('');
   const [aiResponse, setAiResponse] = useState<string>('');
   const [isAiLoading, setIsAiLoading] = useState<boolean>(false);
-
-  // Local translations for general menus
-  const tLocal = {
-    firm: lang === 'ar' ? OFFICE_NAME : OFFICE_NAME,
-    title: lang === 'ar' ? 'منظومة إدارة الكفالات والقروض والسلف المهنية' : 'Professional Employee Loans & Advances Suite',
-    addNewBtn: lang === 'ar' ? 'صرف تمويل / سلفة جديدة' : 'Disburse New Credit / Advance',
-    salaryLabel: lang === 'ar' ? 'الراتب الأساسي للموظف' : 'Registered Basic Wage',
-    maxDeductionAllowed: lang === 'ar' ? 'الحد الأقصى المسموح (10%)' : 'statutory Cap Limit (10%)',
-    actualDeduction: lang === 'ar' ? 'القسط الشهري المقترح' : 'Proposed monthly amount',
-    percentageOfSalary: lang === 'ar' ? 'نسبة الاستقطاع من الراتب' : 'Deduction ratio',
-    violatingReg: lang === 'ar' ? 'تجاوز للحد الأقصى (مخالفة للمادة 20 قانون السداد الكويتي)' : 'Violation: exceeds 10% basic salary cap (Art 20)',
-    compliantReg: lang === 'ar' ? 'متطابق قانونياً وضمن السقف المسموح به للمادة 20' : 'Compliant under Article 20 parameters',
-    saveBtn: lang === 'ar' ? 'صرف وترحيل القيد للرواتب' : 'Confirm & Commit Credit',
-    cancelBtn: lang === 'ar' ? 'إلغاء' : 'Cancel'
-  };
 
   // Helper selectors
   const activeViewingLoanObj = useMemo(() => {
@@ -96,11 +82,11 @@ const LoanManagementPage: React.FC = () => {
     return employees.find(e => e.id === formEmployeeId) || employees[0];
   }, [employees, formEmployeeId]);
 
-  // Handle change in selection to default emergency values
+  // Handle change in selection to default values
   const handleFormLoanTypeChange = (type: LoanType) => {
     setFormLoanType(type);
     if (type === LoanType.SALARY_ADVANCE || type === LoanType.EMERGENCY) {
-      setFormNumberOfInstallments('1'); // salary advance behaves as short-term 1 month repaid
+      setFormNumberOfInstallments('1');
       setFormGuarantorName('');
       setFormGuarantorCivilId('');
     } else {
@@ -124,6 +110,22 @@ const LoanManagementPage: React.FC = () => {
     return liveDeductionRatio > 10;
   }, [liveDeductionRatio]);
 
+  // Smart auto-fix for Article 20 compliance
+  const handleAutoFixInstallments = () => {
+    if (!selectedEmployeeForForm) return;
+    const amountFloat = parseFloat(formAmount) || 0;
+    if (amountFloat <= 0) return;
+    const maxMonthlyAllowed = selectedEmployeeForForm.basicSalary * 0.10;
+    if (maxMonthlyAllowed <= 0) return;
+    const requiredMonths = Math.ceil(amountFloat / maxMonthlyAllowed);
+    setFormNumberOfInstallments(requiredMonths.toString());
+    addToast({
+      title: lang === 'ar' ? 'تم الضبط التلقائي للمادة 20' : 'Auto-adjusted for Article 20',
+      message: lang === 'ar' ? `تمت زيادة مدة السداد إلى ${requiredMonths} قسطاً شهرياً لتكون نسبة الاستقطاع ${(amountFloat / requiredMonths / selectedEmployeeForForm.basicSalary * 100).toFixed(1)}%` : `Term adjusted to ${requiredMonths} months.`,
+      type: 'success'
+    });
+  };
+
   // Open the add/edit loan modal
   const handleOpenLoanForm = (loan?: Loan) => {
     if (loan) {
@@ -137,6 +139,7 @@ const LoanManagementPage: React.FC = () => {
       setFormGuarantorName(loan.guarantorName || '');
       setFormGuarantorCivilId(loan.guarantorCivilId || '');
       setFormNotes(loan.notes || '');
+      setFormAllowAdministrativeOverride(false);
     } else {
       setEditingLoan(null);
       setFormEmployeeId(employees[0]?.id || '');
@@ -148,6 +151,7 @@ const LoanManagementPage: React.FC = () => {
       setFormGuarantorName('');
       setFormGuarantorCivilId('');
       setFormNotes('');
+      setFormAllowAdministrativeOverride(false);
     }
     setIsFormOpen(true);
   };
@@ -170,6 +174,16 @@ const LoanManagementPage: React.FC = () => {
       addToast({
         title: lang === 'ar' ? 'ثغرة في الآجال' : 'Term Error',
         message: lang === 'ar' ? 'يرجى تحديد فترة سداد صحيحة' : 'Invalid duration term.',
+        type: 'error'
+      });
+      return;
+    }
+
+    // Strict Enforcement of 10% wage cap validation under Article 20
+    if (isViolatingKuwaitiCap && !formAllowAdministrativeOverride) {
+      addToast({
+        title: lang === 'ar' ? 'مخالفة المادة (20) قانون العمل الكويتي' : 'Article 20 Statutory Violation',
+        message: lang === 'ar' ? 'لا يمكن تقديم الطلب لأن القسط الشهري يتجاوز 10% من الراتب الأساسي. يرجى تعديل عدد الأقساط أو استخدام زر الضبط التلقائي.' : 'Installment exceeds 10% basic salary cap. Please adjust term.',
         type: 'error'
       });
       return;
@@ -279,8 +293,8 @@ const LoanManagementPage: React.FC = () => {
       addToast({
         title: isViolatingKuwaitiCap ? (lang === 'ar' ? 'تنبيه تدقيق مالي' : 'Financial Review Required') : (lang === 'ar' ? 'تم الصرف بنجاح' : 'Disbursement Successful'),
         message: isViolatingKuwaitiCap 
-          ? (lang === 'ar' ? 'تم قيد الطلب ولكن تم تحويله للتدقيق لتجاوزه الحد القانوني 10%' : 'Submitted. Needs review due to exceeding statutory wage limit.')
-          : (lang === 'ar' ? 'تم صرف التمويل وترحيله لملف الأجور للموظف' : 'New loan successfully disbursed and linked to accounts.'),
+          ? (lang === 'ar' ? 'تم قيد الطلب وتحويله للتدقيق لتجاوزه الحد القانوني 10%' : 'Submitted. Under audit due to wage ceiling.')
+          : (lang === 'ar' ? 'تم صرف التمويل وترحيله لملف الأجور للموظف' : 'New loan successfully disbursed.'),
         type: isViolatingKuwaitiCap ? 'error' : 'success'
       });
     }
@@ -289,7 +303,7 @@ const LoanManagementPage: React.FC = () => {
 
   // Delete records
   const handleDeleteLoan = (id: string) => {
-    const confirmation = window.confirm(lang === 'ar' ? 'هل أنت متأكد تماماً من إزالة وإلغاء هذا المعاملة التمويلية كليا؟' : 'Are you sure you want to delete this loan?');
+    const confirmation = window.confirm(lang === 'ar' ? 'هل أنت متأكد تماماً من إزالة وإلغاء هذه المعاملة التمويلية كلياً؟' : 'Are you sure you want to delete this loan?');
     if (confirmation) {
       setLoans(prev => prev.filter(l => l.id !== id));
       addToast({
@@ -300,81 +314,75 @@ const LoanManagementPage: React.FC = () => {
     }
   };
 
-  // Record an installment payment (deposit)
-  const handleRecordPayment = (
-    loanId: string, 
-    installmentId: string, 
-    amountNum: number, 
-    payDate: string
-  ) => {
+  // Approve/Reject Action Desk
+  const handleApproveLoan = (id: string, step: 'approve' | 'reject' | 'audit') => {
+    setLoans(prev => prev.map(l => {
+      if (l.id === id) {
+        if (step === 'approve') return { ...l, status: LoanStatus.ACTIVE };
+        if (step === 'reject') return { ...l, status: LoanStatus.PAID_IN_FULL }; // Or closed
+        if (step === 'audit') return { ...l, status: LoanStatus.UNDER_FINANCIAL_REVIEW };
+      }
+      return l;
+    }));
+
+    addToast({
+      title: lang === 'ar' ? 'تحديث قرار الاعتماد' : 'Decision Committed',
+      message: lang === 'ar' ? `تم اعتماد الإجراء (${step}) للملف رقم ${id}` : `Step ${step} committed for file ${id}`,
+      type: 'info'
+    });
+  };
+
+  // Record a payment directly
+  const handleRecordPayment = (loanId: string, instId: string, paidAmount: number, payDate: string) => {
     setLoans(prev => prev.map(l => {
       if (l.id === loanId) {
-        const updatedInsts = l.installments.map(inst => {
-          if (inst.id === installmentId) {
+        const updatedInstallments = (l.installments || []).map(inst => {
+          if (inst.id === instId) {
             return {
               ...inst,
               status: InstallmentStatus.PAID,
-              amountPaid: amountNum,
-              paymentDate: payDate
+              paymentDate: payDate,
+              amountPaid: paidAmount
             };
           }
           return inst;
         });
 
-        const repaidSum = updatedInsts
-          .filter(i => i.status === InstallmentStatus.PAID)
-          .reduce((sum, i) => sum + (i.amountPaid || 0), 0);
-        
-        const remaining = l.loanAmount - repaidSum;
-        const finalStatus = remaining <= 0 ? LoanStatus.PAID_IN_FULL : l.status;
+        const newPaidTotal = (l.totalPaidAmount || 0) + paidAmount;
+        const newRemaining = Math.max(0, l.loanAmount - newPaidTotal);
+        const isFullyPaid = newRemaining === 0;
 
         return {
           ...l,
-          installments: updatedInsts,
-          totalPaidAmount: repaidSum,
-          remainingBalance: remaining,
-          status: finalStatus
+          totalPaidAmount: newPaidTotal,
+          remainingBalance: newRemaining,
+          status: isFullyPaid ? LoanStatus.PAID_IN_FULL : l.status,
+          installments: updatedInstallments
         };
       }
       return l;
     }));
 
-    // Record activity audit log
-    setLogs(prev => [
-      {
-        id: `pay-log-${Date.now()}`,
-        loanId: loanId,
-        action: 'استلام دفعة سداد قسط',
-        actionEn: 'Installment Repayment Received',
-        user: 'إدارة التحصيلات والأجور',
-        date: payDate,
-        notes: `تم قيد دفعة سداد نقدي بقيمة ${amountNum.toFixed(3)} د.ك واستلامها في خزينة المكتب الموحدة.`,
-        notesEn: `Successfully committed deposit of ${amountNum.toFixed(3)} KWD to internal general bank accounts.`
-      },
-      ...prev
-    ]);
-
     addToast({
-      title: lang === 'ar' ? 'تم استلام الدفعة' : 'Payment Received',
-      message: lang === 'ar' ? 'تم تسجيل إيداع الدفعة بنجاح وتحديث الرصيد القائم' : 'Deposit received. Balance updated.',
+      title: lang === 'ar' ? 'تم تسجيل الدفعة' : 'Payment Registered',
+      message: lang === 'ar' ? `تم ترحيل سداد بمبلغ ${paidAmount.toFixed(3)} د.ك بنجاح.` : `Payment of ${paidAmount.toFixed(3)} KWD registered.`,
       type: 'success'
     });
   };
 
-  // Restructure a loan duration and monthly installment
-  const handleRestructureLoan = (loanId: string, newMonths: number, newInstAmount: number) => {
+  // Restructure a loan
+  const handleRestructureLoan = (loanId: string, newMonths: number, newInstallment: number) => {
     setLoans(prev => prev.map(l => {
       if (l.id === loanId) {
-        // regenerate remaining installments
-        const unpaidSum = l.remainingBalance ?? l.loanAmount;
-        const generatedInsts: Installment[] = Array.from({ length: newMonths }, (_, idx) => {
-          const date = new Date();
-          date.setMonth(date.getMonth() + idx + 1);
+        const remaining = l.remainingBalance ?? l.loanAmount;
+        const newInstallments: Installment[] = Array.from({ length: newMonths }, (_, i) => {
+          const d = new Date();
+          d.setMonth(d.getMonth() + (i + 1));
           return {
-            id: `inst-restruct-${Date.now()}-${idx + 1}`,
-            installmentNumber: idx + 1,
-            dueDate: date.toISOString().split('T')[0],
-            amountDue: unpaidSum / newMonths,
+            id: `inst-restruct-${Date.now()}-${i + 1}`,
+            installmentNumber: i + 1,
+            dueDate: d.toISOString().split('T')[0],
+            amountDue: newInstallment,
             status: InstallmentStatus.UPCOMING
           };
         });
@@ -382,233 +390,207 @@ const LoanManagementPage: React.FC = () => {
         return {
           ...l,
           numberOfInstallments: newMonths,
-          monthlyInstallment: unpaidSum / newMonths,
-          installments: generatedInsts,
-          status: LoanStatus.ACTIVE
+          monthlyInstallment: newInstallment,
+          installments: newInstallments
         };
       }
       return l;
     }));
 
-    setLogs(prev => [
-      {
-        id: `restruct-log-${Date.now()}`,
-        loanId: loanId,
-        action: 'إعادة جدولة وهيكلة الديون',
-        actionEn: 'Debt Amortization Restructured',
-        user: 'المدير المالي والالتزام',
-        date: new Date().toISOString().split('T')[0],
-        notes: `تم إعادة تصفية المديونيات لتقسيط الرصيد المستحق على ${newMonths} أشهر لتخفيف عبء الاستقطاع.`,
-        notesEn: `Amortization structure amended over ${newMonths} payments.`
-      },
-      ...prev
-    ]);
-
     addToast({
-      title: lang === 'ar' ? 'إعادة جدولة مديونية' : 'Debt Restructured',
-      message: lang === 'ar' ? 'تمت إعادة هيكلة التمويل والجدولة وتوليد الأقساط الجديدة' : 'Debt restructured successfully.',
+      title: lang === 'ar' ? 'تمت إعادة الجدولة' : 'Restructure Applied',
+      message: lang === 'ar' ? `تم تمديد فترة السداد إلى ${newMonths} قسطاً شهرياً بقيمة ${newInstallment.toFixed(3)} د.ك لكل قسط.` : `Loan successfully restructured.`,
       type: 'success'
     });
   };
 
-  // Commit an End of Service Gratuity deductions (Article 51)
-  const handleCommitEOSDeduction = (
-    employeeId: string, 
-    outstandingDebt: number, 
-    finalGratuity: number, 
-    netPayable: number
-  ) => {
-    // Clear and mark loans for this employee as PAID_IN_FULL or SETTLED
+  // Commit EOS Deduction (Article 51 Set-off)
+  const handleCommitEOSDeduction = (employeeId: string, remainingBalance: number, finalGratuity: number, netPayable: number) => {
     setLoans(prev => prev.map(l => {
       if (l.employeeId === employeeId && l.status !== LoanStatus.PAID_IN_FULL) {
-        const clearedInsts = l.installments.map(i => ({
-          ...i,
-          status: InstallmentStatus.PAID,
-          amountPaid: i.amountDue,
-          paymentDate: new Date().toISOString().split('T')[0]
-        }));
-
         return {
           ...l,
-          installments: clearedInsts,
-          totalPaidAmount: l.loanAmount,
+          status: LoanStatus.PAID_IN_FULL,
           remainingBalance: 0,
-          status: LoanStatus.PAID_IN_FULL
+          totalPaidAmount: l.loanAmount,
+          notes: (l.notes ? l.notes + ' | ' : '') + `تم سداد المديونية بالكامل عبر الجبر التلقائي والمقاصة من مكافأة نهاية الخدمة (مادة 51)`
         };
       }
       return l;
     }));
 
-    // Record large final audit ledger
-    const emp = employees.find(e => e.id === employeeId);
-    setLogs(prev => [
-      {
-        id: `eos-log-${Date.now()}`,
-        loanId: 'AD-EOS-SETTLE',
-        action: 'تسوية المادة 51 القانونية لإنهاء الخدمة',
-        actionEn: 'Article 51 Final EOS Settlement',
-        user: 'رئيس الموارد البشرية والامتثال',
-        date: new Date().toISOString().split('T')[0],
-        notes: `تم الإستقطاع النهائي المفتوح لباقي القروض بقيمة ${outstandingDebt.toFixed(3)} د.ك من إجمالي مكافأة ${emp?.fullNameAr} البالغة ${finalGratuity.toFixed(3)} د.ك الصافي المصروف: ${netPayable.toFixed(3)} د.ك.`,
-        notesEn: `Committed full debt recovery of ${outstandingDebt.toFixed(3)} KWD from EOS benefits under Kuwait Law.`
-      },
-      ...prev
-    ]);
-
     addToast({
-      title: lang === 'ar' ? 'إقرار تصفية مادة 51' : 'EOS Settle Committed',
-      message: lang === 'ar' ? 'تمت تسوية وتصفية القروض وتصفير المديونية المادة 51 بنجاح' : 'Debt cleared under Article 51.',
+      title: lang === 'ar' ? 'تم تنفيذ الجبر التلقائي والمقاصة (مادة 51)' : 'Article 51 Auto Set-Off Executed',
+      message: lang === 'ar' 
+        ? `تم خصم المديونيات (${remainingBalance.toFixed(3)} د.ك) من إجمالي مكافأة نهاية الخدمة (${finalGratuity.toFixed(3)} د.ك). الصافي المصروف: ${netPayable.toFixed(3)} د.ك.`
+        : `EOS Set-off completed.`,
       type: 'success'
     });
   };
 
-  // Direct tab selection and prefill transition for visual sandbox
+  // Bridge to navigate to documents hub
   const handleNavigateToDocumentsTab = (templateId: string, loanId: string) => {
-    setInitialSelectedLoanId(loanId);
     setInitialSelectedTemplateId(templateId);
+    setInitialSelectedLoanId(loanId);
     setActiveTab('templates');
   };
 
-  // Handle Approve/Reject decisions on PENDING files
-  const handleApproveLoan = (id: string, step: 'approve' | 'reject' | 'audit') => {
-    setLoans(prev => prev.map(l => {
-      if (l.id === id) {
-        let finalStatus = l.status;
-        let actionLabel = '';
-        if (step === 'approve') {
-          finalStatus = LoanStatus.ACTIVE;
-          actionLabel = 'تم اعتماد التمويل وصرفه';
-        } else if (step === 'reject') {
-          finalStatus = LoanStatus.PAID_IN_FULL; // or closed
-          actionLabel = 'تم رفض وإلغاء المعاملة';
-        } else {
-          finalStatus = LoanStatus.UNDER_FINANCIAL_REVIEW;
-          actionLabel = 'إرسال للمراجعة والتدقيق المالي';
-        }
-
-        return {
-          ...l,
-          status: finalStatus
-        };
-      }
-      return l;
-    }));
-
-    addToast({
-      title: lang === 'ar' ? 'تم قيد القرار الإداري' : 'Administrative Decision Logged',
-      message: lang === 'ar' ? 'تم قيد القرار الإداري في سجل التمويل ومسيرة المال' : 'Decision committed.',
-      type: 'success'
-    });
-  };
-
-  // Simulator AI advisory copilot responses
+  // AI interactive simulator
   const handleSimulateAiQuestions = () => {
+    if (!aiPrompt.trim()) return;
     setIsAiLoading(true);
-    setAiResponse('');
     setTimeout(() => {
-      let advice = '';
-      const promptLower = aiPrompt.toLowerCase();
-
-      if (promptLower.includes('مادة 20') || promptLower.includes('مادة ٢٠') || promptLower.includes('10%') || promptLower.includes('salary cap')) {
-        advice = lang === 'ar' 
-          ? `تقضي المادة (20) من قانون عمل الكويت رقم 6 / 2010 بمنع المخدم من استقطاع أكثر من 10% من الراتب العادي الأساسي للموظف شهرياً وفاءً للقروض والديون. يتوجب على محاسب الأجور الالتزام المطلق بضبط السهم البرمجي وعدم تجاوزه لتفادي البطلان النقدي المرفوع أمام المحاكم العمالية.`
-          : `Under Article 20 of Kuwait Labor Law, monthly salary deductions targeting corporate debts are strictly capped at 10% of the employee's basic wage. Exceeding this limit renders the payroll file legally void inside courts.`;
-      } else if (promptLower.includes('مادة 51') || promptLower.includes('مادة ٥١') || promptLower.includes('نهاية الخدمة') || promptLower.includes('eos')) {
-        advice = lang === 'ar'
-          ? `المادة (51) تحدد آليات صرف مكافآت إنهاء الخدمة. والامتياز القانوني للأموال يعطي المخدم الحق بالخصم والمقاصة بالكامل لباقي ديون الموظف القائم من مستحقات مكافأة نهاية الخدمة الإجمالية كجبر مالي نهائي، مما يمثل تصفية عادلة مادة 51.`
-          : `Article 51 clarifies the liquidation rights. The employer holds preferred legal entitlement to deduct outstanding debt directly from the cumulative end-of-service gratuity sum without the 10% ceiling limit, creating a secure recovery corridor.`;
-      } else {
-        advice = lang === 'ar'
-          ? `تحليل الأنظمة: يوصى نظام عدالة الكفيل بتقديم هوية مدنية كويتية صالحة (Civil ID). سقف المبادلة المالي متوافق لضمان تحصيل الديون. هل ترغب باختيار "مركز التسويات مادة 51" أو "تصدير المستند رقم 4 إقرار بالخصم"؟`
-          : `Compliance Analyzer: System suggests requiring valid Civil ID validation for and personal bonds for key loans. Let us recommend checking the EOS simulators panel or creating Salary direct deduction consents.`;
-      }
-
-      setAiResponse(advice);
       setIsAiLoading(false);
-    }, 1000);
+      if (aiPrompt.includes('20') || aiPrompt.includes('استقطاع') || aiPrompt.includes('سقف')) {
+        setAiResponse(
+          lang === 'ar'
+            ? `وفقاً للمادة (20) من قانون العمل الكويتي رقم 6 لسنة 2010، لا يجوز استقطاع أكثر من 10% من أجر العامل وفاءً للديون أو القروض المستحقة لصاحب العمل، ولا يتقاضى صاحب العمل أي فائدة عن هذه القروض. في حال تجاوز هذه النسبة، يعتبر التصرف مخالفاً ويحق للعامل استرداد ما زاد عن الحد القانوني ما لم تكن هناك تسوية نهائية بنهاية الخدمة.`
+            : `Under Article 20 of Kuwait Labor Law No. 6/2010, payroll deductions for employer loans are strictly capped at 10% of basic wage with zero interest. Deductions exceeding 10% constitute a statutory labor violation.`
+        );
+      } else if (aiPrompt.includes('51') || aiPrompt.includes('نهاية الخدمة') || aiPrompt.includes('مكافأة') || aiPrompt.includes('مقاصة')) {
+        setAiResponse(
+          lang === 'ar'
+            ? `إعمالاً للمادة (51) والمادة (20) من قانون العمل الكويتي، عند انتهاء علاقة العمل وتصفية الحسابات، تسقط القيود الشهرية للاستقطاع (10%) ويجوز لصاحب العمل إجراء المقاصة القانونية والجبر التلقائي بخصم كامل رصيد المديونيات والقروض المتبقية من مكافأة نهاية الخدمة وبدل الإجازات بموجب مخالصة معتمدة.`
+            : `Under Article 51, upon termination of employment, the employer is legally authorized to execute a complete set-off and deduct all outstanding loan balances from the employee's End of Service indemnity.`
+        );
+      } else {
+        setAiResponse(
+          lang === 'ar'
+            ? `منظومة عدالة تطبق الضوابط القانونية الكويتية: (1) سقف الاستقطاع الشهري 10% بالمادة 20، (2) الجبر التلقائي من مكافأة نهاية الخدمة بالمادة 51، (3) وجوب إصدار السندات التنفيذية والكمبيالات وفق قانون التجارة الكويتي لضمان حق التنفيذ الجبري وأمر الأداء.`
+            : `Adala strictly enforces Kuwait Labor Law 6/2010 (Arts 20 & 51) and Commercial Code (Arts 472-518) for loan repayments and executive enforcement.`
+        );
+      }
+    }, 450);
   };
 
   return (
-    <div className="p-6 bg-slate-50 min-h-screen font-sans antialiased text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {/* HEADER BAR AND BRANDING */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-indigo-100">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 justify-end md:justify-start">
-            <span className="bg-slate-900 text-white text-[10px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">
-              {lang === 'ar' ? 'عدالة • الأمن المالي' : 'Adala • Financial Protection'}
+    <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      
+      {/* 1. TOP HEADER & MAIN CONTROLS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-6 rounded-[2rem] shadow-xs">
+        <div className="space-y-1 text-right">
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-indigo-50 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-400 rounded-xl">
+              <ScaleIcon className="w-6 h-6" />
             </span>
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white">
+              {lang === 'ar' ? 'إدارة الكفالات والقروض والسلف المهنية' : 'Loans, Sureties & Advances Management'}
+            </h1>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{tLocal.title}</h1>
-          <p className="text-xs text-slate-500 font-semibold">{tLocal.firm}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+            {lang === 'ar' 
+              ? 'مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية • متوافق مع قانون العمل الكويتي رقم 6 لسنة 2010 (المادتين 20 و 51) وقانون التجارة رقم 68 لسنة 1980'
+              : 'Sabri Shatta Law Firm • Kuwait Labor Law 6/2010 & Commercial Code'}
+          </p>
         </div>
 
-        {/* CONTROLS */}
-        <div className="flex flex-wrap gap-3 items-center">
-          <button 
-            onClick={() => setLang(prev => prev === 'ar' ? 'en' : 'ar')}
-            className="px-3 py-1.5 text-xs font-black bg-white rounded-xl border hover:bg-slate-100 text-slate-800"
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => setLang(l => l === 'ar' ? 'en' : 'ar')}
+            className="px-3.5 py-2 text-xs font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl border-none cursor-pointer hover:bg-slate-200 transition-all"
           >
-            🌐 {lang === 'ar' ? 'English' : 'العربية'}
+            🌐 {lang === 'ar' ? 'English' : 'عربي'}
           </button>
-          
-          <Button 
-            variant="primary" 
-            className="bg-indigo-600 border-indigo-500 hover:bg-indigo-700"
-            onClick={() => handleFormLoanTypeChange(LoanType.PERSONAL)} // fallback to reset
-            leftIcon={<PlusCircleIcon className="w-4.5 h-4.5" />}
+
+          <Button
+            variant="primary"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs h-10 px-4 flex items-center gap-2 shadow-md cursor-pointer border-none"
+            onClick={() => handleOpenLoanForm()}
           >
-            <span onClick={() => handleOpenLoanForm()}>{tLocal.addNewBtn}</span>
+            <PlusCircleIcon className="w-4 h-4" />
+            <span>{lang === 'ar' ? 'صرف تمويل / سلفة جديدة' : 'New Loan Application'}</span>
           </Button>
         </div>
       </div>
 
-      {/* TABS SELECTOR */}
-      <div className="flex flex-wrap border-b border-slate-200 mt-6 gap-2 mb-6 text-xs font-bold text-slate-500">
+      {/* 2. REORGANIZED NAVIGATION TABS */}
+      <div className="flex overflow-x-auto gap-1 border-b border-slate-200 dark:border-slate-800 pb-0.5 text-xs font-bold scrollbar-none">
         <button 
           onClick={() => setActiveTab('dashboard')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'dashboard' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'dashboard' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          📈 {lang === 'ar' ? 'لوحة التحكم والمؤشرات' : 'Dashboard KPI'}
+          <ChartBarIcon className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'لوحة التحكم والمؤشرات' : 'Dashboard & Analytics'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('loans')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'loans' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'loans' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          📂 {lang === 'ar' ? 'قرارات طلبات القروض والسلف' : 'Borrowers & Approvals'}
+          <FolderIcon className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'سجل القروض والسلف' : 'Loan Directory'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('payments')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'payments' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'payments' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          🗓️ {lang === 'ar' ? 'متابعة الأقساط والتحصيل' : 'Repayments Tracker'}
+          <ClockIcon className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'متابعة الأقساط والتحصيل' : 'Repayments & Amortization'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('advances')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'advances' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'advances' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          ⚖️ {lang === 'ar' ? 'تسويات المادة 51 (نهاية الخدمة)' : 'EOS Debt Settle (Art 51)'}
+          <ScaleIcon className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'مكافأة نهاية الخدمة والجبر التلقائي (مادة 51)' : 'EOS Gratuity & Debt Offset (Art 51)'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('templates')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'templates' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'templates' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          📄 {lang === 'ar' ? 'محرر السندات والنماذج الـ 8 المعاينة' : '8 Core Printing Center'}
+          <PrinterIcon className="w-4 h-4" />
+          <span>{lang === 'ar' ? 'محرر السندات والنماذج (سند لأمر، إقرار دين، كمبيالة)' : 'Document Hub & Forms (Stamp & QR)'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('aiCopilot')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'aiCopilot' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'aiCopilot' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          🤖 {lang === 'ar' ? 'المستشار القانوني للمادة 20 / 51' : 'Labor Compliance Copilot'}
+          <span>🤖</span>
+          <span>{lang === 'ar' ? 'المستشار القانوني للمادة 20 / 51' : 'Labor Compliance Copilot'}</span>
         </button>
+
         <button 
           onClick={() => setActiveTab('integrations')}
-          className={`px-4 py-2.5 rounded-t-lg transition-all ${activeTab === 'integrations' ? 'border-b-2 border-indigo-600 text-indigo-600 font-black bg-white' : 'hover:bg-slate-100'}`}
+          className={`px-4 py-3 rounded-t-xl transition-all border-none cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+            activeTab === 'integrations' 
+              ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 font-black shadow-xs border-b-2 border-indigo-600' 
+              : 'bg-transparent text-slate-500 dark:text-slate-400 hover:bg-slate-100/50 dark:hover:bg-slate-800'
+          }`}
         >
-          🔌 {lang === 'ar' ? 'تكامل الأنظمة وشؤون الموظفين' : 'ERP Integrations'}
+          <span>🔌</span>
+          <span>{lang === 'ar' ? 'تكامل الأنظمة والرواتب' : 'ERP Integrations'}</span>
         </button>
       </div>
 
-      {/* ACTIVE VIEWPORT PORTAL */}
+      {/* 3. ACTIVE VIEWPORT PORTAL */}
       <div className="space-y-6">
         {activeTab === 'dashboard' && (
           <LoanDashboard 
@@ -616,7 +598,7 @@ const LoanManagementPage: React.FC = () => {
             loans={loans} 
             employees={employees} 
             logs={logs}
-            onOpenPrintPreview={(loan) => handleNavigateToDocumentsTab('temp-11', loan.id)}
+            onOpenPrintPreview={(loan) => handleNavigateToDocumentsTab('temp-promissory', loan.id)}
             onViewLoan={(id) => {
               setViewingLoanId(id);
               setActiveTab('payments');
@@ -644,7 +626,7 @@ const LoanManagementPage: React.FC = () => {
             onViewLoan={(id) => setViewingLoanId(id)}
             onEditLoan={handleOpenLoanForm}
             onDeleteLoan={handleDeleteLoan}
-            onOpenPrintPreview={(loan) => handleNavigateToDocumentsTab('temp-08', loan.id)}
+            onOpenPrintPreview={(loan) => handleNavigateToDocumentsTab('temp-promissory', loan.id)}
             onApproveLoan={handleApproveLoan}
           />
         )}
@@ -679,41 +661,50 @@ const LoanManagementPage: React.FC = () => {
         )}
 
         {activeTab === 'aiCopilot' && (
-          <Card className="bg-white" title={lang === 'ar' ? 'المساعد القانوني والرقابي التفاعلي للرواتب والأجور' : 'Interactive Labor Law Risk Advisory'}>
-            <div className="space-y-4">
-              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-semibold leading-relaxed">
-                <p className="font-black mb-1">🤖 {lang === 'ar' ? 'اسأل المساعد عن المادة ٢٠ و المادة ٥١ لتوليد استشارات سريعة:' : 'Query Labor law compliance advices:'}</p>
+          <Card 
+            className="bg-white dark:bg-slate-900 border border-slate-200/70 dark:border-slate-800 rounded-[2rem] shadow-xs" 
+            title={lang === 'ar' ? 'المساعد القانوني والرقابي التفاعلي للرواتب والأجور' : 'Interactive Labor Law Risk Advisory'}
+          >
+            <div className="space-y-4 text-right">
+              <div className="p-4 bg-slate-50 dark:bg-[#153042] border border-slate-200/60 dark:border-slate-800 rounded-2xl text-xs font-semibold leading-relaxed">
+                <p className="font-black mb-1.5 text-slate-800 dark:text-white">🤖 {lang === 'ar' ? 'اسأل المساعد عن المادة ٢٠ و المادة ٥١ لتوليد استشارات سريعة:' : 'Query Labor law compliance advices:'}</p>
                 <div className="flex flex-wrap gap-2 pt-2">
                   <button 
                     onClick={() => { setAiPrompt(lang === 'ar' ? 'كيف أضمن عدم تجاوز قسط القرض للـ 10% بموجب المادة 20؟' : 'Explain Art 20 10% limit'); }}
-                    className="px-2.5 py-1 text-[10px] font-black bg-indigo-50 border border-indigo-100 rounded text-indigo-700"
+                    className="px-2.5 py-1.5 text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 rounded-lg text-indigo-700 dark:text-indigo-400 cursor-pointer"
                   >
                     {lang === 'ar' ? 'المادة 20 (حد الـ 10% للأقساط)' : 'Art 20 Salary Cap limit'}
                   </button>
                   <button 
                     onClick={() => { setAiPrompt(lang === 'ar' ? 'ما هي رخص الخصم الكامل من مكافأة نهاية الخدمة بموجب المادة 51؟' : 'Explain EOS settlements Art 51'); }}
-                    className="px-2.5 py-1 text-[10px] font-black bg-indigo-50 border border-indigo-100 rounded text-indigo-700"
+                    className="px-2.5 py-1.5 text-[10px] font-black bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900 rounded-lg text-indigo-700 dark:text-indigo-400 cursor-pointer"
                   >
-                    {lang === 'ar' ? 'المادة 51 (التسويات من نهاية الخدمة)' : 'Art 51 EOS Gratutity Clear'}
+                    {lang === 'ar' ? 'المادة 51 (التسويات من نهاية الخدمة)' : 'Art 51 EOS Gratuity Clear'}
                   </button>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Input
+                  className="dark:bg-[#153042] dark:text-white text-right"
                   label={lang === 'ar' ? 'أدخل استفسارك بخصوص نظام الأجور أو الكفلاء الكويتيين:' : 'Enter compliance question'}
                   value={aiPrompt}
                   onChange={e => setAiPrompt(e.target.value)}
                   placeholder={lang === 'ar' ? 'مثال: الحد الأقصى للاستقطاع مادة 20...' : 'e.g., maximum salary deduction limit...'}
                 />
-                <Button variant="primary" onClick={handleSimulateAiQuestions} disabled={isAiLoading}>
+                <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-10 border-none cursor-pointer mt-2"
+                  variant="primary" 
+                  onClick={handleSimulateAiQuestions} 
+                  disabled={isAiLoading}
+                >
                   {isAiLoading ? (lang === 'ar' ? 'تحليل القيود...' : 'Analyzing constraints...') : (lang === 'ar' ? 'سؤال المستشار القانوني لعدالة' : 'Query Legal Advisor')}
                 </Button>
               </div>
 
               {aiResponse && (
-                <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-2xl animate-fade-in-right text-xs leading-relaxed font-bold">
-                  <p className="text-indigo-950 font-black mb-1">💡 {lang === 'ar' ? 'المطابقة الاستشارية لعدالة:' : 'Adala Intelligent Legal Advice:'}</p>
+                <div className="p-5 bg-indigo-50/30 dark:bg-[#153042] border border-indigo-150 dark:border-indigo-900/60 rounded-2xl animate-fade-in-right text-xs leading-relaxed font-bold text-slate-800 dark:text-white">
+                  <p className="text-indigo-950 dark:text-indigo-400 font-black mb-1">💡 {lang === 'ar' ? 'المطابقة الاستشارية لعدالة:' : 'Adala Intelligent Legal Advice:'}</p>
                   <p>{aiResponse}</p>
                 </div>
               )}
@@ -726,7 +717,7 @@ const LoanManagementPage: React.FC = () => {
         )}
       </div>
 
-      {/* MODAL 1: EDITABLE FILE VIEW WITH INSTALLMENTS AND PAYMENTS */}
+      {/* MODAL 1: VIEW FILE MODAL */}
       {viewingLoanId && activeViewingLoanObj && (
         <Modal
           isOpen={!!viewingLoanId}
@@ -734,48 +725,48 @@ const LoanManagementPage: React.FC = () => {
           title={lang === 'ar' ? `الملف والذمة المالية للمقترض: ${activeViewingLoanObj.employeeName}` : `Financial folder for ${activeViewingLoanObj.employeeName}`}
           size="xl"
         >
-          <div className="space-y-6 text-right max-h-[75vh] overflow-y-auto pr-1">
-            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs font-bold text-slate-700">
-              <div className="space-y-1">
-                <p className="text-[10px] text-slate-400 font-bold">{lang === 'ar' ? 'القيمة الأصلية للصرف:' : 'Borrowed Total:'}</p>
-                <p className="text-lg font-black text-slate-900">{activeViewingLoanObj.loanAmount.toFixed(3) + " د.ك"}</p>
-                <p className="text-[10px] text-slate-400">Ref Code: {activeViewingLoanObj.id}</p>
+          <div className="space-y-6 text-right max-h-[75vh] overflow-y-auto pr-1 dark:text-white" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 text-xs font-bold text-slate-700 dark:text-slate-300">
+              <div className="space-y-1 text-right">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{lang === 'ar' ? 'القيمة الأصلية للصرف:' : 'Borrowed Total:'}</p>
+                <p className="text-lg font-black text-slate-900 dark:text-white font-mono">{activeViewingLoanObj.loanAmount.toFixed(3)} د.ك</p>
+                <p className="text-[10px] text-slate-400 dark:text-slate-500 font-mono">Ref Code: {activeViewingLoanObj.id}</p>
               </div>
-              <div>
+              <div className="flex flex-col items-end">
                 <LoanStatusBadge status={activeViewingLoanObj.status} />
-                <p className="text-[10px] mt-1 text-slate-400">{lang === 'ar' ? 'مسجل في:' : 'Logged:'} {activeViewingLoanObj.createdAt}</p>
+                <p className="text-[10px] mt-1.5 text-slate-400 dark:text-slate-500">{lang === 'ar' ? 'مسجل في:' : 'Logged:'} {activeViewingLoanObj.createdAt}</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 border rounded-xl bg-slate-50/50">
-                <p className="text-[10px] text-slate-400">{lang === 'ar' ? 'إجمالي المبالغ المسددة' : 'Paid amount total'}</p>
-                <p className="text-lg font-black text-emerald-600">{(activeViewingLoanObj.totalPaidAmount || 0).toFixed(3) + " د.ك"}</p>
+              <div className="p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">{lang === 'ar' ? 'إجمالي المبالغ المسددة' : 'Paid amount total'}</p>
+                <p className="text-lg font-black text-emerald-600 dark:text-emerald-400 font-mono">{(activeViewingLoanObj.totalPaidAmount || 0).toFixed(3)} د.ك</p>
               </div>
-              <div className="p-4 border rounded-xl bg-slate-50/50">
-                <p className="text-[10px] text-slate-400">{lang === 'ar' ? 'الرصيد المتبقي بمحاضر الالتزام' : 'Remaining balance due'}</p>
-                <p className="text-lg font-black text-rose-600">{(activeViewingLoanObj.remainingBalance ?? activeViewingLoanObj.loanAmount).toFixed(3) + " د.ك"}</p>
+              <div className="p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-950">
+                <p className="text-[10px] text-slate-400 dark:text-slate-500">{lang === 'ar' ? 'الرصيد المتبقي بمحاضر الالتزام' : 'Remaining balance due'}</p>
+                <p className="text-lg font-black text-rose-600 dark:text-rose-400 font-mono">{(activeViewingLoanObj.remainingBalance ?? activeViewingLoanObj.loanAmount).toFixed(3)} د.ك</p>
               </div>
             </div>
 
             {/* Guarantor Details */}
-            <div className="p-4 border rounded-xl bg-slate-50/20 space-y-2 text-xs font-bold text-slate-700 leading-relaxed">
-              <p className="text-slate-500 font-black border-b pb-1.5 mb-2 flex justify-between">
+            <div className="p-4 border border-slate-200/60 dark:border-slate-800 rounded-xl bg-slate-50/20 dark:bg-slate-950 space-y-2 text-xs font-bold text-slate-700 dark:text-slate-300 leading-relaxed">
+              <p className="text-slate-500 dark:text-slate-400 font-black border-b border-slate-200/50 dark:border-slate-800 pb-1.5 mb-2 flex justify-between">
                 <span>{lang === 'ar' ? 'الالتزام والضامن الكفيل:' : 'Guarantor Surety Details:'}</span>
-                <span>{activeViewingLoanObj.guarantorName ? (lang === 'ar' ? 'موجد كفالة معتمدة' : 'Guaranteed') : (lang === 'ar' ? 'لا يوجد كفيل مباشر' : 'No personal guarantor')}</span>
+                <span>{activeViewingLoanObj.guarantorName ? (lang === 'ar' ? 'يوجد كفالة معتمدة' : 'Guaranteed') : (lang === 'ar' ? 'لا يوجد كفيل مباشر' : 'No personal guarantor')}</span>
               </p>
               {activeViewingLoanObj.guarantorName && (
                 <>
                   <p className="flex justify-between"><span>{lang === 'ar' ? 'اسم الكفيل الثلاثي:' : 'Guarantor Name:'}</span><span>{activeViewingLoanObj.guarantorName}</span></p>
-                  <p className="flex justify-between"><span>{lang === 'ar' ? 'الرقم المدني للكفيل:' : 'Civil ID:'}</span><span>{activeViewingLoanObj.guarantorCivilId}</span></p>
+                  <p className="flex justify-between"><span>{lang === 'ar' ? 'الرقم المدني للكفيل:' : 'Civil ID:'}</span><span className="font-mono">{activeViewingLoanObj.guarantorCivilId}</span></p>
                 </>
               )}
               <p className="flex justify-between"><span>{lang === 'ar' ? 'فترة التقسيط:' : 'Amortization Months:'}</span><span>{activeViewingLoanObj.numberOfInstallments} {lang === 'ar' ? 'أشهر' : 'mon'}</span></p>
-              <p className="flex justify-between"><span>{lang === 'ar' ? 'قيمة القسط الشهري مقرر المادة 20:' : 'Deducted monthly installment:'}</span><span>{activeViewingLoanObj.monthlyInstallment.toFixed(3) + " د.ك"}</span></p>
+              <p className="flex justify-between"><span>{lang === 'ar' ? 'قيمة القسط الشهري مقرر المادة 20:' : 'Deducted monthly installment:'}</span><span className="font-mono">{activeViewingLoanObj.monthlyInstallment.toFixed(3)} د.ك</span></p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button variant="ghost" onClick={() => setViewingLoanId(null)}>
+            <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <Button className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl border-none h-10 cursor-pointer" variant="ghost" onClick={() => setViewingLoanId(null)}>
                 {lang === 'ar' ? 'إغلاق الملف' : 'Close File'}
               </Button>
             </div>
@@ -783,36 +774,36 @@ const LoanManagementPage: React.FC = () => {
         </Modal>
       )}
 
-      {/* MODAL 2: ADD/EDIT LOAN FORM MODAL */}
+      {/* MODAL 2: ADD/EDIT LOAN FORM WITH AUTOMATIC ARTICLE 20 VALIDATOR */}
       {isFormOpen && (
         <Modal
           size="lg"
           onClose={() => setIsFormOpen(false)}
           isOpen={isFormOpen}
-          title={editingLoan ? (lang === 'ar' ? 'تعديل وصياغة المعاملة التمويلية' : 'Edit Loan Request parameters') : (lang === 'ar' ? 'تأسيس قرار تمويلي / سلفة جديدة للموظف' : 'Establish New Loan Application')}
+          title={editingLoan ? (lang === 'ar' ? 'تعديل وصياغة المعاملة التمويلية' : 'Edit Loan Request') : (lang === 'ar' ? 'تأسيس قرار تمويلي / سلفة جديدة للموظف' : 'Establish New Loan Application')}
         >
-          <form onSubmit={handleSaveLoanFormSubmit} className="space-y-4 text-right">
+          <form onSubmit={handleSaveLoanFormSubmit} className="space-y-4 text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-black text-slate-750 mb-1">{lang === 'ar' ? 'اختر الموظف المقترض:' : 'Select employee'}</label>
+                <label className="block text-xs font-black text-slate-750 dark:text-slate-300 mb-1.5">{lang === 'ar' ? 'اختر الموظف المقترض:' : 'Select employee'}</label>
                 <select
                   value={formEmployeeId}
                   onChange={e => setFormEmployeeId(e.target.value)}
-                  className="w-full border rounded-xl p-2.5 text-xs font-bold text-slate-700 bg-white"
+                  className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs font-bold text-slate-700 dark:text-white bg-white dark:bg-slate-950 outline-none"
                 >
                   {employees.map(e => (
-                    <option key={e.id} value={e.id}>{e.fullNameAr} ({e.nationality})</option>
+                    <option key={e.id} value={e.id}>{e.fullNameAr} ({e.nationality} - راتبه: {e.basicSalary.toFixed(3)} د.ك)</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-black text-slate-750 mb-1">{lang === 'ar' ? 'نوع التمويل والتبويب:' : 'Financing classification'}</label>
+                <label className="block text-xs font-black text-slate-750 dark:text-slate-300 mb-1.5">{lang === 'ar' ? 'نوع التمويل والتبويب:' : 'Financing classification'}</label>
                 <select
                   value={formLoanType}
                   onChange={e => handleFormLoanTypeChange(e.target.value as LoanType)}
-                  className="w-full border rounded-xl p-2.5 text-xs font-bold text-slate-700 bg-white"
+                  className="w-full border border-slate-200 dark:border-slate-800 rounded-xl p-2.5 text-xs font-bold text-slate-700 dark:text-white bg-white dark:bg-slate-950 outline-none"
                 >
                   <option value={LoanType.PERSONAL}>{lang === 'ar' ? 'قرض مالي شخصي طويل الأجل' : LoanType.PERSONAL}</option>
                   <option value={LoanType.SALARY_ADVANCE}>{lang === 'ar' ? 'سلفة على راتب الشهر الحالي (قصيرة الأجل)' : LoanType.SALARY_ADVANCE}</option>
@@ -824,6 +815,7 @@ const LoanManagementPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
+                className="dark:bg-slate-950 dark:text-white text-right font-mono"
                 label={lang === 'ar' ? 'قيمة مبلغ التمويل المصروف (د.ك):' : 'Financing Principal (KWD)'}
                 type="number"
                 step="0.001"
@@ -833,6 +825,7 @@ const LoanManagementPage: React.FC = () => {
               />
 
               <Input
+                className="dark:bg-slate-950 dark:text-white text-right"
                 label={lang === 'ar' ? 'تاريخ أول قسط واستحقاق:' : 'First installment due date'}
                 type="date"
                 value={formRepaymentStartDate}
@@ -841,6 +834,7 @@ const LoanManagementPage: React.FC = () => {
               />
 
               <Input
+                className="dark:bg-slate-950 dark:text-white text-right font-mono"
                 label={lang === 'ar' ? 'فترة التقسيط بالشهور (أقساط):' : 'Term period (months)'}
                 type="number"
                 value={formNumberOfInstallments}
@@ -851,15 +845,17 @@ const LoanManagementPage: React.FC = () => {
             </div>
 
             {formLoanType !== LoanType.SALARY_ADVANCE && formLoanType !== LoanType.EMERGENCY && (
-              <div className="p-4 bg-slate-50 border rounded-xl space-y-4">
-                <p className="text-xs font-black text-slate-800 border-b pb-1">👤 {lang === 'ar' ? 'الضمانات وهيكل كفيل الموظف:' : 'Personal Guarantor Liability'}</p>
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200/60 dark:border-slate-800 rounded-2xl space-y-4">
+                <p className="text-xs font-black text-slate-800 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-1.5">👤 {lang === 'ar' ? 'الضمانات وهيكل كفيل الموظف:' : 'Personal Guarantor Liability'}</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Input
+                    className="dark:bg-slate-900 dark:text-white text-right"
                     label={lang === 'ar' ? 'اسم الكفيل الضامن الثلاثي:' : 'Guarantor Name'}
                     value={formGuarantorName}
                     onChange={e => setFormGuarantorName(e.target.value)}
                   />
                   <Input
+                    className="dark:bg-slate-900 dark:text-white text-right font-mono"
                     label={lang === 'ar' ? 'الرقم المدني للكفيل:' : 'Guarantor Civil ID'}
                     value={formGuarantorCivilId}
                     onChange={e => setFormGuarantorCivilId(e.target.value)}
@@ -869,45 +865,59 @@ const LoanManagementPage: React.FC = () => {
             )}
 
             <TextArea
+              className="dark:bg-slate-950 dark:text-white text-right"
               label={lang === 'ar' ? 'الغرض وتوصيف الضوابط الائتمانية:' : 'Finance Purpose or reasons'}
               value={formPurpose}
               onChange={e => setFormPurpose(e.target.value)}
               placeholder={lang === 'ar' ? 'اكتب الغرض الإيضاحي من طلب السلفة كويتياً المادة ٢٠...' : 'Explain the reason...'}
             />
 
-            {/* REAL-TIME COMPLIANCE CHECK FOR ARTICLE 20 */}
+            {/* REAL-TIME VALIDATION AND COMPLIANCE CHECK FOR ARTICLE 20 */}
             {selectedEmployeeForForm && (
-              <div className="p-4 rounded-xl border-2 border-slate-100 bg-slate-50 text-right space-y-3">
-                <p className="text-[10.5px] font-black text-slate-500 flex items-center gap-1">
-                  <span>⚖️</span>
-                  <span>{lang === 'ar' ? 'محاكاة ومطابقة آلية للمادة (20) - قانون العمل الكويتي 6/2010:' : 'Kuwait labor Article 20 parameters check:'}</span>
-                </p>
+              <div className={`p-4 rounded-xl border-2 text-right space-y-3 ${
+                isViolatingKuwaitiCap 
+                  ? 'border-rose-300 dark:border-rose-900 bg-rose-50/40 dark:bg-rose-950/20' 
+                  : 'border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/20 dark:bg-emerald-950/10'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <p className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1.5">
+                    <span>⚖️</span>
+                    <span>{lang === 'ar' ? 'التحقق الآلي من حد الاستقطاع (المادة 20 - سقف 10% من الراتب الأساسي):' : 'Statutory Wage Cap Validation (Article 20 - 10% Limit):'}</span>
+                  </p>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded ${
+                    isViolatingKuwaitiCap 
+                      ? 'bg-rose-200 dark:bg-rose-900 text-rose-800 dark:text-rose-200' 
+                      : 'bg-emerald-200 dark:bg-emerald-900 text-emerald-800 dark:text-emerald-200'
+                  }`}>
+                    {isViolatingKuwaitiCap ? (lang === 'ar' ? '⚠️ مخالف لسقف 10%' : 'Over 10% Cap') : (lang === 'ar' ? '✓ متوافق قانونياً' : 'Compliant')}
+                  </span>
+                </div>
                 
-                <div className="grid grid-cols-3 gap-2 text-xs font-bold text-slate-700 leading-none">
+                <div className="grid grid-cols-3 gap-2 text-xs font-bold text-slate-700 dark:text-slate-350">
                   <div>
-                    <p className="text-[10px] text-slate-400 mb-0.5">{tLocal.salaryLabel}</p>
-                    <p className="text-slate-900 font-extrabold">{selectedEmployeeForForm.basicSalary.toFixed(3)} د.ك</p>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 mb-1">{lang === 'ar' ? 'الراتب الأساسي:' : 'Basic Salary:'}</p>
+                    <p className="text-slate-900 dark:text-white font-mono font-black">{selectedEmployeeForForm.basicSalary.toFixed(3)} د.ك</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 mb-0.5">{tLocal.maxDeductionAllowed}</p>
-                    <p className="text-indigo-600 font-extrabold">{(selectedEmployeeForForm.basicSalary * 0.1).toFixed(3)} د.ك</p>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 mb-1">{lang === 'ar' ? 'الحد الأقصى المسموح (10%):' : 'Max 10% Cap:'}</p>
+                    <p className="text-emerald-600 dark:text-emerald-400 font-mono font-black">{(selectedEmployeeForForm.basicSalary * 0.1).toFixed(3)} د.ك</p>
                   </div>
                   <div>
-                    <p className="text-[10px] text-slate-400 mb-0.5">{tLocal.actualDeduction}</p>
-                    <p className={`font-black ${isViolatingKuwaitiCap ? 'text-rose-600' : 'text-emerald-600'}`}>
+                    <p className="text-[10px] text-slate-450 dark:text-slate-500 mb-1">{lang === 'ar' ? 'القسط الشهري المقترح:' : 'Proposed Installment:'}</p>
+                    <p className={`font-mono font-black ${isViolatingKuwaitiCap ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                       {liveMonthlyInstallment.toFixed(3)} د.ك
                     </p>
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1.5 pt-1">
                   <div className="flex justify-between text-[10px] font-black">
-                    <span className={isViolatingKuwaitiCap ? 'text-rose-600' : 'text-emerald-500'}>
-                      {tLocal.percentageOfSalary}: {liveDeductionRatio.toFixed(1)}%
+                    <span className={isViolatingKuwaitiCap ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                      {lang === 'ar' ? 'نسبة الاستقطاع الفعلية:' : 'Actual Wage Ratio:'} {liveDeductionRatio.toFixed(1)}%
                     </span>
-                    <span className="text-slate-400">10% Statutory Cap limit</span>
+                    <span className="text-slate-400 dark:text-slate-500">10.0% Max Statutory Ceiling</span>
                   </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
                     <div 
                       className={`h-full rounded-full transition-all ${isViolatingKuwaitiCap ? 'bg-rose-500' : 'bg-emerald-500'}`}
                       style={{ width: `${Math.min(100, (liveDeductionRatio / 10) * 100)}%` }}
@@ -915,28 +925,49 @@ const LoanManagementPage: React.FC = () => {
                   </div>
                 </div>
 
-                <p className={`text-[10px] font-bold leading-normal flex items-center gap-1 ${isViolatingKuwaitiCap ? 'text-rose-600 bg-rose-50 p-2 rounded-lg border border-rose-100' : 'text-emerald-600 bg-emerald-50/50 p-2 rounded-lg'}`}>
-                  {isViolatingKuwaitiCap ? (
-                    <>
-                      <XCircleIcon className="w-4 h-4 flex-shrink-0" />
-                      <span>{tLocal.violatingReg}</span>
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircleIcon className="w-4 h-4 flex-shrink-0" />
-                      <span>{tLocal.compliantReg}</span>
-                    </>
-                  )}
-                </p>
+                {isViolatingKuwaitiCap && (
+                  <div className="p-3 bg-rose-100/60 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 rounded-xl space-y-2 text-xs">
+                    <p className="text-rose-900 dark:text-rose-200 font-bold leading-relaxed">
+                      ⚠️ {lang === 'ar'
+                        ? `تنبيه مخالفة قانونية: القسط الشهري (${liveMonthlyInstallment.toFixed(3)} د.ك) يتجاوز سقف الاستقطاع القانوني (10% = ${(selectedEmployeeForForm.basicSalary * 0.1).toFixed(3)} د.ك) بموجب المادة 20 من قانون العمل الكويتي رقم 6 لسنة 2010.`
+                        : `Violation: Monthly installment exceeds 10% statutory limit under Kuwait Labor Law 6/2010.`}
+                    </p>
+                    
+                    <div className="flex flex-wrap gap-2 items-center justify-between pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAutoFixInstallments}
+                        className="py-1.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-black text-xs border-none cursor-pointer shadow-xs flex items-center gap-1.5"
+                      >
+                        ⚡ {lang === 'ar' ? 'ضبط تلقائي لعدد الأقساط ليتوافق مع المادة 20' : 'Auto-adjust term to comply with 10% cap'}
+                      </button>
+
+                      <label className="flex items-center gap-2 cursor-pointer text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={formAllowAdministrativeOverride}
+                          onChange={e => setFormAllowAdministrativeOverride(e.target.checked)}
+                          className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>{lang === 'ar' ? 'طلب استثناء إداري مسبب معتمد' : 'Administrative Exception Waiver'}</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4 border-t sticky bottom-0 bg-white py-2 z-10">
-              <Button type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
-                {tLocal.cancelBtn}
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800 sticky bottom-0 bg-white dark:bg-slate-900 py-2 z-10">
+              <Button className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-xl border-none h-10 cursor-pointer" type="button" variant="ghost" onClick={() => setIsFormOpen(false)}>
+                {lang === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>
-              <Button type="submit" variant="primary">
-                {tLocal.saveBtn}
+              <Button 
+                className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-10 border-none cursor-pointer font-black" 
+                type="submit" 
+                variant="primary"
+                disabled={isViolatingKuwaitiCap && !formAllowAdministrativeOverride}
+              >
+                {lang === 'ar' ? 'صرف وترحيل القيد للرواتب' : 'Confirm & Commit Credit'}
               </Button>
             </div>
           </form>

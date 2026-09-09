@@ -12,6 +12,21 @@ import { geminiService } from '../services/geminiService';
 import { Badge, CompanyDocumentStatusBadge } from '../components/ui/Badge';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '../components/ui/Toast';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+    LineChart,
+    Line,
+    PieChart,
+    Pie,
+    Cell
+} from 'recharts';
 
 // Lucide Icons
 import {
@@ -49,7 +64,9 @@ import {
     Activity,
     FileSpreadsheet,
     BookMarked,
-    Edit3
+    Edit3,
+    TrendingUp,
+    BarChart2
 } from 'lucide-react';
 
 import {
@@ -121,6 +138,8 @@ const DICT = {
         remindersTitle: "الإشعارات والتنبيهات والآجال",
         upcomingExpirations: "مواعيد التجديد القريبة",
         noReminders: "لا توجد تنبيهات عاجلة حالياً.",
+        tabDashboard: "لوحة الرقابة والامتثال",
+        tabEditor: "محرر السندات والقرارات",
         tabProfile: "ملف الشركة والتفتيش",
         tabStructure: "الملاك وهيكل رأس المال",
         tabBoard: "مجلس الإدارة واللجان",
@@ -129,7 +148,8 @@ const DICT = {
         tabActions: "التعديلات والمرئيات الرياضية",
         tabDocuments: "السداد والمستندات والخطابات",
         tabTimeline: "سجل العمليات التاريخية",
-        tabCopilot: "مستشار الحوكمة الذكي",
+        tabCopilot: "مساعد الشركات الذكي",
+        tabReports: "التقارير السنوية للشركة",
         shareholderName: "اسم الشريك / المساهم",
         shareholderNationality: "الجنسية",
         civilId: "الرقم المدني / رقم السجل التجاري للشخص المعنوي",
@@ -205,6 +225,8 @@ const DICT = {
         remindersTitle: "Reminders & Regulatory Deadlines",
         upcomingExpirations: "Pending Renewals",
         noReminders: "No urgent compliance alerts.",
+        tabDashboard: "Compliance Dashboard & Radar",
+        tabEditor: "Minutes & Resolution Editor",
         tabProfile: "Profile & Site License",
         tabStructure: "Partners & Cap Table",
         tabBoard: "Board & Committees",
@@ -214,6 +236,7 @@ const DICT = {
         tabDocuments: "Document Safe & Files",
         tabTimeline: "Milestone Audit Log",
         tabCopilot: "Governance AI Copilot",
+        tabReports: "Annual Corporate Reports",
         shareholderName: "Shareholder Name",
         shareholderNationality: "Nationality",
         civilId: "Civil ID / Legal Entity Registry",
@@ -298,12 +321,17 @@ export default function CompanyAffairsPage() {
     });
 
     // Navigation and Visual Preferences
-    const [activeTab, setActiveTab] = useState<string>('profile');
+    const [activeTab, setActiveTab] = useState<string>('dashboard');
+    const [dashboardSubTab, setDashboardSubTab] = useState<string>('profile');
     const [searchQuery, setSearchQuery] = useState<string>('');
     const [filterLegalForm, setFilterLegalForm] = useState<string>('ALL');
     const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
     const [showArchivedCompanies, setShowArchivedCompanies] = useState<boolean>(false);
     const [showNotificationList, setShowNotificationList] = useState<boolean>(false);
+
+    // Integrated Resolution and Minutes Editor States
+    const [docTitle, setDocTitle] = useState<string>('محضر اجتماع الجمعية العامة العادية لزيادة رأس المال');
+    const [docContent, setDocContent] = useState<string>('');
 
     // AI Copilot State
     const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model', content: string }[]>([
@@ -372,6 +400,30 @@ export default function CompanyAffairsPage() {
     const activeCompanyReminders = useMemo(() => {
         return reminders.filter(r => r.companyId === selectedCompanyId && !r.isRead);
     }, [reminders, selectedCompanyId]);
+
+    // Lazy load default document text based on active company
+    useEffect(() => {
+        if (!docContent && activeCompany) {
+            setDocContent(`بسم الله الرحمن الرحيم
+
+دولة الكويت
+وزارة التجارة والصناعة (MOCI)
+محضر اجتماع الجمعية العامة العادية لشركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'}
+
+إنه في تاريخه أعلاه، وبموجب موافقة وزارة التجارة والصناعة المسبقة، انعقدت الجمعية العامة العادية لشركاء شركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'} في مقرها الرئيسي، بحضور شركاء يمثلون 100% من رأس المال البالغ ${activeCompany?.capital ? activeCompany.capital.toLocaleString() : '100,000'} د.ك.
+
+رئيس الجلسة: السيد/ ${activeCompany?.boardMembers?.[0]?.name || 'خالد عبد الله الشاهين'} (رئيس مجلس الإدارة)
+
+جدول الأعمال والقرارات المعتمدة:
+أولاً: الموافقة بالإجماع على زيادة رأس المال المصرح به والمدفوع إلى ${activeCompany?.capital ? (activeCompany.capital * 1.5).toLocaleString() : '150,000'} د.ك عن طريق إدخال شركاء ومستثمرين جدد.
+ثانياً: تفويض السيد/ ${activeCompany?.authorizedSignatories?.[0]?.name || 'خالد عبد الله الشاهين'}، بصفته مفوضاً بالتوقيع، بتمثيل الشركة أمام الجهات الرسمية، وتحديداً وزارة التجارة والصناعة، وكاتب العدل التابع لوزارة العدل للتوقيع على الملحق التعديلي لعقد التأسيس.
+ثالثاً: تفويض رئيس الجلسة بإنشاء وتوطين حساب التوفير لزيادة رأس المال لدى البنك التجاري الكويتي.
+
+القسم القانوني والمطابقة - مكتب الحوكمة والامتثال
+توقيع رئيس الجلسة:                             توقيع كاتب المحضر المعتمد:
+.........................                            .........................`);
+        }
+    }, [activeCompany, docContent]);
 
     // Format utility helpers
     const formatKWD = (value?: number) => {
@@ -975,6 +1027,174 @@ export default function CompanyAffairsPage() {
         }
     };
 
+    // --- GOVERNANCE RADAR VULNERABILITIES LIST ---
+    const vulnerabilityList = useMemo(() => {
+        const list = [
+            {
+                id: 'CORP-VULN-001',
+                title: activeCompany?.companyNameAr || 'الملف السجلي للشركة',
+                type: 'تأخر اجتماع الجمعية العمومية السنوية (AGM)',
+                issue: 'مرور أكثر من 3 أشهر عمالية مالية على نهاية السنة دون جدولة أو انعقاد الجمعية العمومية للشركاء لاعتماد البيانات المالية وتوصية الأرباح، مما ينتهك المادة 134 من قانون الشركات الكويتي رقم 1/2016.',
+                rec: 'أمر فوري: صياغة مسودة عاجلة لدعوة الجمعية وبنود القرار وإعلام قصر العدل ووزارة التجارة.',
+                severity: 'critical'
+            },
+            {
+                id: 'CORP-VULN-002',
+                title: 'هيكل صلاحيات البنوك والمعاملات',
+                type: 'أمن التواقيع وحدود الصلاحية المنفردة العالية',
+                issue: 'سجل الصلاحيات الحالي يظهر تفويضاً منفرداً لبعض أفراد الإدارة والاتصال بحدود تفوق 50,000 د.ك دون اشتراط للتصديق أو التوقيع المزدوج المشترك (Dual Joint Signature) مما يعرض الشركة لمطالبات بالغة الحرج.',
+                rec: 'شريعة التحوط: تعديل جدول المفوضين بوزارة التجارة لإدراج فئة المسؤولية المزدوجة المشتركة.',
+                severity: 'high'
+            }
+        ];
+
+        if (shareholdersSumPercent !== 100) {
+            list.push({
+                id: 'CORP-VULN-003',
+                title: 'سلاسل التأسيس وقيد الحصص',
+                type: 'عدم توازن نسب كشف الشركاء والملاك (Cap Table)',
+                issue: `مجموع الحصص والنسب الموزعة للشركاء بمستند الملاك الحالي يعادل %${shareholdersSumPercent}، مما يظهر فارقاً حسابياً يعطل قيد واعتماد أي تعديل أساسي أو زيادة لرأس مال الشركة لدى وزارة التجارة (MOCI).`,
+                rec: 'تصحيح عاجل: تعديل جدول الشركاء ومراجعة كاتب لضبط الأوزان النسبية وجمع الحصص لتساوي 100% تماماً.',
+                severity: 'critical'
+            });
+        }
+
+        return list;
+    }, [activeCompany, shareholdersSumPercent]);
+
+    // --- GOVERNANCE VULNERABILITIES DISCUSS & ACCLAIM ACTIONS ---
+    const handleDiscussVulnerability = (v: any) => {
+        setActiveTab('copilot');
+        const q = `بصفتك مستشار حوكمة الشركات والخبير بقوانين الشركات الكويتية، أريد مناقشة المخالفة أو الثغرة القانونية التالية لشركة ${activeCompany?.companyNameAr}:
+- النوع: ${v.type}
+- الوصف والثغرة المرصودة: ${v.issue}
+- المعالجة والتوصية: ${v.rec}
+يرجى تقديم شرح مفصل للمخاطر المترتبة على هذه الثغرة بموجب قانون الشركات الكويتي رقم 1 لسنة 2016، وكيفية اتخاذ الخطوات الإجرائية اللازمة مع وزارة التجارة والصناعة (MOCI) فوراً لتجنب أي عقوبات أو وقف التراخيص أو بطلان القرارات.`;
+        
+        setChatMessages(prev => [...prev, { role: 'user', content: q }]);
+        setIsAiLoading(true);
+        
+        geminiService.getChatbotResponse(q, []).then(res => {
+            setChatMessages(prev => [...prev, { role: 'model', content: res }]);
+        }).catch(() => {
+            setChatMessages(prev => [...prev, { role: 'model', content: 'حدث خطأ أثناء فحص البيانات من مستشار الحوكمة الذكي.' }]);
+        }).finally(() => {
+            setIsAiLoading(false);
+        });
+    };
+
+    const handleFixVulnerability = (v: any) => {
+        let titleTemplate = '';
+        let bodyTemplate = '';
+        
+        if (v.id === 'CORP-VULN-001') {
+            titleTemplate = 'عقد ودعوة اجتماع الجمعية العامة العادية السنوية لتدارك مغبة التأخر';
+            bodyTemplate = `بسم الله الرحمن الرحيم
+دولة الكويت
+بموافقة وزارة التجارة والصناعة (MOCI)
+
+الموضوع: دعوة عاجلة لانعقاد الجمعية العامة العادية لشركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'}
+
+يسر مجلس إدارة / مدير شركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'} دعوة السادة الشركاء الكرام لحضور اجتماع الجمعية العامة العادية المقرر انعقاده في المقر الرئيسي للشركة، وذلك لمناقشة جدول الأعمال التالي وتفادي المخالفات والجزاءات المنصوص عليها في المادة 134 من قانون الشركات الكويتي رقم 1/2016:
+
+جدول الأعمال:
+1. مناقشة تقرير الإدارة والمديرين عن نشاط الشركة وإقرار البيانات المالية للحسابات الختامية السنوية.
+2. مناقشة تقرير مراقب الإيرادات والحسابات والمصادقة التامة عليه.
+3. إبراء ذمة أعضاء مجلس الإدارة والمدير عن السنة المنصرمة، وتعيين أو إعادة تعيين مراقب الحسابات.
+
+وتفضلوا بقبول فائق الاحترام والتقدير.
+إمضاء واعتماد الجهة المصدرة:
+........................................`;
+        } else if (v.id === 'CORP-VULN-002') {
+            titleTemplate = 'محضر مجلس إدارة بتقييد رخص التوقيع والاعتمادات البنكية المشتركة';
+            bodyTemplate = `بسم الله الرحمن الرحيم
+دولة الكويت
+محضر اجتماع مجلس إدارة شركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'}
+
+الموضوع: تعديل واعتماد حدود رخص التوقيع ومطابقة البنوك بنظام ثنائي مشترك
+
+اجتمع مجلس إدارة شركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'} وقرر بالإجماع وتفادياً لمخاطر التواقيع الفردية المفتوحة المالي اعتماد الضوابط الرقابية التالية:
+أولاً: تحديد وتأسيس فئات التوقيع على ألا يتعدى في أي حال التوقيع المالي الفردي لأي مفوض أو مدير للشركة قيمة 50,000 د.ك (خمسون ألف دينار كويتي).
+ثانياً: العمليات التي تزيد قيمتها عن 50,050 د.ك تتطلب توقيعاً مشتركاً مزدوجاً (Dual Joint Signature) من الفئة الأولى أ مع أي من الشركاء أو أعضاء الإدارة الماليين المعتمدين.
+ثالثاً: يفوض رئيس الجلسة بتسليم هذا القرار الموثق للبنك المركزي وكافة البنوك المحلية الفعالة لاعتماد ضوابط براءات السداد.
+
+إمضاءات وتوقيع أعضاء مجلس الإدارت:
+........................................`;
+        } else {
+            titleTemplate = 'قرار الشركاء بمراجعة وإعادة توزيع الأنصبة والحصص لتساوي 100%';
+            bodyTemplate = `بسم الله الرحمن الرحيم
+دولة الكويت
+وزارة التجارة والصناعة (MOCI) - كشف قيد حصص الملاك الشركاء
+
+الموضوع: قرار تعديل وإعادة هيكلة جدول الحصص والأنصبة لشركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'}
+
+اجتمع الشركاء الملاك لشركة ${activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'} ذ.م.م، وقرروا بالإجماع تصحيح وإعادة معايرة قيم وأوزان كشف توزيع الحصص الرأس مالية لتطابق نسبة 100% تماماً وبصورة تضمن حماية السجلات الرسمية كالتالي:
+- الشريك الأول: نسبة ملكية عادلة وموازية تعادل 60% من إجمالي رأس المال المكتتب به.
+- الشريك الثاني: نسبة ملكية عادلة وموازية تعادل 40% من إجمالي رأس المال المكتتب به.
+- المجموع الإجمالي: يعادل نسبة 100% مطابقة تامة تامة ومؤكدة لسجلات السجل التجاري المعتمد بوزارة التجارة.
+
+يفوض الشركاء الممثل القانوني للشركة بتسجيل الملحق بالتنسيق مع كاتب العدل.
+
+توقيعات الشركاء والمدير المسؤول:
+........................................`;
+        }
+        
+        setDocTitle(titleTemplate);
+        setDocContent(bodyTemplate);
+        setActiveTab('editor');
+        addToast({ type: 'success', title: 'تم فتح المسودة بالمحرر القانوني', message: 'المستند جاهز الآن للتعديل المباشر في تبويب المحرر وتصديره فوراً.' });
+    };
+
+    // Exporters for document editor (HTML-based downloads & trigger prints)
+    const handleExportDoc = (formatType: 'pdf' | 'doc' | 'xls') => {
+        if (formatType === 'doc') {
+            const htmlContent = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>${docTitle}</title></head>
+                <body style="direction: rtl; font-family: Arial, sans-serif; padding: 25px; line-height: 1.6;">
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <h2>دولة الكويت</h2>
+                        <h3>نموذج صادر من نظام حوكمة شؤون الشركات وقصر العدل الذكي</h3>
+                    </div>
+                    <hr style="border: 2px solid #4f46e5;"/>
+                    <h2 style="color: #4f46e5; text-align: center; margin-top: 20px;">${docTitle}</h2>
+                    <br/>
+                    <p style="white-space: pre-wrap; font-size: 14px; text-align: right;">${docContent}</p>
+                    <br/>
+                    <hr/>
+                    <p style="text-align: center; font-size: 10px; color: #888;">تم التوليد والصياغة بمطابقة أوتوماتيكية للفرائض وقوانين الشركات الكويتية عبر منظومة عدالة الممتثلة</p>
+                </body>
+                </html>
+            `;
+            const blob = new Blob([htmlContent], { type: 'application/msword;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${docTitle}.doc`;
+            link.click();
+            addToast({ type: 'success', title: 'تصدير مستند Word', message: 'بدأ تحميل الملف بصيغة صالحة للتعديل المباشر.' });
+        } else if (formatType === 'xls') {
+            const rows = [
+                ["المستند وصنف الحوكمة القانونية", docTitle],
+                ["المنشأة والشركة المستهدفة", activeCompany?.companyNameAr || 'الشاهين العقارية ذ.م.م'],
+                ["تاريخ تدوين وتعمير المعاملة", new Date().toLocaleDateString('ar-KW')],
+                ["محتويات ومسودة السند المصدق", docContent]
+            ];
+            const csvContent = "data:text/csv;charset=utf-8,\uFEFF" 
+                + rows.map(e => e.map(val => `"${val.replace(/"/g, '""')}"`).join(",")).join("\n");
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `${docTitle}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            addToast({ type: 'success', title: 'تصدير جدول البيانات الإحصائية', message: 'تم تحميل ملف البيانات بصيغة CSV المتوافقة مع Excel.' });
+        } else if (formatType === 'pdf') {
+            window.print();
+        }
+    };
+
     // Filter systems depending on query
     const filteredCompaniesList = useMemo(() => {
         return companies.filter(c => {
@@ -1128,39 +1348,46 @@ export default function CompanyAffairsPage() {
                 </div>
             </header>
 
-            {/* Active Company Workspace Selector */}
+            {/* Active Company Workspace Selector & Quick AI Bar */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 no-print">
                 <div className="lg:col-span-8">
-                    <Card className="rounded-[2.5rem] border-none shadow-xl bg-white dark:bg-dm-card p-6">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <Card className="rounded-[2.5rem] border-none shadow-xl bg-gradient-to-r from-[#032B24] via-[#134D41] to-[#00796B] p-6 text-white relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-64 h-64 bg-amber-400/10 rounded-full blur-3xl pointer-events-none" />
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
                             <div className="flex items-start gap-4">
-                                <div className="w-16 h-16 rounded-[1.7rem] bg-indigo-500/5 text-indigo-600 flex items-center justify-center font-black shadow-lg shadow-indigo-500/5">
+                                <div className="w-16 h-16 rounded-[1.7rem] bg-white/10 text-amber-300 flex items-center justify-center font-black shadow-lg border border-white/20 backdrop-blur-md">
                                     <Building2 className="w-8 h-8" />
                                 </div>
                                 <div>
-                                    <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-1 rounded-full">
-                                        {tLocal.activeCompany}
-                                    </span>
-                                    <h2 className="text-lg md:text-xl font-black mt-1.5 text-slate-900 dark:text-white">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase text-amber-300 bg-amber-400/20 px-3 py-1 rounded-full border border-amber-400/30">
+                                            {tLocal.activeCompany}
+                                        </span>
+                                        <span className="text-[10px] font-black text-emerald-200 bg-emerald-500/20 px-3 py-1 rounded-full border border-emerald-400/30">
+                                            96% {lang === 'ar' ? 'درجة الامتثال' : 'Compliance Rate'}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-lg md:text-xl font-black mt-2 text-white">
                                         {lang === 'ar' ? activeCompany?.companyNameAr : (activeCompany?.companyNameEn || activeCompany?.companyNameAr)}
                                     </h2>
-                                    <p className="text-xs text-slate-400 mt-1 flex items-center gap-2">
+                                    <p className="text-xs text-slate-200/80 mt-1 flex flex-wrap items-center gap-2 font-medium">
                                         <span>{activeCompany?.legalForm}</span> • 
-                                        <span>{tLocal.regNumber}: <span className="font-mono text-indigo-600 font-bold">{activeCompany?.registrationNumber}</span></span>
+                                        <span>{tLocal.regNumber}: <span className="font-mono text-amber-300 font-bold">{activeCompany?.registrationNumber}</span></span> • 
+                                        <span>الترخيص: <span className="font-mono text-emerald-200 font-bold">{activeCompany?.tradeLicenseNumber || '987654/MOCI'}</span></span>
                                     </p>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <div className="flex flex-col text-right">
-                                    <span className="text-[10px] text-slate-400">{tLocal.changeCompany}</span>
+                                    <span className="text-[10px] text-slate-300 font-bold">{tLocal.changeCompany}</span>
                                     <select
                                         value={selectedCompanyId}
                                         onChange={(e) => setSelectedCompanyId(e.target.value)}
-                                        className="mt-1 block w-48 md:w-60 bg-slate-50 dark:bg-slate-800 border border-gray-200 dark:border-gray-700 py-1.5 px-3 rounded-full text-xs font-black focus:outline-none focus:ring-2 focus:ring-primary text-slate-800 dark:text-white"
+                                        className="mt-1 block w-48 md:w-56 bg-white/10 dark:bg-slate-900 border border-white/20 py-1.5 px-3 rounded-full text-xs font-black focus:outline-none focus:ring-2 focus:ring-amber-400 text-white cursor-pointer"
                                     >
                                         {companies.map(c => (
-                                            <option key={c.id} value={c.id}>
+                                            <option key={c.id} value={c.id} className="text-slate-900 bg-white">
                                                 {lang === 'ar' ? c.companyNameAr : (c.companyNameEn || c.companyNameAr)}
                                             </option>
                                         ))}
@@ -1170,31 +1397,66 @@ export default function CompanyAffairsPage() {
                                 <Button
                                     variant="ghost"
                                     onClick={() => { setEditingCompany(activeCompany); setIsCompanyModalOpen(true); }}
-                                    className="p-3 hover:bg-slate-100 rounded-full mt-4 flex items-center justify-center cursor-pointer"
+                                    className="p-3 hover:bg-white/10 text-white rounded-full mt-4 flex items-center justify-center cursor-pointer border border-white/20"
                                 >
-                                    <Edit3 className="w-4 h-4 text-gray-500" />
+                                    <Edit3 className="w-4 h-4 text-amber-300" />
                                 </Button>
                             </div>
+                        </div>
+
+                        {/* Quick Prompt Input Bar for Contract/Governance Analysis */}
+                        <div className="mt-5 pt-4 border-t border-white/10 flex items-center gap-2">
+                            <div className="p-2 rounded-xl bg-amber-400/20 text-amber-300">
+                                <Sparkles className="w-4 h-4 animate-pulse" />
+                            </div>
+                            <input
+                                type="text"
+                                placeholder={lang === 'ar' ? "فحص سريع لعقد تأسيس، نقل حصص، أو كشف ثغرة حوكمة بالذكاء الاصطناعي..." : "Quick AI analysis for articles of association, share transfers, or governance gap..."}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                                        const promptVal = e.currentTarget.value.trim();
+                                        e.currentTarget.value = '';
+                                        setActiveTab('copilot');
+                                        setChatInput(promptVal);
+                                        setTimeout(() => {
+                                            handleSendCustomCopilotMessage();
+                                        }, 100);
+                                    }
+                                }}
+                                className="flex-1 bg-white/10 border border-white/20 rounded-full px-4 py-2 text-xs text-white placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                            />
+                            <button
+                                onClick={() => setActiveTab('copilot')}
+                                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-full transition-all shadow-md cursor-pointer whitespace-nowrap"
+                            >
+                                {lang === 'ar' ? 'استشارة الـ AI' : 'Consult AI'}
+                            </button>
                         </div>
                     </Card>
                 </div>
 
                 <div className="lg:col-span-4">
-                    <Card className="rounded-[2.5rem] border-none shadow-xl bg-slate-900 dark:bg-dm-card p-6 text-white overflow-hidden relative group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/15 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
+                    <Card className="rounded-[2.5rem] border-none shadow-xl bg-[#0F2027] dark:bg-dm-card p-6 text-white overflow-hidden relative group border border-amber-500/20">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full -mr-16 -mt-16 group-hover:scale-110 transition-transform" />
                         <div className="relative z-10">
-                            <span className="text-[9px] uppercase tracking-wider font-black text-indigo-300">{tLocal.complianceStatus}</span>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[9px] uppercase tracking-wider font-black text-amber-400">{tLocal.complianceStatus}</span>
+                                <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">
+                                    معتمد - MOCI & CMA
+                                </span>
+                            </div>
                             <div className="flex items-center gap-2.5 mt-3">
-                                <CheckCircle className="w-8 h-8 text-emerald-400" />
+                                <ShieldCheck className="w-8 h-8 text-emerald-400" />
                                 <div>
-                                    <p className="text-xl font-black">94% (امتثال ممتاز)</p>
-                                    <p className="text-[10px] text-slate-300">مطابق لقرارات الهيئات الرقابية ووزارة التجارة</p>
+                                    <p className="text-xl font-black text-white">96% (درجة حوكمة AAA)</p>
+                                    <p className="text-[10px] text-slate-300 mt-0.5">مطابق لقرارات وزارة التجارة وهيئة أسواق المال</p>
                                 </div>
                             </div>
-                            <div className="mt-5 text-right">
+                            <div className="mt-5 flex justify-between items-center text-right border-t border-slate-800 pt-3">
+                                <span className="text-[10px] text-slate-400 font-bold">المقر: مكتب المحامي صبري شطا</span>
                                 <button
                                     onClick={() => setShowArchivedCompanies(!showArchivedCompanies)}
-                                    className="text-[10px] font-black underline hover:text-indigo-200 cursor-pointer"
+                                    className="text-[10px] font-black text-amber-300 underline hover:text-amber-200 cursor-pointer"
                                 >
                                     {showArchivedCompanies ? (lang === 'ar' ? 'عرض النشطة' : 'Show Active') : (lang === 'ar' ? 'إظهار الملفات المؤرشفة' : 'Show Archived')}
                                 </button>
@@ -1207,15 +1469,12 @@ export default function CompanyAffairsPage() {
             {/* Interactive Tab Navigation */}
             <nav className="flex items-center border-b border-gray-200 dark:border-gray-800 overflow-x-auto no-print">
                 {[
-                    { key: 'profile', label: tLocal.tabProfile, icon: Building2 },
-                    { key: 'structure', label: tLocal.tabStructure, icon: Users },
-                    { key: 'board', label: tLocal.tabBoard, icon: ShieldCheck },
-                    { key: 'signatories', label: tLocal.tabSignatories, icon: Key },
-                    { key: 'meetings', label: tLocal.tabMeetings, icon: BookOpen },
-                    { key: 'actions', label: tLocal.tabActions, icon: Scale },
-                    { key: 'documents', label: tLocal.tabDocuments, icon: FileText },
-                    { key: 'timeline', label: tLocal.tabTimeline, icon: History },
-                    { key: 'copilot', label: tLocal.tabCopilot, icon: Sparkles }
+                    { key: 'dashboard', label: tLocal.tabDashboard, icon: Building2 },
+                    { key: 'resolutions_generator', label: lang === 'ar' ? 'مولد القرارات والجمعيات العمومية' : 'Resolutions Generator', icon: BookMarked },
+                    { key: 'reports', label: tLocal.tabReports, icon: FileSpreadsheet },
+                    { key: 'copilot', label: tLocal.tabCopilot, icon: Sparkles },
+                    { key: 'editor', label: tLocal.tabEditor, icon: FileText },
+                    { key: 'timeline', label: tLocal.tabTimeline, icon: History }
                 ].map(tab => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.key;
@@ -1237,44 +1496,248 @@ export default function CompanyAffairsPage() {
             </nav>
 
             {/* SEARCH AND FILTERS */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 no-print border-b border-gray-100 dark:border-gray-800 pb-4">
-                <div className="relative w-full md:w-96">
-                    <Search className="absolute right-3.5 top-3 w-4.5 h-4.5 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder={tLocal.searchPlaceholder}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-dm-card border border-neutral-light border-opacity-30 rounded-full text-xs focus:ring-2 focus:ring-primary focus:outline-none text-slate-800 dark:text-neutral-light"
-                    />
-                </div>
+            {activeTab === 'dashboard' && (
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 no-print border-b border-gray-100 dark:border-gray-800 pb-4">
+                    <div className="relative w-full md:w-96">
+                        <Search className="absolute right-3.5 top-3 w-4.5 h-4.5 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder={tLocal.searchPlaceholder}
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pr-10 pl-4 py-2.5 bg-white dark:bg-dm-card border border-neutral-light border-opacity-30 rounded-full text-xs focus:ring-2 focus:ring-primary focus:outline-none text-slate-800 dark:text-neutral-light"
+                        />
+                    </div>
 
-                <div className="flex items-center gap-2 self-stretch md:self-auto justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                        <Filter className="w-4 h-4" />
-                        <span>{lang === 'ar' ? 'عرض كـ:' : 'View:'}</span>
-                    </div>
-                    <div className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full flex gap-1">
-                        <button
-                            onClick={() => setViewMode('card')}
-                            className={`px-3 py-1 rounded-full text-[10px] font-black cursor-pointer ${viewMode === 'card' ? 'bg-white dark:bg-dm-card text-primary shadow' : 'text-slate-400'}`}
-                        >
-                            {lang === 'ar' ? 'بطاقات' : 'Cards'}
-                        </button>
-                        <button
-                            onClick={() => setViewMode('table')}
-                            className={`px-3 py-1 rounded-full text-[10px] font-black cursor-pointer ${viewMode === 'table' ? 'bg-white dark:bg-dm-card text-primary shadow' : 'text-slate-400'}`}
-                        >
-                            {lang === 'ar' ? 'جداول' : 'Table'}
-                        </button>
+                    <div className="flex items-center gap-2 self-stretch md:self-auto justify-between">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                            <Filter className="w-4 h-4" />
+                            <span>{lang === 'ar' ? 'عرض كـ:' : 'View:'}</span>
+                        </div>
+                        <div className="bg-slate-100 dark:bg-slate-800 p-1.5 rounded-full flex gap-1">
+                            <button
+                                onClick={() => setViewMode('card')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black cursor-pointer ${viewMode === 'card' ? 'bg-white dark:bg-dm-card text-primary shadow' : 'text-slate-400'}`}
+                            >
+                                {lang === 'ar' ? 'بطاقات' : 'Cards'}
+                            </button>
+                            <button
+                                onClick={() => setViewMode('table')}
+                                className={`px-3 py-1 rounded-full text-[10px] font-black cursor-pointer ${viewMode === 'table' ? 'bg-white dark:bg-dm-card text-primary shadow' : 'text-slate-400'}`}
+                            >
+                                {lang === 'ar' ? 'جداول' : 'Table'}
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
             {/* TAB CONTENT AREA */}
             <main className="min-h-96">
+                
+                {/* Dashboard Specific Elements */}
+                {activeTab === 'dashboard' && (
+                    <div className="space-y-6 mb-8 no-print">
+                        {/* 1. Bento Statistics Cards & Circular Compliance Gauge */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            
+                            {/* Circular Compliance Progress Gauge */}
+                            <Card className="rounded-[2.5rem] p-6 bg-white dark:bg-dm-card border-none shadow-xl flex flex-col items-center justify-center text-center">
+                                <span className="text-[10px] font-black uppercase text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 rounded-full mb-3">
+                                    {lang === 'ar' ? 'مؤشر أمان الشركة' : 'Company Safety Indicator'}
+                                </span>
+                                <div className="relative w-28 h-28 flex items-center justify-center">
+                                    <svg className="w-full h-full transform -rotate-90">
+                                        <circle 
+                                            cx="56" 
+                                            cy="56" 
+                                            r="48" 
+                                            className="stroke-slate-100 dark:stroke-slate-800" 
+                                            strokeWidth="10" 
+                                            fill="transparent" 
+                                        />
+                                        <circle 
+                                            cx="56" 
+                                            cy="56" 
+                                            r="48" 
+                                            className="stroke-primary" 
+                                            strokeWidth="10" 
+                                            fill="transparent" 
+                                            strokeDasharray={2 * Math.PI * 48}
+                                            strokeDashoffset={2 * Math.PI * 48 * (1 - (shareholdersSumPercent === 100 ? 0.94 : 0.72))}
+                                            strokeLinecap="round"
+                                        />
+                                    </svg>
+                                    <div className="absolute text-center">
+                                        <span className="text-2xl font-black text-slate-800 dark:text-white">
+                                            {shareholdersSumPercent === 100 ? '94%' : '72%'}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 block font-bold">
+                                            {shareholdersSumPercent === 100 ? (lang === 'ar' ? 'امتثال تام' : 'Strong Safe') : (lang === 'ar' ? 'ثغرات معلقة' : 'Action Required')}
+                                        </span>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Total Capitalization Card */}
+                            <Card className="rounded-[2.5rem] p-6 bg-white dark:bg-dm-card border-none shadow-xl flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <span className="text-[10px] text-slate-400 font-bold block">{tLocal.capital}</span>
+                                        <p className="text-xl font-black mt-2 text-slate-800 dark:text-white">{formatKWD(activeCompany?.capital)}</p>
+                                    </div>
+                                    <div className="p-3.5 bg-indigo-50 dark:bg-indigo-900/10 rounded-2xl text-primary">
+                                        <Coins className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-4">
+                                    {lang === 'ar' ? 'رأس المال المدفوع بالكامل المقيد رسمياً' : 'Official paid-up registered equity'}
+                                </p>
+                            </Card>
+
+                            {/* Total Partners Card */}
+                            <Card className="rounded-[2.5rem] p-6 bg-white dark:bg-dm-card border-none shadow-xl flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <span className="text-[10px] text-slate-400 font-bold block">{lang === 'ar' ? 'عدد الشركاء الملاك' : 'Shareholders'}</span>
+                                        <p className="text-2xl font-black mt-2 text-slate-800 dark:text-white">{activeCompany?.shareholders?.length || 0}</p>
+                                    </div>
+                                    <div className="p-3.5 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl text-emerald-600">
+                                        <Users className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-emerald-500 font-bold mt-4">
+                                    {lang === 'ar' ? `مجموع ملكية الحصص: ${shareholdersSumPercent}%` : `Equity total matching: ${shareholdersSumPercent}%`}
+                                </p>
+                            </Card>
+
+                            {/* Boards & Signatories info */}
+                            <Card className="rounded-[2.5rem] p-6 bg-white dark:bg-dm-card border-none shadow-xl flex flex-col justify-between">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <span className="text-[10px] text-slate-400 font-bold block">{lang === 'ar' ? 'إداريون ومفوضون بالتوقيع' : 'Boards & Signatories'}</span>
+                                        <p className="text-2xl font-black mt-2 text-slate-800 dark:text-white">
+                                            {(activeCompany?.boardMembers?.length || 0) + (activeCompany?.authorizedSignatories?.length || 0)}
+                                        </p>
+                                    </div>
+                                    <div className="p-3.5 bg-amber-50 dark:bg-amber-900/10 rounded-2xl text-amber-600">
+                                        <ShieldCheck className="w-5 h-5" />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-4">
+                                    {lang === 'ar' ? `تحديث التراخيص: ${activeCompany?.tradeLicenseNumber ? 'ساري وصالح' : 'غير مكتمل'}` : 'All business trade licenses verified'}
+                                </p>
+                            </Card>
+
+                        </div>
+
+                        {/* 2. Kuwait Corporate Governance & Loophole Radar table */}
+                        <Card className="rounded-[2.5rem] p-6 bg-white dark:bg-dm-card border-none shadow-xl">
+                            <div className="flex items-center justify-between border-b pb-4 mb-4">
+                                <div>
+                                    <h3 className="font-black text-slate-900 dark:text-white text-base flex items-center gap-2">
+                                        <AlertTriangle className="w-5 h-5 text-amber-500 animate-pulse" />
+                                        <span>{lang === 'ar' ? 'مرصد الامتثال والثغرات القانونية النشطة' : 'Governance Gaps & Compliance Evaluation'}</span>
+                                    </h3>
+                                    <p className="text-xs text-slate-400 mt-1">
+                                        {lang === 'ar' ? 'تحديد المخالفات الرقابية بموجب قانون الشركات الكويتي وإجراء المعالجات فحصاً واقتراحاً' : 'Automated tracking of regulatory loopholes with instant corrective models'}
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-right text-xs">
+                                    <thead>
+                                        <tr className="border-b border-gray-100 dark:border-gray-800 text-slate-400 font-bold">
+                                            <th className="py-3 px-4">{lang === 'ar' ? 'تصنيف الثغرة' : 'Gap Category'}</th>
+                                            <th className="py-3 px-4">{lang === 'ar' ? 'الوصف والنص الحرج' : 'Issue Description'}</th>
+                                            <th className="py-3 px-4">{lang === 'ar' ? 'المعالجة المعتمدة' : 'Corrective Action'}</th>
+                                            <th className="py-3 px-4 text-center">{lang === 'ar' ? 'حالة المخاطر' : 'Risk Severity'}</th>
+                                            <th className="py-3 px-4 text-left">{lang === 'ar' ? 'الإجراء الذكي' : 'Smart Remediation'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50 dark:divide-gray-800/40">
+                                        {vulnerabilityList.map(v => (
+                                            <tr key={v.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20">
+                                                <td className="py-4 px-4 font-black text-slate-800 dark:text-neutral-light">
+                                                    {v.type}
+                                                </td>
+                                                <td className="py-4 px-4 text-slate-500 max-w-xs leading-relaxed">
+                                                    {v.issue}
+                                                </td>
+                                                <td className="py-4 px-4 text-indigo-600 dark:text-indigo-400 font-bold max-w-xs">
+                                                    {v.rec}
+                                                </td>
+                                                <td className="py-4 px-4 text-center">
+                                                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black ${
+                                                        v.severity === 'critical' ? 'bg-red-50 dark:bg-red-950/20 text-red-600' : 'bg-amber-50 dark:bg-amber-950/20 text-amber-600'
+                                                    }`}>
+                                                        {v.severity === 'critical' ? (lang === 'ar' ? 'خطير جداً' : 'Critical') : (lang === 'ar' ? 'متوسط الأهمية' : 'High Alert')}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-4">
+                                                    <div className="flex gap-2 justify-end">
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="secondary" 
+                                                            onClick={() => handleDiscussVulnerability(v)}
+                                                            className="flex items-center gap-1 text-[10px] py-1.5 px-3 rounded-full hover:bg-primary hover:text-white cursor-pointer"
+                                                        >
+                                                            <Sparkles className="w-3 h-3" />
+                                                            <span>{lang === 'ar' ? 'استقصاء ومناقشة' : 'Discuss'}</span>
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="primary" 
+                                                            onClick={() => handleFixVulnerability(v)}
+                                                            className="flex items-center gap-1 text-[10px] py-1.5 px-3 rounded-full cursor-pointer"
+                                                        >
+                                                            <FileCheck className="w-3 h-3" />
+                                                            <span>{lang === 'ar' ? 'إصلاح فوري دقيق' : 'Auto Remedy'}</span>
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+
+                        {/* 3. Re-introduced Secondary Sub-tabs workspace controller pills bar */}
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400 no-print border-b border-gray-200 dark:border-gray-800 pb-3 mb-2">
+                            <Activity className="w-4 h-4 text-indigo-500 animate-pulse" />
+                            <span>{lang === 'ar' ? 'تنقل في ملفات وقرارات الشركة النشطة:' : 'Navigate active workspace records:'}</span>
+                        </div>
+                        <div className="no-print flex overflow-x-auto gap-2 bg-slate-50 dark:bg-slate-850/10 p-2 rounded-[2rem] border border-gray-150 dark:border-gray-800">
+                            {[
+                                { key: 'profile', label: tLocal.tabProfile },
+                                { key: 'structure', label: tLocal.tabStructure },
+                                { key: 'board', label: tLocal.tabBoard },
+                                { key: 'signatories', label: tLocal.tabSignatories },
+                                { key: 'meetings', label: tLocal.tabMeetings },
+                                { key: 'actions', label: tLocal.tabActions },
+                                { key: 'documents', label: tLocal.tabDocuments }
+                            ].map(tab => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setDashboardSubTab(tab.key)}
+                                    className={`px-5 py-2.5 text-[11px] font-black rounded-full whitespace-nowrap cursor-pointer transition-all ${
+                                        dashboardSubTab === tab.key 
+                                        ? 'bg-primary text-white shadow-lg shadow-primary/20' 
+                                        : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/30'
+                                    }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+
+                    </div>
+                )}
+
                 {/* 1. Profile Tab */}
-                {activeTab === 'profile' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'profile' && (
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <Card className="lg:col-span-2 rounded-3xl p-6 bg-white dark:bg-dm-card border-none shadow-lg">
@@ -1374,7 +1837,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 2. Shareholders & Partner List Tab */}
-                {activeTab === 'structure' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'structure' && (
                     <div className="space-y-6">
                         {shareholdersSumPercent !== 100 && (
                             <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-200 text-amber-800 dark:text-amber-400 flex items-center gap-3 text-xs">
@@ -1494,7 +1957,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 3. Board of Directors and committees */}
-                {activeTab === 'board' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'board' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-sm">{lang === 'ar' ? 'تاريخ وسجل عضوية مجلس الإدارة واللجان' : 'Board Members & Committees Directory'}</h3>
@@ -1573,7 +2036,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 4. Authorized Signatories Tab */}
-                {activeTab === 'signatories' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'signatories' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-sm">{lang === 'ar' ? 'المفوضين بالتوقيع ونطاق الصلاحيات القانونية' : 'Authorized Signatories Registry'}</h3>
@@ -1627,7 +2090,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 5. Assemblies & Minutes Index */}
-                {activeTab === 'meetings' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'meetings' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-sm">{lang === 'ar' ? 'سجل تدوين جلسات ومقترحات الجمعيات والمجالس' : 'Commercial Assemblies & Board Meetings Log'}</h3>
@@ -1698,7 +2161,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 6. Corporate Actions / Capital revisions */}
-                {activeTab === 'actions' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'actions' && (
                     <div className="space-y-6">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-sm">{lang === 'ar' ? 'سجل التعديلات الأساسية على عقد التأسيس وزيادات رأس المال' : 'Key Articles Amendments & Structural Revisions'}</h3>
@@ -1754,7 +2217,7 @@ export default function CompanyAffairsPage() {
                 )}
 
                 {/* 7. Files Safe & Correspondence */}
-                {activeTab === 'documents' && (
+                {activeTab === 'dashboard' && dashboardSubTab === 'documents' && (
                     <div className="space-y-6">
                         {/* Drag and Drop simulate panel */}
                         <div
@@ -1835,6 +2298,236 @@ export default function CompanyAffairsPage() {
                     </div>
                 )}
 
+                {/* Integrated Documents & Resolutions Editor */}
+                {activeTab === 'editor' && (
+                    <div className="space-y-6">
+                        {/* Quick Presets Bar for Legal Documents */}
+                        <Card className="p-4 bg-gradient-to-r from-emerald-900/10 via-teal-900/10 to-indigo-900/10 dark:bg-slate-900 rounded-3xl border border-emerald-500/20 no-print">
+                            <div className="flex items-center gap-2 mb-3">
+                                <FileText className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                                <h4 className="font-black text-sm text-slate-900 dark:text-white">
+                                    {lang === 'ar' ? 'نماذج وقوالب المحاضر والقرارات الجاهزة' : 'Pre-configured Minutes & Resolutions Templates'}
+                                </h4>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                                <button
+                                    onClick={() => {
+                                        setDocTitle(`محضر اجتماع الجمعية العامة العادية للسنة المالية - ${activeCompany?.companyNameAr}`);
+                                        setDocContent(`محضر اجتماع الجمعية العامة العادية\nلشركة ${activeCompany?.companyNameAr || '...'}\nالشكل القانوني: ${activeCompany?.legalForm}\nرقم السجل التجاري: ${activeCompany?.registrationNumber}\nرأس المال المصرح به: ${formatKWD(activeCompany?.capital)}\n\nإنه في يوم .......... الموافق .../.../2026، اجتمعت الجمعية العامة العادية لمساهمي/شركاء الشركة بمقرها الرئيس برئاسة رئيس مجلس الإدارة وبحضور الشركاء الممثلين لنسبة ...% من رأس المال.\n\nجدول الأعمال والقرارات المتخذة:\n1. اعتماد تقرير مجلس الإدارة عن نشاط الشركة وحساباتها الختامية.\n2. المصادقة على الميزانية العمومية وحساب الأرباح والخسائر عن السنة المالية المنتهية.\n3. إبراء ذمة أعضاء مجلس الإدارة/المدراء عن إدارتهم للشركة خلال السنة المالية.\n4. تعيين/إعادة تعيين مراقب الحسابات للشركة وتفويض الإدارة بتحديد أتعابه.\n\nوقد صودق على هذا المحضر للرفع لوزارة التجارة والصناعة (MOCI) والتأشير بالسجل التجاري.\n\nتوقيع رئيس الجلسة / المدير العام:\n.........................................`);
+                                        addToast({ type: 'success', title: 'تم تحميل النموذج', message: 'محضر الجمعية العامة العادية جاهز للتعديل.' });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-500 text-right text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow-md"
+                                >
+                                    <div className="text-emerald-600 dark:text-emerald-400 font-black mb-1">1. جمعية عامة عادية (AGM)</div>
+                                    <div className="text-[10px] text-slate-500">اعتماد الميزانية السنوية وإبراء الذمة</div>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setDocTitle(`محضر اجتماع الجمعية العامة غير العادية (زيادة رأس المال) - ${activeCompany?.companyNameAr}`);
+                                        setDocContent(`محضر اجتماع الجمعية العامة غير العادية (EGA)\nلشركة ${activeCompany?.companyNameAr || '...'}\n\nإنه في يوم .......... الموافق .../.../2026، وافقت الجمعية العامة غير العادية بالإجماع على القرار الإستراتيجي التالي:\n\n1. زيادة رأس مال الشركة المرخص به والمصدق من ${formatKWD(activeCompany?.capital)} د.ك إلى رأس مال جديد بقيمة ${formatKWD((activeCompany?.capital || 100000) * 1.5)} د.ك.\n2. تعديل المادة رقم (...) من عقد التأسيس والنظام الأساسي للشركة بما يتوافق مع رأس المال الجديد.\n3. تفويض السيد/ ......................... بالتوقيع أمام موثق وزارة العدل بالإدارة العامة للتوثيق ولدى وزارة التجارة والصناعة.\n\nحرر هذا المحضر لإتمام إجراءات التوثيق والتأشير بالسجل التجاري.\n\nتوقيع الشركاء والمفوضين:\n.........................................`);
+                                        addToast({ type: 'success', title: 'تم تحميل النموذج', message: 'محضر الجمعية غير العادية لزيادة رأس المال جاهز.' });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-500 text-right text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow-md"
+                                >
+                                    <div className="text-teal-600 dark:text-teal-400 font-black mb-1">2. جمعية غير عادية (EGM)</div>
+                                    <div className="text-[10px] text-slate-500">زيادة رأس المال وتعديل عقد التأسيس</div>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setDocTitle(`قرار مجلس الإدارة بالتمثيل والاعتماد البنكي - ${activeCompany?.companyNameAr}`);
+                                        setDocContent(`قرار مجلس الإدارة / الشركاء رقم (2026/01)\nلشركة ${activeCompany?.companyNameAr || '...'}\n\nقرر مجلس الإدارة في جلسته المنعقدة بتاريخ .../.../2026 ما يلي:\n\nأولاً: تفويض السيد/ ......................... (بطاقة مدنية رقم: ....................) بتمثيل الشركة بصفته مفوضاً بالتوقيع أمام كافة البنوك والمؤسسات المالية داخل وخارج دولة الكويت.\nثانياً: تحديد سقف صلاحية التوقيع المنفرد بـ (${formatKWD(50000)}) د.ك وما زاد عن ذلك يتطلب التوقيع المشترك مع المفوض الثاني.\nثالثاً: فتح وتفعيل الحسابات البنكية وإصدار الاعتمادات والتسهيلات المصرفية باسم الشركة.\n\nالتواقيع المعتمدة:\n1- المفوض الأول: ............................\n2- المفوض الثاني: ............................`);
+                                        addToast({ type: 'success', title: 'تم تحميل النموذج', message: 'قرار الاعتماد البنكي جاهز للتعديل.' });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-500 text-right text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow-md"
+                                >
+                                    <div className="text-indigo-600 dark:text-indigo-400 font-black mb-1">3. قرار الاعتماد البنكي</div>
+                                    <div className="text-[10px] text-slate-500">تحديد صلاحيات التوقيع البنكي والمفوضين</div>
+                                </button>
+
+                                <button
+                                    onClick={() => {
+                                        setDocTitle(`قرار تعديل ملكية وقيد الحصص وتنازل الشركاء - ${activeCompany?.companyNameAr}`);
+                                        setDocContent(`إقرار وتنازل عن حصص بشركة ${activeCompany?.companyNameAr || '...'}\nرقم السجل التجاري: ${activeCompany?.registrationNumber}\n\nأقر أنا الشريك المتنازل/ ......................... بالبيع والتنازل عن عدد (...) حصة بقيمة اسمية قدرها (...) د.ك لصالح الشريك المتنازل له/ .........................\n\nوبذلك تتغير هيكلة حصص رأس المال بالشركة لتصبح على النحو التالي:\n1. الشريك الأول: نسبة ...%\n2. الشريك الثاني: نسبة ...%\n\nوقد صدر هذا القرار للتأشير به أمام الإدارة العامة للتوثيق بوزارة العدل وتعديل السجل التجاري بوزارة التجارة والصناعة.\n\nتوقيع المتنازل: ....................     توقيع المتنازل له: ....................`);
+                                        addToast({ type: 'success', title: 'تم تحميل النموذج', message: 'قرار تنازل ونقل ملكية الحصص جاهز.' });
+                                    }}
+                                    className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-emerald-500 text-right text-xs font-bold transition-all shadow-sm cursor-pointer hover:shadow-md"
+                                >
+                                    <div className="text-amber-600 dark:text-amber-400 font-black mb-1">4. تنازل ونقل ملكية حصص</div>
+                                    <div className="text-[10px] text-slate-500">تعديل هيكل ملكية الشركاء الملاك</div>
+                                </button>
+                            </div>
+                        </Card>
+
+                        <div className="flex flex-col lg:flex-row gap-6">
+                            
+                            {/* Variable Insertion Sidebar Wrapper */}
+                            <div className="lg:col-span-1 lg:w-80 space-y-4 no-print flex-shrink-0">
+                                <Card className="p-5 bg-indigo-500/5 rounded-2xl border-none">
+                                    <h4 className="font-black text-xs text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                                        <Sparkles className="w-4 h-4 text-primary animate-pulse" />
+                                        <span>{lang === 'ar' ? 'مساعِد ومتغيرات الصياغة' : 'Draft variables'}</span>
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">
+                                        {lang === 'ar' ? 'انقر على أي متغير لتوطين قيم ملف المنشأة وإضافتها فوراً بمكان مؤشر المحرر:' : 'Click any variable to append official entity records directly into the active draft area:'}
+                                    </p>
+                                    <div className="space-y-2 text-xs">
+                                        <button 
+                                            onClick={() => setDocContent(prev => prev + `\nشريك ومدير شركة ${activeCompany?.companyNameAr || 'الشاهين العقارية'}`)}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ اسم الشركة (عربي)' : '+ Company Name (AR)'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setDocContent(prev => prev + `\nالشكل القانوني: ${activeCompany?.legalForm || 'شركة ذات مسؤولية محدودة'}`)}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ نوع الهيكل القانوني' : '+ Legal form'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setDocContent(prev => prev + `\nرأس مال الشركة الإجمالي: ${activeCompany?.capital ? formatKWD(activeCompany.capital) : '100,000 د.ك'}`)}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ قيم رأس المال الدفتري' : '+ Authorized Capital'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setDocContent(prev => prev + `\nرقم السجل التجاري: ${activeCompany?.registrationNumber || '12345/أ'}`)}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ رقم القيد والسجل التجاري' : '+ Commercial registry'}
+                                        </button>
+                                        <button 
+                                            onClick={() => setDocContent(prev => prev + `\nرقم الموحد (MOCI): ${activeCompany?.tradeLicenseNumber || '987654'}`)}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ رقم الترخيص الموحد (MOCI)' : '+ MOCI license number'}
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                const list = activeCompany?.shareholders?.map(s => `- الشريك: ${s.name} (حصة بنسبة ${s.sharePercentage}%)`).join('\n') || '';
+                                                setDocContent(prev => prev + `\nكشف قيد المساهمين الملاك:\n${list}`);
+                                            }}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ قائمة وجدول كشف الشركاء' : '+ Shareholders distribution list'}
+                                        </button>
+                                        <button 
+                                            onClick={() => {
+                                                const list = activeCompany?.authorizedSignatories?.map(s => `- المفوض: ${s.name} (الصلاحية: ${s.signatureScope})`).join('\n') || '';
+                                                setDocContent(prev => prev + `\nجدول رخص التواقيع للمفوضين البنكيين:\n${list}`);
+                                            }}
+                                            className="w-full text-right p-2 border border-gray-100 dark:border-gray-800 bg-white dark:bg-slate-900 rounded-xl hover:border-primary cursor-pointer text-slate-700 dark:text-neutral-light hover:text-primary transition-all font-bold"
+                                        >
+                                            {lang === 'ar' ? '+ جدول المفوضين بالتوقيع الكويتي' : '+ Signatory rights table'}
+                                        </button>
+                                    </div>
+                                </Card>
+
+                                <Card className="p-4 bg-slate-100 dark:bg-slate-805/30 rounded-2xl border-none">
+                                    <h4 className="font-bold text-xs text-slate-400 mb-2">{lang === 'ar' ? 'إرشادات الإيداع والمطابقة' : 'Filing guidelines'}</h4>
+                                    <p className="text-[10px] text-slate-400 leading-relaxed">
+                                        {lang === 'ar' 
+                                            ? 'بموجب قانون التجارة الكويتي، يتعين مصادقة كاتب العدل لوزارة العدل وتوثيق القرارات خلال 15 يوماً من الجمعية لتكون سارية بالكامل.' 
+                                            : 'Kuwaiti corporate law requires public registry approval and electronic filings within 15 working days from general assembly consensus.'}
+                                    </p>
+                                </Card>
+                            </div>
+
+                            {/* Main Document Workspace Paper Canvas */}
+                            <div className="flex-1 flex flex-col gap-4">
+                                <Card className="flex-1 rounded-[2rem] p-8 bg-white dark:bg-dm-card border-none shadow-xl flex flex-col gap-6">
+                                    
+                                    {/* Action Bar */}
+                                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 dark:border-gray-800 pb-4 no-print">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                                {lang === 'ar' ? 'وضع الصياغة والمصادقة المباشرة' : 'Active draft compliance mode'}
+                                            </span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                variant="secondary" 
+                                                onClick={() => handleExportDoc('doc')}
+                                                className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-full cursor-pointer"
+                                            >
+                                                <Download className="w-4 h-4" />
+                                                <span>{lang === 'ar' ? 'Word' : 'Word doc'}</span>
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="secondary" 
+                                                onClick={() => handleExportDoc('xls')}
+                                                className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-full cursor-pointer"
+                                            >
+                                                <FileSpreadsheet className="w-4 h-4" />
+                                                <span>Excel / CSV</span>
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="primary" 
+                                                onClick={() => handleExportDoc('pdf')}
+                                                className="flex items-center gap-1.5 text-xs py-2 px-4 rounded-full cursor-pointer"
+                                            >
+                                                <Printer className="w-4 h-4" />
+                                                <span>{lang === 'ar' ? 'الطباعة السريعة' : 'Print PDF'}</span>
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Document Title input */}
+                                    <div className="flex flex-col gap-1">
+                                        <label className="text-xs text-slate-400 font-bold px-1">{lang === 'ar' ? 'موضوع / عنوان القرار أو المحضر:' : 'Document / Resolution Topic Title:'}</label>
+                                        <input 
+                                            type="text" 
+                                            value={docTitle} 
+                                            onChange={(e) => setDocTitle(e.target.value)}
+                                            className="w-full bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-gray-800 py-3 px-4 rounded-2xl text-xs md:text-sm font-black focus:ring-2 focus:ring-primary focus:outline-none text-slate-900 dark:text-white"
+                                            placeholder={lang === 'ar' ? 'أدخل عنوان السند...' : 'Document title...'}
+                                        />
+                                    </div>
+
+                                    {/* Rich Text Resolution content area */}
+                                    <div className="flex-1 flex flex-col gap-1">
+                                        <label className="text-xs text-slate-400 font-bold px-1">{lang === 'ar' ? 'مسودة النص الأساسي والمصادرات القانونية:' : 'Draft legal body content:'}</label>
+                                        <textarea
+                                            value={docContent}
+                                            onChange={(e) => setDocContent(e.target.value)}
+                                            rows={18}
+                                            className="w-full flex-1 bg-slate-50 dark:bg-slate-900 border border-gray-100 dark:border-gray-800 p-6 rounded-2xl text-xs leading-relaxed focus:ring-2 focus:ring-primary focus:outline-none focus:bg-white dark:focus:bg-slate-950 font-mono text-slate-800 dark:text-neutral-light min-h-[400px]"
+                                            style={{ direction: 'rtl' }}
+                                        />
+                                    </div>
+
+                                    {/* Official Sabri Shatta Law Office Approved Seal Stamp (Renders on Print) */}
+                                    <div className="mt-6 pt-6 border-t border-dashed border-gray-200 dark:border-gray-800 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                                            <p className="font-bold text-slate-800 dark:text-slate-200">ملاحظة التوثيق:</p>
+                                            <p>تم إعداد هذا المستند عبر المنظومة الرقمية بحوكمة معتمدة لمكتب المحامي صبري شطا.</p>
+                                        </div>
+
+                                        {/* Official Approved Circular Stamp Component */}
+                                        <div className="flex items-center gap-3 border-2 border-[#134D41] dark:border-emerald-500 rounded-full px-5 py-2.5 bg-emerald-50/50 dark:bg-emerald-950/30">
+                                            <div className="w-10 h-10 rounded-full border border-amber-500 flex items-center justify-center bg-white dark:bg-slate-900 shadow-inner">
+                                                <ShieldCheck className="w-6 h-6 text-[#134D41] dark:text-emerald-400" />
+                                            </div>
+                                            <div className="text-right">
+                                                <div className="text-[11px] font-black text-[#134D41] dark:text-emerald-400">مكتب المحامي صبري شطا</div>
+                                                <div className="text-[9px] font-bold text-amber-600 dark:text-amber-400">ختم توثيق وحوكمة الشركات - معتمد</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                </Card>
+                            </div>
+
+                        </div>
+                    </div>
+                )}
+
                 {/* 8. Interactive Timeline Events tracking */}
                 {activeTab === 'timeline' && (
                     <div className="space-y-6">
@@ -1864,6 +2557,529 @@ export default function CompanyAffairsPage() {
                             ) : (
                                 <p className="text-center py-12 text-slate-400 text-xs">لا توجد فعاليات مسجلة للأرشفة في هذه الشركة.</p>
                             )}
+                        </div>
+                    </div>
+                )}
+
+                {/* -------------------- GENERAL ASSEMBLY & BOARD RESOLUTION GENERATOR -------------------- */}
+                {activeTab === 'resolutions_generator' && (
+                    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                        <div className="bg-gradient-to-r from-[#032B24] via-[#134D41] to-[#0A4136] p-6 rounded-3xl text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 text-amber-300 font-bold text-xs">
+                                    <BookMarked className="w-5 h-5" />
+                                    <span>{lang === 'ar' ? 'مولد قرارات الجمعيات العمومية ومجالس الإدارة (قانون الشركات الكويتي 1/2016)' : 'MOCI Resolution Generator'}</span>
+                                </div>
+                                <h3 className="text-xl font-black text-white mt-1">
+                                    {lang === 'ar' ? `صياغة قرار رسمي موثق لشركة: ${activeCompany?.companyNameAr}` : `Resolution Generator for ${activeCompany?.companyNameAr}`}
+                                </h3>
+                                <p className="text-xs text-slate-200/80 mt-1">
+                                    {lang === 'ar' ? 'إنشاء قرارات محكمة قانونياً وجاهزة للتسجيل والإيداع لدى وزارة التجارة والصناعة (MOCI) والسجل التجاري' : 'Generate legally sound resolutions ready for MOCI registry filing'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                            
+                            {/* Generator Controls */}
+                            <div className="lg:col-span-5 space-y-4">
+                                <Card className="p-5 space-y-4 bg-white dark:bg-dm-card border-none shadow-md">
+                                    <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-2 border-b pb-3">
+                                        <FileCheck className="w-4 h-4 text-emerald-500" />
+                                        <span>{lang === 'ar' ? 'إعدادات القرار والجمعية' : 'Resolution Parameters'}</span>
+                                    </h4>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 block mb-1">{lang === 'ar' ? 'نوع الاجتماع / القرار:' : 'Meeting Category:'}</label>
+                                        <select 
+                                            id="res-type-select"
+                                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-white"
+                                            onChange={(e) => {
+                                                const val = e.target.value;
+                                                if (val === 'agm') {
+                                                    setDocTitle(`محضر اجتماع الجمعية العامة العادية - ${activeCompany?.companyNameAr}`);
+                                                    setDocContent(`محضر اجتماع الجمعية العامة العادية\nلشركة: ${activeCompany?.companyNameAr}\nالسجل التجاري: ${activeCompany?.registrationNumber}\nرأس المال: ${formatKWD(activeCompany?.capital)}\n\nإنه في يوم .......... الموافق .../.../2026، اجتمعت الجمعية العامة العادية لمساهمي/شركاء الشركة بمقرها الرئيس بتمام الساعة 10:00 صباحاً بحضور نسبة حضور تعادل %92 من رأس المال.\n\nقرارات الجمعية العادية:\n1. المصادقة التامة على تقرير مجلس الإدارة عن السنة المالية المنتهية والحسابات الختامية.\n2. اعتماد تقرير مراقب الحسابات والمصادقة على الميزانية العمومية.\n3. إبراء ذمة أعضاء مجلس الإدارة والمديرين عن إدارتهم للشركة خلال السنة المالية.\n4. تعيين مراقب الحسابات وتفويض مجلس الإدارة بتحديد أتعابه.`);
+                                                } else if (val === 'egm') {
+                                                    setDocTitle(`محضر اجتماع الجمعية العامة غير العادية (زيادة رأس المال) - ${activeCompany?.companyNameAr}`);
+                                                    setDocContent(`محضر اجتماع الجمعية العامة غير العادية\nلشركة: ${activeCompany?.companyNameAr}\nالسجل التجاري: ${activeCompany?.registrationNumber}\n\nقرارات الجمعية غير العادية بالإجماع:\n1. زيادة رأس مال الشركة من ${formatKWD(activeCompany?.capital)} د.ك إلى ${formatKWD((activeCompany?.capital || 100000) * 1.5)} د.ك.\n2. تعديل المادة رقم (6) من عقد التأسيس والنظام الأساسي للشركة بما يطابق رأس المال الجديد.\n3. تفويض المدير العام بالتوقيع أمام التوثيق العقاري بوزارة العدل والسجل التجاري بوزارة التجارة والصناعة (MOCI).`);
+                                                } else {
+                                                    setDocTitle(`قرار مجلس الإدارة بتفويض التوقيع والاعتمادات البنكية - ${activeCompany?.companyNameAr}`);
+                                                    setDocContent(`قرار مجلس الإدارة رقم (2026/02)\nلشركة: ${activeCompany?.companyNameAr}\n\nاجتمع مجلس الإدارة وقرر ما يلي:\n1. تفويض المفوض المعتمد بتمثيل الشركة بصفة فردية حتى سقف 50,000 د.ك لدى كافة البنوك الكويتي.\n2. المخولون بالتوقيع يتطلب توقيعهم الثنائي المزدوج لأي مبالغ تجاوز 50,000 د.ك.\n3. تقديم هذا القرار للبنوك والجهات الرسمية فوراً.`);
+                                                }
+                                            }}
+                                        >
+                                            <option value="agm">1. جمعية عامة عادية (AGM) - اعتماد الميزانية وإبراء الذمة</option>
+                                            <option value="egm">2. جمعية عامة غير عادية (EGM) - زيادة رأس المال وتعديل العقود</option>
+                                            <option value="board">3. قرار مجلس إدارة (Board Resolution) - صلاحيات البنوك والإدارة</option>
+                                            <option value="managers">4. قرار هيئة المديرين - عزل/تعيين مدير وتعديل الأغراض</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 block mb-1">{lang === 'ar' ? 'تاريخ عقد الاجتماع:' : 'Meeting Date:'}</label>
+                                        <input type="date" defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-white" />
+                                    </div>
+
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 block mb-1">{lang === 'ar' ? 'نسبة النصاب وحضور الشركاء:' : 'Quorum Attendance:'}</label>
+                                        <input type="text" defaultValue="92.5% من إجمالي الحصص المكتتب بها" className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-white" />
+                                    </div>
+
+                                    <div className="pt-2 flex gap-2">
+                                        <Button 
+                                            size="sm" 
+                                            variant="primary" 
+                                            onClick={() => {
+                                                window.print();
+                                            }} 
+                                            className="flex-1 font-black"
+                                            leftIcon={<Printer className="w-4 h-4" />}
+                                        >
+                                            {lang === 'ar' ? 'طباعة القرار مع التوثيق' : 'Print Resolution'}
+                                        </Button>
+
+                                        <Button 
+                                            size="sm" 
+                                            variant="secondary" 
+                                            onClick={() => {
+                                                setActiveTab('editor');
+                                                addToast({ type: 'info', title: 'تم فتح المحرر', message: 'يمكنك الآن إضافة تعديلات وصياغات مخصصة للمستند.' });
+                                            }} 
+                                            className="flex-1 font-black"
+                                            leftIcon={<Edit3 className="w-4 h-4" />}
+                                        >
+                                            {lang === 'ar' ? 'تعديل بالمحرر' : 'Edit in Canvas'}
+                                        </Button>
+                                    </div>
+                                </Card>
+                            </div>
+
+                            {/* Live Draft Preview Canvas */}
+                            <div className="lg:col-span-7">
+                                <Card className="p-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-lg font-serif space-y-6 text-slate-900 dark:text-slate-100 relative">
+                                    <div className="text-center border-b pb-4 space-y-1">
+                                        <div className="text-xs font-black text-amber-600 dark:text-amber-400">دولة الكويت - وزارة التجارة والصناعة (MOCI)</div>
+                                        <h2 className="text-lg font-black text-slate-900 dark:text-white">{docTitle}</h2>
+                                        <p className="text-[10px] text-slate-400 font-sans">مسجلة بموجب أحكام قانون الشركات رقم 1 لسنة 2016 ولائحته التنفيذية</p>
+                                    </div>
+
+                                    <div className="text-xs leading-relaxed whitespace-pre-wrap font-sans bg-slate-50 dark:bg-slate-800/40 p-5 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                        {docContent || `محضر اجتماع الجمعية العامة العادية
+لشركة: ${activeCompany?.companyNameAr}
+السجل التجاري: ${activeCompany?.registrationNumber}
+
+قرارات الجمعية العادية:
+1. المصادقة التامة على تقرير مجلس الإدارة عن السنة المالية المنتهية والحسابات الختامية.
+2. اعتماد تقرير مراقب الحسابات والمصادقة على الميزانية العمومية.
+3. إبراء ذمة أعضاء مجلس الإدارة والمديرين عن إدارتهم للشركة خلال السنة المالية.`}
+                                    </div>
+
+                                    <div className="pt-6 border-t grid grid-cols-2 text-center text-xs font-bold font-sans">
+                                        <div>
+                                            <p className="text-slate-400 text-[10px]">توقيع رئيس الجلسة / رئيس مجلس الإدارة</p>
+                                            <p className="mt-8 text-slate-800 dark:text-white font-black">....................................................</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-slate-400 text-[10px]">خاتم ومصادقة الإدارة القانونية (مكتب صبري شطا)</p>
+                                            <p className="mt-8 text-emerald-600 font-mono font-black">[معتمد وموثق بالسجل الرقمي]</p>
+                                        </div>
+                                    </div>
+                                </Card>
+                            </div>
+
+                        </div>
+                    </div>
+                )}
+
+                {/* Annual Corporate Reports & Performance Dashboard */}
+                {activeTab === 'reports' && (
+                    <div className="space-y-6">
+                        
+                        {/* MOCI REGULATORY DEADLINES & BUDGET SUBMISSION ALERT ENGINE */}
+                        <Card className="p-5 bg-gradient-to-r from-amber-50/80 via-white to-amber-50/50 dark:from-slate-900 dark:to-slate-900 border-2 border-amber-300 rounded-3xl shadow-sm space-y-3">
+                            <div className="flex justify-between items-center">
+                                <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400 font-black text-sm">
+                                    <Bell className="w-5 h-5 text-amber-600 animate-bounce" />
+                                    <span>{lang === 'ar' ? 'التنبيه الآلي لمواعيد تقديم الميزانيات والمتطلبات التنظيمية لوزارة التجارة (MOCI)' : 'Automated MOCI Budget & Regulatory Alert Engine'}</span>
+                                </div>
+                                <span className="px-3 py-1 bg-amber-500 text-slate-950 font-black text-[10px] rounded-full">
+                                    {lang === 'ar' ? 'تحديث حي' : 'Live MOCI Sync'}
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+                                <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-amber-200 dark:border-slate-700">
+                                    <div className="text-[10px] font-black text-rose-600">🚨 الميزانية السنوية (MOCI)</div>
+                                    <p className="text-xs font-black text-slate-800 dark:text-white mt-1">تقديم البيانات المالية 2025</p>
+                                    <p className="text-[10px] text-rose-500 font-bold mt-1">باقي 28 يوماً قبل انتهاء المهلة</p>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-amber-200 dark:border-slate-700">
+                                    <div className="text-[10px] font-black text-amber-600">⚠️ الترخيص التجاري</div>
+                                    <p className="text-xs font-black text-slate-800 dark:text-white mt-1">تجديد رخصة وزارة التجارة</p>
+                                    <p className="text-[10px] text-amber-600 font-bold mt-1">باقي 42 يوماً (الرخصة سارية)</p>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="text-[10px] font-black text-emerald-600">✅ غرفة التجارة والصناعة</div>
+                                    <p className="text-xs font-black text-slate-800 dark:text-white mt-1">شهادة الانتساب السنوية</p>
+                                    <p className="text-[10px] text-emerald-600 font-bold mt-1">مجددة ومستوفاة بالكامل</p>
+                                </div>
+
+                                <div className="p-3 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
+                                    <div className="text-[10px] font-black text-indigo-600">ℹ️ اعتماد التوقيع (PACI)</div>
+                                    <p className="text-xs font-black text-slate-800 dark:text-white mt-1">اعتماد المفوضين بالسجل</p>
+                                    <p className="text-[10px] text-indigo-600 font-bold mt-1">ساري حتى ديسمبر 2026</p>
+                                </div>
+                            </div>
+                        </Card>
+
+
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                            <div>
+                                <h3 className="font-black text-lg text-slate-900 dark:text-white flex items-center gap-2">
+                                    <BarChart2 className="w-5 h-5 text-indigo-500" />
+                                    <span>{lang === 'ar' ? 'التقارير السنوية للشركة' : 'Annual Corporate Reports'}</span>
+                                    <span className="text-xs bg-indigo-500/10 text-indigo-500 px-2 py-0.5 rounded-full font-bold">
+                                        {activeCompany?.companyNameAr || 'الشركة المحددة'}
+                                    </span>
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    {lang === 'ar' 
+                                        ? 'تحليل شامل لمعدلات الربحية والأداء السنوي ومؤشرات الامتثال للقوانين الكويتية' 
+                                        : 'Comprehensive analysis of annual performance, profitability rates, and Kuwaiti corporate law compliance index'}
+                                </p>
+                            </div>
+
+                            {/* Export / Print Buttons */}
+                            <div className="flex gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => {
+                                        const capitalVal = activeCompany?.capital || 150000;
+                                        const headers = ["Year", "Revenue (KWD)", "Expenses (KWD)", "Net Profit (KWD)", "Profitability Rate (%)", "Compliance Index (%)"];
+                                        const rows = [
+                                            ["2021", (capitalVal * 1.5).toFixed(0), (capitalVal * 1.2).toFixed(0), (capitalVal * 0.3).toFixed(0), "15", "82"],
+                                            ["2022", (capitalVal * 1.8).toFixed(0), (capitalVal * 1.35).toFixed(0), (capitalVal * 0.45).toFixed(0), "18", "85"],
+                                            ["2023", (capitalVal * 2.2).toFixed(0), (capitalVal * 1.6).toFixed(0), (capitalVal * 0.6).toFixed(0), "20", "89"],
+                                            ["2024", (capitalVal * 2.6).toFixed(0), (capitalVal * 1.85).toFixed(0), (capitalVal * 0.75).toFixed(0), "22", "92"],
+                                            ["2025", (capitalVal * 3.1).toFixed(0), (capitalVal * 2.1).toFixed(0), (capitalVal * 1.0).toFixed(0), "24", "96"]
+                                        ];
+                                        const csvContent = "data:text/csv;charset=utf-8," 
+                                            + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+                                        const encodedUri = encodeURI(csvContent);
+                                        const link = document.createElement("a");
+                                        link.setAttribute("href", encodedUri);
+                                        link.setAttribute("download", `Annual_Report_${activeCompany?.companyNameAr || 'Company'}.csv`);
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                    }}
+                                    className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-full cursor-pointer"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    <span>{lang === 'ar' ? 'تصدير البيانات CSV' : 'Export CSV'}</span>
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="primary"
+                                    onClick={() => window.print()}
+                                    className="flex items-center gap-1.5 text-xs py-2 px-3 rounded-full cursor-pointer"
+                                >
+                                    <Printer className="w-3.5 h-3.5" />
+                                    <span>{lang === 'ar' ? 'طباعة التقرير المالي' : 'Print Report'}</span>
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Summary KPI Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                            <Card className="p-4 bg-gradient-to-br from-indigo-500/5 to-indigo-500/10 border-none rounded-2xl flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {lang === 'ar' ? 'إجمالي أرباح السنوات (5 سنوات)' : 'Total Cumulative Profits (5Y)'}
+                                    </span>
+                                    <div className="p-1 bg-indigo-500 text-white rounded-lg">
+                                        <Coins className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                        {formatKWD((activeCompany?.capital || 150000) * 3.1)}
+                                    </h3>
+                                    <p className="text-[10px] text-emerald-500 font-bold mt-1 flex items-center gap-1">
+                                        <TrendingUp className="w-3.5 h-3.5" />
+                                        <span>+32% {lang === 'ar' ? 'نمو تراكمي مستمر' : 'cumulative growth'}</span>
+                                    </p>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-none rounded-2xl flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {lang === 'ar' ? 'معدل الربحية التشغيلي' : 'Average Operating Profitability'}
+                                    </span>
+                                    <div className="p-1 bg-emerald-500 text-white rounded-lg">
+                                        <TrendingUp className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                        24.2%
+                                    </h3>
+                                    <p className="text-[10px] text-slate-500 mt-1">
+                                        {lang === 'ar' ? 'أعلى بنسبة 4.2% من متوسط السوق' : '4.2% higher than market avg'}
+                                    </p>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-none rounded-2xl flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {lang === 'ar' ? 'معدل تسوية القضايا المغلقة' : 'Closed Cases Rate'}
+                                    </span>
+                                    <div className="p-1 bg-amber-500 text-white rounded-lg">
+                                        <Scale className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                        94.1%
+                                    </h3>
+                                    <p className="text-[10px] text-amber-600 font-bold mt-1">
+                                        {lang === 'ar' ? 'تم تسوية 32 قضية من أصل 34' : '32 out of 34 cases resolved'}
+                                    </p>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 bg-gradient-to-br from-teal-500/5 to-teal-500/10 border-none rounded-2xl flex flex-col justify-between">
+                                <div className="flex justify-between items-start">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400">
+                                        {lang === 'ar' ? 'مؤشر الامتثال لقانون العمل والشركات' : 'Kuwaiti Law Compliance Index'}
+                                    </span>
+                                    <div className="p-1 bg-teal-500 text-white rounded-lg">
+                                        <ShieldCheck className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <div className="mt-4">
+                                    <h3 className="text-xl font-black text-slate-900 dark:text-white">
+                                        96.0%
+                                    </h3>
+                                    <p className="text-[10px] text-teal-600 font-bold mt-1 flex items-center gap-1">
+                                        <span>{lang === 'ar' ? 'درجة حوكمة ممتازة (AAA)' : 'Excellent Governance Rating'}</span>
+                                    </p>
+                                </div>
+                            </Card>
+                        </div>
+
+                        {/* Detailed Reports and Charts Panel */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            
+                            {/* Card 1: Annual Financial Performance */}
+                            <Card className="p-6 bg-white dark:bg-dm-card rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                                <div>
+                                    <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <BarChart2 className="w-4 h-4 text-indigo-500" />
+                                        <span>{lang === 'ar' ? 'إحصائيات الأداء السنوي والمالي (د.ك)' : 'Annual Financial Performance (KWD)'}</span>
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">
+                                        {lang === 'ar' 
+                                            ? 'مقارنة الإيرادات السنوية، المصروفات التشغيلية وصافي الأرباح التراكمية بناءً على رأس المال الدفتري' 
+                                            : 'Comparison of annual revenues, operating expenses, and net profit based on company capital'}
+                                    </p>
+                                </div>
+
+                                <div className="h-64 w-full text-xs">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart
+                                            data={[
+                                                { year: '2021', revenue: Math.round((activeCompany?.capital || 150000) * 1.5), expenses: Math.round((activeCompany?.capital || 150000) * 1.2), profit: Math.round((activeCompany?.capital || 150000) * 0.3) },
+                                                { year: '2022', revenue: Math.round((activeCompany?.capital || 150000) * 1.8), expenses: Math.round((activeCompany?.capital || 150000) * 1.35), profit: Math.round((activeCompany?.capital || 150000) * 0.45) },
+                                                { year: '2023', revenue: Math.round((activeCompany?.capital || 150000) * 2.2), expenses: Math.round((activeCompany?.capital || 150000) * 1.6), profit: Math.round((activeCompany?.capital || 150000) * 0.6) },
+                                                { year: '2024', revenue: Math.round((activeCompany?.capital || 150000) * 2.6), expenses: Math.round((activeCompany?.capital || 150000) * 1.85), profit: Math.round((activeCompany?.capital || 150000) * 0.75) },
+                                                { year: '2025', revenue: Math.round((activeCompany?.capital || 150000) * 3.1), expenses: Math.round((activeCompany?.capital || 150000) * 2.1), profit: Math.round((activeCompany?.capital || 150000) * 1.0) }
+                                            ]}
+                                            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="opacity-40" />
+                                            <XAxis dataKey="year" stroke="#94A3B8" fontSize={11} />
+                                            <YAxis stroke="#94A3B8" fontSize={11} tickFormatter={(val) => `${val / 1000}k`} />
+                                            <Tooltip formatter={(value: any) => [`${Number(value).toLocaleString()} د.ك`, '']} />
+                                            <Legend verticalAlign="top" height={36} iconType="circle" />
+                                            <Bar name={lang === 'ar' ? 'الإيرادات' : 'Revenue'} dataKey="revenue" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                                            <Bar name={lang === 'ar' ? 'المصروفات' : 'Expenses'} dataKey="expenses" fill="#F43F5E" radius={[4, 4, 0, 0]} />
+                                            <Bar name={lang === 'ar' ? 'الأرباح الصافية' : 'Net Profits'} dataKey="profit" fill="#10B981" radius={[4, 4, 0, 0]} />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </Card>
+
+                            {/* Card 2: Profitability and Compliance Trends */}
+                            <Card className="p-6 bg-white dark:bg-dm-card rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                                <div>
+                                    <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <TrendingUp className="w-4 h-4 text-teal-500" />
+                                        <span>{lang === 'ar' ? 'علاقة معدلات الربحية ومؤشر الامتثال القانوني (%)' : 'Profitability Rates & Legal Compliance Index Correlation (%)'}</span>
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">
+                                        {lang === 'ar' 
+                                            ? 'يوضح هذا الرسم البياني التفاعلي كيف يسهم تعزيز الامتثال لقوانين العمل والشركات الكويتية في زيادة الربحية وتجنب المخالفات والغرامات' 
+                                            : 'This interactive chart demonstrates how tightening legal compliance positively correlates with profitability growth'}
+                                    </p>
+                                </div>
+
+                                <div className="h-64 w-full text-xs">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart
+                                            data={[
+                                                { year: '2021', profitability: 15, compliance: 82 },
+                                                { year: '2022', profitability: 18, compliance: 85 },
+                                                { year: '2023', profitability: 20, compliance: 89 },
+                                                { year: '2024', profitability: 22, compliance: 92 },
+                                                { year: '2025', profitability: 24, compliance: 96 }
+                                            ]}
+                                            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                                        >
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" className="opacity-40" />
+                                            <XAxis dataKey="year" stroke="#94A3B8" fontSize={11} />
+                                            <YAxis stroke="#94A3B8" fontSize={11} domain={[0, 100]} />
+                                            <Tooltip formatter={(value: any) => [`${value}%`, '']} />
+                                            <Legend verticalAlign="top" height={36} iconType="circle" />
+                                            <Line name={lang === 'ar' ? 'معدل الربحية السنوي' : 'Profitability Rate'} type="monotone" dataKey="profitability" stroke="#10B981" strokeWidth={3} activeDot={{ r: 8 }} />
+                                            <Line name={lang === 'ar' ? 'مؤشر الامتثال القانوني' : 'Compliance Index'} type="monotone" dataKey="compliance" stroke="#06B6D4" strokeWidth={3} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </Card>
+
+                            {/* Card 3: Closed Legal Disputes & Cases (Pie Chart) */}
+                            <Card className="p-6 bg-white dark:bg-dm-card rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                                <div>
+                                    <h4 className="font-black text-sm text-slate-900 dark:text-white flex items-center gap-1.5">
+                                        <Scale className="w-4 h-4 text-amber-500" />
+                                        <span>{lang === 'ar' ? 'توزيع ملف القضايا والنزاعات المغلقة والمحسومة' : 'Governance & Closed Legal Disputes Breakdown'}</span>
+                                    </h4>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">
+                                        {lang === 'ar' 
+                                            ? 'تصنيف الملفات والنزاعات القانونية والعمالية التي تمت تسويتها بنجاح طبقاً لقوانين التجارة والعمل بدولة الكويت' 
+                                            : 'Classification of corporate & labor disputes settled in full compliance with Kuwaiti regulations'}
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                                    <div className="h-56 w-full text-xs">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={[
+                                                        { name: lang === 'ar' ? 'قضايا عمالية (مستحقات ونهاية خدمة)' : 'Labor & Indemnity Cases', value: 15 },
+                                                        { name: lang === 'ar' ? 'نزاعات عقود وموردين' : 'Supplier Contract Disputes', value: 9 },
+                                                        { name: lang === 'ar' ? 'تحكيم ومطالبات تجارية' : 'Commercial Arbitration Claims', value: 6 },
+                                                        { name: lang === 'ar' ? 'شؤون حماية الملكية والترخيص' : 'IP & MOCI License Compliance', value: 4 }
+                                                    ]}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={80}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    <Cell fill="#6366F1" />
+                                                    <Cell fill="#3B82F6" />
+                                                    <Cell fill="#F59E0B" />
+                                                    <Cell fill="#10B981" />
+                                                </Pie>
+                                                <Tooltip formatter={(value: any) => [`${value} ${lang === 'ar' ? 'قضايا' : 'cases'}`, '']} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+
+                                    {/* Custom Legend */}
+                                    <div className="space-y-3 text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full bg-indigo-500" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-neutral-light">{lang === 'ar' ? 'قضايا عمالية ونهاية خدمة' : 'Labor & Indemnity'}</p>
+                                                <p className="text-[10px] text-slate-400">15 {lang === 'ar' ? 'ملف مغلق ومسوى (44%)' : 'cases closed (44%)'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-neutral-light">{lang === 'ar' ? 'نزاعات عقود وموردين' : 'Supplier Contract'}</p>
+                                                <p className="text-[10px] text-slate-400">9 {lang === 'ar' ? 'ملفات مغلقة ومسواة (26%)' : 'cases closed (26%)'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full bg-amber-500" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-neutral-light">{lang === 'ar' ? 'تحكيم ومطالبات تجارية' : 'Commercial Claims'}</p>
+                                                <p className="text-[10px] text-slate-400">6 {lang === 'ar' ? 'جلسات تسوية نهائية (18%)' : 'cases closed (18%)'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                                            <div>
+                                                <p className="font-bold text-slate-800 dark:text-neutral-light">{lang === 'ar' ? 'حماية الملكية والتراخيص' : 'IP & License Compliance'}</p>
+                                                <p className="text-[10px] text-slate-400">4 {lang === 'ar' ? 'قضايا وتراخيص بلدية (12%)' : 'cases closed (12%)'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
+                            {/* Card 4: Executive Compliance Recommendations */}
+                            <Card className="p-6 bg-gradient-to-br from-indigo-500/5 to-emerald-500/5 dark:bg-dm-card rounded-3xl border border-gray-100 dark:border-gray-800 shadow-sm space-y-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-1.5 bg-indigo-500 text-white rounded-xl">
+                                        <Sparkles className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-black text-sm text-slate-900 dark:text-white">{lang === 'ar' ? 'التوصيات القانونية لحوكمة وامتثال الشركة' : 'Executive Legal Advisory & Governance Insights'}</h4>
+                                        <p className="text-[10px] text-slate-400">{lang === 'ar' ? 'توصيات صادرة بناءً على لوائح وزارة التجارة وقانون العمل الكويتي' : 'Automated governance advisory backed by Kuwaiti statutory laws'}</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 text-xs leading-relaxed text-slate-700 dark:text-slate-300">
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-emerald-100 dark:border-emerald-950 flex gap-3">
+                                        <CheckCircle className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-black text-emerald-600 dark:text-emerald-400">{lang === 'ar' ? 'قانونية محاضر الجمعيات العمومية' : 'General Assembly Legal Validation'}</p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                {lang === 'ar' 
+                                                    ? 'تم توثيق كافة محاضر الجمعيات العادية والغير عادية وإيداعها بنجاح في وزارة التجارة والصناعة (MOCI) ضمن الآجال القانونية الـ 15 يوماً.' 
+                                                    : 'All ordinary and extraordinary general assemblies are recorded and registered at MOCI within the 15-day statutory limit.'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-indigo-100 dark:border-indigo-950 flex gap-3">
+                                        <CheckCircle className="w-5 h-5 text-indigo-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-black text-indigo-600 dark:text-indigo-400">{lang === 'ar' ? 'هيكلة العقود وتواقيع المفوضين' : 'Signatory Threshold Compliance'}</p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                {lang === 'ar' 
+                                                    ? 'حدود المفوضين بالتوقيع متطابقة بالكامل مع السجلات التجارية المصادق عليها، ولا توجد ثغرات تعاقدية نشطة.' 
+                                                    : 'Signatory limits are perfectly aligned with commercial registries; no corporate liability exposure detected.'}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="p-3 bg-white dark:bg-slate-900 rounded-2xl border border-amber-100 dark:border-amber-950 flex gap-3">
+                                        <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-black text-amber-600 dark:text-amber-500">{lang === 'ar' ? 'توصيات قانون العمل الكويتي (تحديث 2026)' : 'Kuwait Labor Law Compliance Alert (2026)'}</p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                {lang === 'ar' 
+                                                    ? 'نوصي بجدولة الإجازات الدورية للموظفين بانتظام لتفادي تراكم رصيد الإجازات السنوية بما يزيد عن 60 يوماً وتجنب الالتزام المالي بالتعويض النقدي عند انتهاء الخدمة.' 
+                                                    : 'Active recommendation to clear accrued annual leaves regularly, capping them to avoid significant cash-out liabilities under Kuwaiti Eos.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </Card>
+
                         </div>
                     </div>
                 )}

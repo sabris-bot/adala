@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import i18n from '../../services/i18n';
 
 type Language = 'ar' | 'en';
 type Direction = 'rtl' | 'ltr';
@@ -15,9 +15,12 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { t, i18n } = useTranslation();
   const [language, setLanguageState] = useState<Language>((i18n.language as Language) || 'ar');
   const [direction, setDirection] = useState<Direction>(language === 'ar' ? 'rtl' : 'ltr');
+
+  const t = useCallback((key: string, defaultValue?: string): string => {
+    return i18n.t(key, defaultValue || key) as string;
+  }, []);
 
   // Sync state with i18n instance immediately
   useEffect(() => {

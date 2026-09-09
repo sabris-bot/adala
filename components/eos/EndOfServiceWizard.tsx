@@ -287,9 +287,14 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({ onClose,
         const end = new Date(formFields.lastWorkingDay);
         let diffMs = end.getTime() - start.getTime();
         
-        if (diffMs < 0) diffMs = 0;
+        // Kuwaiti Labor Law: Service duration is calculated inclusively (both start and end dates are included, hence + 1)
+        // and unpaid leave or unexcused absences during the contract period are deducted from the service tenure.
+        const baseDays = (diffMs >= 0 && !isNaN(start.getTime()) && !isNaN(end.getTime()))
+            ? Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1
+            : 0;
+            
+        const totalWorkedDaysAll = Math.max(0, baseDays - formFields.unpaidLeaveDays);
         
-        const totalWorkedDaysAll = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
         const years = Math.floor(totalWorkedDaysAll / 365);
         const remainingDaysAfterYears = totalWorkedDaysAll % 365;
         const months = Math.floor(remainingDaysAfterYears / 30);
@@ -305,16 +310,20 @@ export const EndOfServiceWizard: React.FC<EndOfServiceWizardProps> = ({ onClose,
         const careerSpanYears = totalWorkedDaysAll / 365;
 
         // Kuwait Private Sector formula:
-        // - First 5 years: 15 days of salary per year = 15/26 of salary per year.
-        // - Subsequent years: 30 days of salary (1 month) per year = 30/26 of salary per year.
-        if (careerSpanYears > 0) {
+        // Under Article 51 of Kuwait Labor Law No. 6/2010:
+        // - No indemnity is payable if the service span is less than 1 year (365 days).
+        // - First 5 years: 15 days of salary per year = 15/26 of monthly gross salary per year.
+        // - Subsequent years: 30 days of salary per year = 30/26 of monthly gross salary per year (NOT flat grossSalary, which only covers 26 days).
+        if (careerSpanYears >= 1) {
             if (careerSpanYears <= 5) {
                 rawIndemnity = (15 / 26) * grossSalary * careerSpanYears;
             } else {
                 const first5YearsGrad = (15 / 26) * grossSalary * 5;
-                const subsequentGrad = grossSalary * (careerSpanYears - 5);
+                const subsequentGrad = (30 / 26) * grossSalary * (careerSpanYears - 5);
                 rawIndemnity = first5YearsGrad + subsequentGrad;
             }
+        } else {
+            rawIndemnity = 0;
         }
 
         // Apply Cap (1.5 years salary ceiling = 18 months salary)

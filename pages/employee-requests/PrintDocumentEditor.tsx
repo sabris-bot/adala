@@ -173,7 +173,7 @@ export const PrintDocumentEditor: React.FC<PrintDocumentEditorProps> = ({
                 <div className="grid grid-cols-3 items-center border-b-2 border-slate-900 pb-5 mb-6">
                     <div className="text-right space-y-1">
                         <h2 className="text-xs font-black text-slate-900">مجموعة عـدالة الكلية</h2>
-                        <p className="text-[10px] text-slate-500 leading-normal">مكتب ألوقيان والعيبان للمحاماة والاستشارات القانونية</p>
+                        <p className="text-[10px] text-slate-500 leading-normal">مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية</p>
                         <p className="text-[9px] text-slate-400 font-mono font-bold">QA-REG-NO: 2026/05</p>
                     </div>
 
@@ -280,7 +280,7 @@ export const PrintDocumentEditor: React.FC<PrintDocumentEditorProps> = ({
                 {/* Contact and Legal Compliance Footer */}
                 <div className="mt-16 pt-4 border-t border-slate-900 flex justify-between items-center text-[8px] text-slate-400 font-semibold Grayscale">
                     <span className="max-w-lg leading-relaxed text-right">
-                        مستند إداري موثق صادر من مجموعة عدالة للمحاماة (مكتب ألوقيان والعيبان). جميع البيانات محمية ومطابقة لأحكام المادة رقم 6 لسنة 2010 بشأن العمل في القطاع الأهلي بدولة الكويت ولائحتها المنظمة.
+                        مستند إداري موثق صادر من مجموعة عدالة للمحاماة (مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية). جميع البيانات محمية ومطابقة لأحكام المادة رقم 6 لسنة 2010 بشأن العمل في القطاع الأهلي بدولة الكويت ولائحتها المنظمة.
                     </span>
                     <div className="flex items-center gap-2">
                         <div className="text-left font-mono">

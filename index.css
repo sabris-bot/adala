@@ -1,35 +1,122 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #00796B;
-  --color-primary-light: #4DB6AC;
-  --color-primary-dark: #004D40;
+  --color-primary: #0F2744;
+  --color-primary-light: #1E3A5F;
+  --color-primary-dark: #0A1C30;
   
-  --color-secondary: #607D8B;
-  --color-secondary-light: #B0BEC5;
-  --color-secondary-dark: #37474F;
+  --color-secondary: #475569;
+  --color-secondary-light: #94A3B8;
+  --color-secondary-dark: #1E293B;
   
-  --color-accent: #FFC107;
-  --color-accent-dark: #FFA000;
+  --color-accent: #C5A880;
+  --color-accent-dark: #A3845B;
+  --color-accent-light: #F4EFE6;
   
-  --color-success: #4CAF50;
-  --color-warning: #FF9800;
-  --color-danger: #F44336;
-  --color-info: #2196F3;
+  --color-success: #059669;
+  --color-warning: #D97706;
+  --color-danger: #DC2626;
+  --color-info: #0284C7;
   
-  --color-dm-background: #102A3A;
-  --color-dm-card: #1E3C50;
-  --color-dm-text: #E0E7EF;
+  --color-dm-background: #0B192C;
+  --color-dm-card: #132742;
+  --color-dm-text: #F1F5F9;
   
-  --color-neutral-bg: #F5F7FA;
+  --color-neutral-bg: #F8FAFC;
   --color-neutral-card: #FFFFFF;
-  --color-neutral-text: #37474F;
+  --color-neutral-text: #0F172A;
+
+  /* Overriding default Indigo palette to align with Royal Navy Theme */
+  --color-indigo-50: #EFF6FF;
+  --color-indigo-100: #DBEAFE;
+  --color-indigo-150: #BFDBFE;
+  --color-indigo-200: #BFDBFE;
+  --color-indigo-300: #93C5FD;
+  --color-indigo-400: #60A5FA;
+  --color-indigo-500: #3B82F6;
+  --color-indigo-600: #1E3A5F;
+  --color-indigo-650: #162E4E;
+  --color-indigo-700: #0F2744;
+  --color-indigo-750: #0D2038;
+  --color-indigo-800: #0A1C30;
+  --color-indigo-900: #06111E;
+
+  /* Overriding default Blue palette to align with Royal Navy Theme */
+  --color-blue-50: #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-300: #93C5FD;
+  --color-blue-400: #60A5FA;
+  --color-blue-500: #2563EB;
+  --color-blue-600: #1E3A5F;
+  --color-blue-700: #0F2744;
+  --color-blue-800: #0A1C30;
+  --color-blue-900: #06111E;
+
+  /* Overriding default Teal palette for secondary accents */
+  --color-teal-50: #F0FDFA;
+  --color-teal-100: #CCFBF1;
+  --color-teal-200: #99F6E4;
+  --color-teal-300: #5EEAD4;
+  --color-teal-400: #2DD4BF;
+  --color-teal-500: #14B8A6;
+  --color-teal-600: #0D9488;
+  --color-teal-700: #0F766E;
+  --color-teal-800: #115E59;
+  --color-teal-900: #134E4A;
+
+  /* Overriding default Emerald palette for legal verification & success */
+  --color-emerald-50: #ECFDF5;
+  --color-emerald-100: #D1FAE5;
+  --color-emerald-200: #A7F3D0;
+  --color-emerald-300: #6EE7B7;
+  --color-emerald-400: #34D399;
+  --color-emerald-500: #10B981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #047857;
+  --color-emerald-800: #065F46;
+  --color-emerald-900: #064E3B;
+
+  /* Overriding default Amber palette to map to prestigious Kuwait Gold/Bronze family */
+  --color-amber-50: #FDFBF7;
+  --color-amber-100: #F8F3EA;
+  --color-amber-200: #EDE1CD;
+  --color-amber-300: #DFCBB0;
+  --color-amber-400: #D4AF37;
+  --color-amber-500: #C5A880;
+  --color-amber-600: #A3845B;
+  --color-amber-700: #8E704A;
+  --color-amber-800: #745A38;
+  --color-amber-900: #513E26;
+
+  /* Harmonizing Purple & Violet palettes to clean Slate/Navy tones */
+  --color-purple-50: #F8FAFC;
+  --color-purple-100: #F1F5F9;
+  --color-purple-200: #E2E8F0;
+  --color-purple-300: #CBD5E1;
+  --color-purple-400: #94A3B8;
+  --color-purple-500: #64748B;
+  --color-purple-600: #1E3A5F;
+  --color-purple-700: #0F2744;
+  --color-purple-800: #0A1C30;
+  --color-purple-900: #06111E;
+
+  --color-violet-50: #F8FAFC;
+  --color-violet-100: #F1F5F9;
+  --color-violet-200: #E2E8F0;
+  --color-violet-300: #CBD5E1;
+  --color-violet-400: #94A3B8;
+  --color-violet-500: #64748B;
+  --color-violet-600: #1E3A5F;
+  --color-violet-700: #0F2744;
+  --color-violet-800: #0A1C30;
+  --color-violet-900: #06111E;
 
   --font-sans: "Tajawal", ui-sans-serif, system-ui, sans-serif;
   --font-marhey: "Marhey", "Tajawal", sans-serif;
 
-  --shadow-card: 0 2px 8px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
-  --shadow-card-hover: 0 8px 16px -3px rgba(0, 0, 0, 0.06), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
 }
 
 /* Prevent display in screen mode */
@@ -37,35 +124,96 @@
   display: none !important;
 }
 
-/* --- PRINT STYLING --- */
+/* --- ADVANCED PRINT ENGINE STYLING --- */
 @media print {
+  @page {
+    margin: 15mm 12mm 15mm 12mm;
+    size: A4 portrait;
+  }
+
+  /* Force clean white print background and crisp black text */
+  *, *:before, *:after {
+    background: transparent !important;
+    color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide all interactive and layout chrome */
+  aside, 
+  nav, 
+  header, 
+  footer,
+  button, 
+  input, 
+  select, 
+  textarea,
+  .no-print, 
+  .print-hide, 
+  .print\:hidden,
+  [role="dialog"] .modal-backdrop,
+  .fixed.inset-0.bg-black,
+  .floating-action-btn,
+  .pagination,
+  .tabs-navigation,
+  .search-filter-bar {
+    display: none !important;
+  }
+
+  /* If a dedicated document or modal sheet is active, suppress global page headers/footers */
+  body:has(#print-preview-pane) .global-print-header,
+  body:has(#print-preview-pane) .global-print-footer,
+  body:has(#printable-official-certificate) .global-print-header,
+  body:has(#printable-official-certificate) .global-print-footer,
+  body:has(.printable-sheet) .global-print-header,
+  body:has(.printable-sheet) .global-print-footer,
+  body:has([data-custom-print="true"]) .global-print-header,
+  body:has([data-custom-print="true"]) .global-print-footer {
+    display: none !important;
+  }
+
+  /* General Page Header for document reports */
   .global-print-header {
     position: fixed !important;
     top: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    height: 40px !important;
+    height: 38px !important;
     display: flex !important;
     flex-direction: row-reverse !important;
     justify-content: space-between !important;
     align-items: center !important;
-    border-bottom: 2px solid #134D41 !important;
-    padding: 0 20px !important;
-    background: white !important;
-    z-index: 9999999 !important;
+    border-bottom: 2px solid #0F2744 !important;
+    padding: 0 10px !important;
+    background: #ffffff !important;
+    z-index: 99999 !important;
     direction: rtl !important;
     font-family: "Tajawal", sans-serif !important;
   }
   
   .global-print-header-logo {
-    font-size: 14pt !important;
+    font-size: 13pt !important;
     font-weight: 900 !important;
-    color: #134D41 !important;
+    color: #0F2744 !important;
     font-family: "Tajawal", sans-serif !important;
   }
 
   .global-print-header-office {
-    font-size: 10pt !important;
+    font-size: 9.5pt !important;
     font-weight: 800 !important;
     color: #1e293b !important;
     font-family: "Tajawal", sans-serif !important;
@@ -76,14 +224,14 @@
     bottom: 0 !important;
     left: 0 !important;
     right: 0 !important;
-    height: 35px !important;
+    height: 30px !important;
     display: flex !important;
     justify-content: center !important;
     align-items: center !important;
-    border-top: 1px solid #134D41 !important;
-    padding: 0 20px !important;
-    background: white !important;
-    z-index: 9999999 !important;
+    border-top: 1px solid #C5A880 !important;
+    padding: 0 10px !important;
+    background: #ffffff !important;
+    z-index: 99999 !important;
     direction: rtl !important;
     text-align: center !important;
     font-size: 8pt !important;
@@ -92,10 +240,54 @@
     font-family: "Tajawal", sans-serif !important;
   }
 
-  .print-hide {
-    display: none !important;
+  /* Main content container reset for printing */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    max-width: 100% !important;
   }
-  
+
+  /* Tables in print: crisp borders, proper breaking */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    break-inside: auto !important;
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+    font-size: 9.5pt !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    break-after: auto !important;
+  }
+
+  th, td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 10px !important;
+    text-align: right !important;
+  }
+
+  th {
+    background-color: #f1f5f9 !important;
+    font-weight: bold !important;
+  }
+
+  /* Avoid page breaks inside cards, stamps, and signatures */
+  .adala-card, 
+  .stamp-box, 
+  .signature-block, 
+  .decision-block,
+  .official-seal {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
   .chat-print-container {
     position: absolute !important;
     top: 0 !important;
@@ -126,11 +318,31 @@
     color: black !important;
     background-color: white !important;
   }
-  
-  .dark .message-bubble-print {
-    color: black !important;
-    background-color: white !important;
-  }
+}
+
+/* --- ADALA UNIFIED COMPONENT SYSTEM --- */
+.adala-card {
+  @apply bg-white dark:bg-dm-card border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xs transition-all;
+}
+
+.adala-table-wrapper {
+  @apply overflow-x-auto rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-dm-card shadow-xs;
+}
+
+.adala-table {
+  @apply w-full text-right text-xs sm:text-sm divide-y divide-slate-200/80 dark:divide-slate-800;
+}
+
+.adala-th {
+  @apply px-4 py-3 bg-slate-50 dark:bg-slate-900/60 font-black text-slate-700 dark:text-slate-300 text-xs whitespace-nowrap;
+}
+
+.adala-td {
+  @apply px-4 py-3 text-slate-800 dark:text-slate-200 text-xs sm:text-sm whitespace-nowrap;
+}
+
+.adala-badge {
+  @apply inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap leading-none;
 }
 
 /* --- MARKDOWN STYLING FOR CHATBOT --- */
@@ -282,13 +494,13 @@ html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment {
 
   /* Specific color preservation for primary actions and highlights */
   .bg-primary, .bg-blue-600, .bg-indigo-600 {
-    background-color: #0D47A1 !important;
+    background-color: #00796B !important;
     color: white !important;
     -webkit-print-color-adjust: exact !important;
   }
 
   .text-primary, .text-blue-600 {
-    color: #0D47A1 !important;
+    color: #00796B !important;
   }
 
   /* Status badges preservation */
@@ -540,7 +752,7 @@ html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment {
     margin: 30pt 0 !important;
     padding: 20pt !important;
     background-color: #f8fafc !important;
-    border: 2pt solid #0D47A1 !important;
+    border: 2pt solid #00796B !important;
     text-align: center !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
@@ -586,9 +798,9 @@ html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment {
   }
 
   /* Typography */
-  h1 { font-size: 24pt !important; color: #0D47A1 !important; margin-bottom: 15pt !important; border-bottom: 2px solid #0D47A1; padding-bottom: 5pt; }
-  h2 { font-size: 18pt !important; color: #1565C0 !important; margin-top: 20pt !important; margin-bottom: 10pt !important; border-right: 5pt solid #1565C0; padding-right: 10pt; }
-  h3 { font-size: 14pt !important; color: #1e3a8a !important; margin-bottom: 8pt !important; }
+  h1 { font-size: 24pt !important; color: #00796B !important; margin-bottom: 15pt !important; border-bottom: 2px solid #00796B; padding-bottom: 5pt; }
+  h2 { font-size: 18pt !important; color: #004D40 !important; margin-top: 20pt !important; margin-bottom: 10pt !important; border-right: 5pt solid #004D40; padding-right: 10pt; }
+  h3 { font-size: 14pt !important; color: #00695C !important; margin-bottom: 8pt !important; }
   p { margin-bottom: 10pt !important; line-height: 1.6; }
 
   /* Specific Print Header for legal documents */
@@ -597,7 +809,7 @@ html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment {
     flex-direction: row !important;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 4px double #0D47A1;
+    border-bottom: 4px double #00796B;
     padding-bottom: 15pt;
     margin-bottom: 30pt;
     width: 100%;
@@ -724,3 +936,60 @@ html.dark .scrollbar-thin::-webkit-scrollbar-button:end:increment {
 .tree-v li:last-child::after { width: 50%; }
 .tree-v li:only-child::after { display: none; }
 .dark .tree-v .node-display::after, .dark .tree-v li::before, .dark .tree-v li::after { background-color: #4b5563; }
+
+/* --- FOCUS MODE GLOBAL STYLES --- */
+html.focus-mode-active aside,
+html.focus-mode-active header,
+html.focus-mode-active footer,
+html.focus-mode-active .global-print-header,
+html.focus-mode-active .global-print-footer,
+html.focus-mode-active .no-focus {
+  display: none !important;
+}
+
+html.focus-mode-active body,
+html.focus-mode-active #root,
+html.focus-mode-active .flex.h-screen {
+  background: #fcfbf9 !important; /* Sepia paper-like tint */
+  color: #1c1917 !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+html.focus-mode-active .flex-1.flex.flex-col.overflow-hidden {
+  height: auto !important;
+  overflow: visible !important;
+}
+
+html.focus-mode-active main {
+  padding: 0 !important;
+  margin: 0 !important;
+  width: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+  background: #fcfbf9 !important;
+}
+
+/* Custom fonts for focused reading */
+.font-focused-serif {
+  font-family: 'Playfair Display', Georgia, Cambria, "Times New Roman", Times, serif !important;
+}
+
+.font-focused-sans {
+  font-family: 'Tajawal', "Inter", sans-serif !important;
+}
+
+@media print {
+  html.focus-mode-active {
+    background: white !important;
+  }
+  html.focus-mode-active main,
+  html.focus-mode-active body,
+  html.focus-mode-active #root {
+    background: white !important;
+    color: black !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+

@@ -1991,7 +1991,7 @@ const LegalFinancialCalculatorPage: React.FC = () => {
                   <span className="text-[8px] tracking-widest block mt-1 font-mono">ADALA SYSTEM</span>
                 </div>
                 <div className="text-left space-y-1">
-                  <h1 className="text-sm font-black text-slate-900">Al-Wagayan & Al-Rowdhan Law Firm</h1>
+                  <h1 className="text-sm font-black text-slate-900">Sabry Shatta Law Firm</h1>
                   <p className="text-[10px] text-slate-500 font-bold">Kuwait Comprehensive Judicial Statements & Ledgers</p>
                   <p className="text-[9px] text-slate-400 font-mono">Ref: ADALA-CALC-{selectedSavedOp.id.toUpperCase()}</p>
                 </div>

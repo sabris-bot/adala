@@ -17,26 +17,28 @@ async function startServer() {
   // --- Gemini Setup ---
   const API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
   const ai = API_KEY ? new GoogleGenAI({ apiKey: API_KEY }) : null;
-  const GEMINI_MODEL = "gemini-3.5-flash";
+  const GEMINI_MODEL = "gemini-3.8-flash";
 
   if (!ai) {
     console.warn("WARNING: GEMINI_API_KEY is not set. AI features will be disabled.");
   }
 
   // --- Resilient API Helpers ---
-  async function generateContentWithRetry(aiClient: any, params: any, retries = 3, delay = 1000): Promise<any> {
+  async function generateContentWithRetry(aiClient: any, params: any, retries = 4, delay = 1200): Promise<any> {
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         const response = await aiClient.models.generateContent(params);
         return response;
       } catch (error: any) {
-        const isRateLimit = error.message?.includes('429') || 
-                            error.message?.includes('Quota exceeded') || 
-                            error.message?.includes('RESOURCE_EXHAUSTED') ||
-                            error.status === 429;
+        const errStr = String(error?.message || error?.stack || error || "");
+        const isRateLimit = errStr.includes('429') || 
+                            errStr.includes('Quota exceeded') || 
+                            errStr.includes('RESOURCE_EXHAUSTED') ||
+                            error?.status === 429 ||
+                            error?.statusCode === 429;
                             
         if (isRateLimit && attempt < retries) {
-          console.warn(`[Gemini Retry] Attempt ${attempt} failed with 429. Retrying in ${delay}ms...`);
+          console.warn(`[Gemini Retry] Attempt ${attempt} / ${retries} rate limited with 429/ResourceExhausted. Retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           delay *= 2; // exponential backoff
           continue;
@@ -296,9 +298,20 @@ async function startServer() {
 
       res.json({ text: response.text });
     } catch (error: any) {
-      console.error('Gemini Chat Error:', error);
-      // Fallback gracefully instead of returning 500 error to keep client secure
-      res.json({ text: getChatbotServerFallback(message || "") });
+      const errStr = String(error?.message || error?.stack || error || "");
+      const isRateLimit = errStr.includes('429') || errStr.includes('Quota exceeded') || errStr.includes('RESOURCE_EXHAUSTED') || error?.status === 429;
+      
+      if (isRateLimit) {
+        console.warn(`[Gemini Chat Rate Limit] Serving local law database fallback beautifully.`);
+      } else {
+        console.warn(`[Gemini Chat Warning] Request failed (${error?.message || error}), serving fallback.`);
+      }
+      
+      res.json({ 
+        text: getChatbotServerFallback(message || ""), 
+        isFallback: true, 
+        isQuotaExceeded: isRateLimit 
+      });
     }
   });
 
@@ -308,9 +321,9 @@ async function startServer() {
     if (!ai) {
       console.warn("Gemini Client not initialized, returning server's offline fallback.");
       if (prompt && (prompt.includes('"heirs"') || prompt.includes('husband') || prompt.includes('heir'))) {
-        return res.json({ text: parseInheritanceTextLocally(prompt) });
+        return res.json({ text: parseInheritanceTextLocally(prompt), isFallback: true });
       }
-      return res.json({ text: getLegalReportFallback(prompt || "") });
+      return res.json({ text: getLegalReportFallback(prompt || ""), isFallback: true });
     }
     
     try {
@@ -326,16 +339,251 @@ async function startServer() {
 
       res.json({ text: response.text });
     } catch (error: any) {
-      console.error('Gemini Generate Error:', error);
-      // Failover gracefully based on prompt type to keep the web application completely zero-downtime
+      const errStr = String(error?.message || error?.stack || error || "");
+      const isRateLimit = errStr.includes('429') || errStr.includes('Quota exceeded') || errStr.includes('RESOURCE_EXHAUSTED') || error?.status === 429;
+      
+      if (isRateLimit) {
+        console.warn(`[Gemini Generate Rate Limit] Serving local structured assets fallback.`);
+      } else {
+        console.warn(`[Gemini Generate Warning] Request failed (${error?.message || error}), serving fallback.`);
+      }
+
       if (prompt && (prompt.includes('"heirs"') || prompt.includes('husband') || prompt.includes('heir'))) {
         try {
-          return res.json({ text: parseInheritanceTextLocally(prompt) });
+          return res.json({ 
+            text: parseInheritanceTextLocally(prompt), 
+            isFallback: true, 
+            isQuotaExceeded: isRateLimit 
+          });
         } catch (jsonErr) {
-          console.error("Local inheritance parser failed, using simple static mockup", jsonErr);
+          console.warn("Local inheritance parser failed, using simple static mockup", jsonErr);
         }
       }
-      res.json({ text: getLegalReportFallback(prompt || "") });
+      res.json({ 
+        text: getLegalReportFallback(prompt || ""), 
+        isFallback: true, 
+        isQuotaExceeded: isRateLimit 
+      });
+    }
+  });
+
+  app.post('/api/gemini/generate-questions', async (req, res) => {
+    const { incidentType, additionalDetails } = req.body;
+
+    const getLocalQuestionsFallback = (type: string) => {
+      const norm = String(type || '').trim();
+      if (norm.includes('إهمال') || norm.toLowerCase().includes('negligence') || norm.includes('التقصير الإداري والفني')) {
+        return [
+          "ما هي طبيعة المهام والمسؤوليات الموكلة إليك تحديداً في يوم الواقعة؟",
+          "هل تم تدريبك وتوجيهك مسبقاً بكيفية تجنب حدوث هذا النوع من التقصير أو الإهمال؟",
+          "ما هي الأسباب المباشرة وغير المباشرة التي أدت إلى وقوع الإهمال في أداء الواجب الإداري/الفني؟",
+          "هل نتج عن هذا التقصير أي أضرار مادية أو معنوية للشركة أو العملاء؟",
+          "ما هي التدابير التي اتخذتها فور علمك بالواقعة للحد من تفاقم الضرر؟"
+        ];
+      } else if (norm.includes('غياب') || norm.toLowerCase().includes('absence') || norm.includes('الانقطاع عن العمل')) {
+        return [
+          "ما هي أسباب تغيبك عن العمل خلال الفترة المحددة دون إذن رسمي مسبق؟",
+          "هل قمت بإخطار مسؤولك المباشر أو إدارة الموارد البشرية بعذر الغياب في حينه أو خلال المدة المقررة قانوناً؟",
+          "هل تتوفر لديك مستندات رسمية أو تقارير طبية معتمدة تبرر هذا الغياب؟",
+          "هل أنت على علم باللوائح الداخلية وقانون العمل الكويتي بشأن الانقطاع عن العمل دون عذر مقبول؟",
+          "ما هو تعهدك لضمان عدم تكرار مثل هذا الانقطاع مستقبلاً حفاظاً على سير العمل؟"
+        ];
+      } else if (norm.includes('سرقة') || norm.toLowerCase().includes('theft') || norm.includes('الاختلاس والسرقة')) {
+        return [
+          "أين كنت متواجداً وقت وقوع الحادثة، وما هي صلتك المباشرة بالعهدة أو الممتلكات المفقودة؟",
+          "هل تملك تصريحاً رسمياً أو صلاحية للوصول إلى هذه المواد/الأموال/المستندات في ذلك الوقت؟",
+          "كيف تفسر وجود فروقات أو نقص في العهدة المسؤولة عنها، أو رصد حركة غير معتادة؟",
+          "هل شارك أو اطلع أي طرف آخر على الرموز السرية أو مفاتيح مكان الواقعة؟",
+          "ما هو ردك التفصيلي على الشهادات أو القرائن الموثقة التي تشير إلى صلتك المباشرة بالواقعة؟"
+        ];
+      } else {
+        return [
+          "يرجى سرد تفاصيل الواقعة موضوع التحقيق بشكل دقيق ومفصل من وجهة نظرك؟",
+          "ما هو ردك على المخالفة الإدارية المنسوبة إليك بكتاب الإحالة للتحقيق؟",
+          "هل توجد أي دوافع أو ظروف قاهرة دفعتك لارتكاب أو المشاركة في هذا الفعل؟",
+          "هل تود إضافة أي شهود، مستندات، أو قرائن تؤيد دفاعك ودفوعك القانونية؟",
+          "ما هو تعهدك والتزامك بخصوص احترام اللوائح الداخلية للشركة مستقبلاً؟"
+        ];
+      }
+    };
+
+    if (!ai) {
+      console.warn("Gemini Client not initialized, returning local questions fallback.");
+      return res.json({ questions: getLocalQuestionsFallback(incidentType), isFallback: true });
+    }
+
+    try {
+      const prompt = `أنت مستشار قانوني متميز في القانون الكويتي واللوائح الإدارية وعلاقات العمل.
+المطلوب هو توليد 5 أسئلة استقصائية ذكية ودقيقة ومفصلة لاستخدامها في محضر تحقيق رسمي وجلسة سماع أقوال داخل الشركة.
+نوع الواقعة: "${incidentType}"
+تفاصيل إضافية: "${additionalDetails || 'لا توجد تفاصيل إضافية مخصصة'}"
+
+يجب أن تكون الأسئلة:
+1. مكتوبة باللغة العربية الفصحى القانونية السليمة والمهنية جداً.
+2. تركز على الواقعة وتفنيد دفاع الموظف أو الشاهد بذكاء وحرفية لتعزيز دقة المحاضر.
+3. تتماشى مع مبادئ قانون العمل الكويتي والضمانات الإجرائية (المادة 115).
+4. ترجع كقائمة JSON تحتوي فقط على مصفوفة من السلاسل النصية (Array of strings). دون أي نص إضافي أو علامات markdown غير صالحة.
+
+مثال للخرج المطلوب:
+[
+  "السؤال الأول هنا؟",
+  "السؤال الثاني هنا؟"
+]`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: GEMINI_MODEL,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          temperature: 0.3,
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.STRING
+            },
+            description: "قائمة بالأسئلة الاستقصائية المولدة"
+          }
+        }
+      });
+
+      let questions = [];
+      try {
+        questions = JSON.parse(response.text.trim());
+      } catch (e) {
+        console.warn("Failed to parse Gemini JSON response for questions, trying fallback matches:", response.text, e);
+        const text = response.text.trim();
+        const matches = text.match(/"([^"]+)"/g);
+        if (matches && matches.length > 0) {
+          questions = matches.map(m => m.replace(/"/g, ''));
+        } else {
+          questions = getLocalQuestionsFallback(incidentType);
+        }
+      }
+
+      res.json({ questions, isFallback: false });
+    } catch (error: any) {
+      const errStr = String(error?.message || error?.stack || error || "");
+      const isRateLimit = errStr.includes('429') || errStr.includes('Quota exceeded') || errStr.includes('RESOURCE_EXHAUSTED') || error?.status === 429;
+      
+      console.warn(`[Gemini Questions Warning] Request failed (${error?.message || error}), serving fallback.`);
+      res.json({ 
+        questions: getLocalQuestionsFallback(incidentType), 
+        isFallback: true, 
+        isQuotaExceeded: isRateLimit 
+      });
+    }
+  });
+
+  // --- Inheritance Legal AI Consultant Endpoint (Kuwait Law 51/1984) ---
+  app.post('/api/inheritance/ai-consultant', async (req, res) => {
+    const { 
+      deceasedName, 
+      deceasedGender, 
+      madhab,
+      totalEstate = 0,
+      netEstate = 0,
+      assets = {},
+      deductions = {},
+      heirs = [],
+      specialCircumstances = ''
+    } = req.body;
+
+    const securedDebts = Number(deductions.securedDebts || 0);
+    const funeralExpenses = Number(deductions.funeralExpenses || 0);
+    const unsecuredDebts = Number(deductions.unsecuredDebts || 0);
+    const wills = Number(deductions.wills || 0);
+    const totalDebts = securedDebts + funeralExpenses + unsecuredDebts;
+    const isDeficit = totalDebts > totalEstate;
+    const deficitAmount = Math.max(0, totalDebts - totalEstate);
+    const cash = Number(assets.cash || 0);
+    const realEstate = Number(assets.realEstate || 0);
+    const stocks = Number(assets.stocks || 0);
+
+    const getDynamicKuwaitiLegalFallback = () => {
+      const debtCoverageRatio = totalEstate > 0 ? ((totalDebts / totalEstate) * 100).toFixed(1) : '100';
+      const liquidCoverage = cash >= totalDebts ? 'تغطي الديون بالكامل' : 'عجز في السيولة النقدية يتطلب تسييل أصول أخرى';
+
+      return `## تقرير الاستشارة القانونية الاستراتيجية في تصفية وقسمة التركة المعقدة
+**مكتب المحامي صبري شطا للمحاماة والاستشارات القانونية - دولة الكويت**
+**رقم القيد الاستشاري:** ADV-EST-${Date.now().toString().slice(-6)}
+**المرجع التشريعي:** قانون الأحوال الشخصية الكويتي رقم (51) لسنة 1984 (المواد 288 إلى 345)
+
+---
+
+### أولاً: التشخيص المالي والهيكلي للتركة والتزاماتها
+- **المورث:** ${deceasedName || 'المورث'} (${deceasedGender === 'F' ? 'متوفاة' : 'متوفى'}) - المذهب الحاكم: ${madhab === 'jafari' ? 'المذهب الجعفري (الدوائر الاستئنافية الجعفرية)' : 'المذهب السني (قانون الأحوال الشخصية 51/1984)'}.
+- **إجمالي الموجودات المحصورة:** ${totalEstate.toLocaleString()} د.ك (سيولة نقدية: ${cash.toLocaleString()} د.ك، عقارات: ${realEstate.toLocaleString()} د.ك، أوراق مالية: ${stocks.toLocaleString()} د.ك).
+- **إجمالي الديون ومؤن التجهيز:** ${totalDebts.toLocaleString()} د.ك (نسبة استهلاك الديون للتركة: ${debtCoverageRatio}%).
+- **الوضع المحاسبي للتركة:** ${isDeficit ? `⚠️ تركة مستغرقة بالديون بعجز قدره (${deficitAmount.toLocaleString()} د.ك). يمتنع توزيع أي إرث شرعي.` : `صافي خالص للتوزيع قدره (${netEstate.toLocaleString()} د.ك). حالة السيولة: ${liquidCoverage}.`}
+
+---
+
+### ثانياً: التكييف الشرعي والقانوني لترتيب الحقوق (إعمالاً للمادة 289)
+عملاً بنص المادة (289) من قانون الأحوال الشخصية الكويتي وقاعدة «لا تركة إلا بعد سداد الديون»، يجب على مصفّي التركة الالتزام الصارم بالترتيب الآتي:
+1. **الحقوق العينية الممتازة (${securedDebts.toLocaleString()} د.ك):** كرهون البنوك العقارية والقروض المقيدة بحبس العين؛ تستوفى من ثمن الأعيان المرهونة ذاتها قبل أي حق آخر.
+2. **نفقات التجهيز والدفن بالمعروف (${funeralExpenses.toLocaleString()} د.ك):** من كفن وغسل ونقل ودَفن بالقدر المتعارف عليه لأمثال المورث، مقدمة على ديون الصحة والديون العادية.
+3. **الديون المرسلة في الذمة (${unsecuredDebts.toLocaleString()} د.ك):** وتشمل القروض الشخصية، مطالبات الشركات، ديون النفقة الزوجية، وزكاة التركة الواجبة. ${isDeficit ? 'وحيث إن التركة مستغرقة، يطبق نظام «قسمة الغرماء» بين الدائنين العاديين بنسبة دين كل منهم.' : 'تسدد بالكامل من السيولة المتوفرة قبل الانتقال للوصايا.'}
+4. **الوصايا (${wills.toLocaleString()} د.ك):** تنفذ الوصية في حدود ثلث ما تبقى بعد استيفاء الديون المذكورة، ولا تنفذ في الزائد عن الثلث إلا بإجازة الورثة الراشدين.
+
+---
+
+### ثالثاً: خطة العمل الاستراتيجية المقترحة لمكتب المحاماة
+1. **تجنب المزاد القضائي الجبري:** نوصي الورثة بعدم اللجوء إلى دعوى فرز وتجنيب مستعجلة، حيث تؤدي البيوع القضائية إلى بخس قيمة الأصول العقارية بنسبة (20% إلى 30%).
+2. **جدولة الديون أو التسييل الاختياري:** ${cash < totalDebts ? 'نظراً لعدم كفاية السيولة النقدية، نوصي بإبرام اتفاق رضائي مع الدائنين لبيع أصل منقول (كالسيارات أو الأسهم) أو تخصيص ريع العقارات التأجيري لسداد الديون تباعاً.' : 'استخدام السيولة النقدية فوراً لاستصدار براءة ذمة مصرفية وحفظ أصول العقارات سليمة للورثة.'}
+3. **اتفاق التخارج الرضائي (المادة 318):** صياغة عقد تخارج موثق يتيح للوارث الراغب في العقار تعويض بقية الورثة بحصصهم نقداً، مع إخطار الهيئة العامة لشؤون القصر إذا وُجد قاصر بين الورثة.
+
+---
+
+### رابعاً: التوصيات الإجرائية أمام المحاكم الكويتية
+- **الخطوة الأولى:** استخراج شهادة حصر الوراثة الرسمية من إدارة التوثيقات الشرعية بمجمع المحاكم.
+- **الخطوة الثانية:** توجيه إعلانات رسمية على يد مندوب الإعلان للدائنين المعلومين لتقديم مستندات مديونياتهم الموثقة.
+- **الخطوة الثالثة:** إيداع محضر تصفية تركة ودي وموثق أو قيد دعوى قسمة تركة وتصفية مدنية أمام المحكمة الكلية.`;
+    };
+
+    if (!ai) {
+      return res.json({ consultation: getDynamicKuwaitiLegalFallback(), isFallback: true });
+    }
+
+    try {
+      const prompt = `
+أنت رئيس الدائرة الاستشارية لقضايا التركات والتركات المعقدة بمكتب «المحامي صبري شطا للمحاماة والاستشارات القانونية» بدولة الكويت.
+المطلوب صياغة استشارة قانونية ومالية متقدمة وشاملة، موجهة للمحامي والموكلين، تركز بشكل عميق على معالجة الديون المتعددة وأصول التركة وتجنب النزاع القضائي، استناداً لأحكام قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984 والمذهب المعمول به.
+
+بيانات القضية المدخلة:
+- المورث: ${deceasedName || 'المورث'} (${deceasedGender === 'F' ? 'متوفاة' : 'متوفى'})
+- المذهب: ${madhab === 'jafari' ? 'المذهب الجعفري (الأحوال الشخصية الجعفرية)' : 'المذهب السني (قانون الأحوال الشخصية الكويتي رقم 51 لسنة 1984)'}
+- إجمالي قيمة التركة: ${totalEstate.toLocaleString()} د.ك
+- تفصيل الأصول: سيولة نقدية: ${cash.toLocaleString()} د.ك، عقارات: ${realEstate.toLocaleString()} د.ك، أوراق مالية وأسهم: ${stocks.toLocaleString()} د.ك، أصول أخرى: ${(totalEstate - cash - realEstate - stocks).toLocaleString()} د.ك.
+- تفصيل الديون:
+  * ديون ممتازة وعينية موثقة برهون: ${securedDebts.toLocaleString()} د.ك
+  * نفقات التجهيز والجنازة بالمعروف: ${funeralExpenses.toLocaleString()} د.ك
+  * ديون عادية ومرسلة في الذمة (تجارية، شخصية، زكاة تركة): ${unsecuredDebts.toLocaleString()} د.ك
+  * وصايا مشروطة: ${wills.toLocaleString()} د.ك
+- إجمالي الالتزامات: ${totalDebts.toLocaleString()} د.ك
+- صافي التركة للتوزيع: ${netEstate.toLocaleString()} د.ك
+- الورثة المقيدون: ${heirs.map((h: any) => `${h.label || h.type} (العدد: ${h.count})`).join(', ') || 'لم يتم إدخال ورثة بعد'}
+${specialCircumstances ? `- ملحوظات وظروف خاصة: ${specialCircumstances}` : ''}
+
+يرجى تنظيم الاستشارة بالأقسام التالية باللغة العربية القانونية الرصينة:
+1. التشخيص المالي والهيكلي للتركة ونسبة الديون للأصول (مع بيان هل التركة مستغرقة بالديون وحكم المادة 289).
+2. الترتيب الإلزامي لسداد الديون ومؤن التجهيز والوصايا سنداً للمواد (288 إلى 292 من القانون الكويتي).
+3. استراتيجية تسييل الأصول وحماية العقارات من البيع القضائي الجبري بالمزاد العلني.
+4. مقترحات التخارج الرضائي (المادة 318) وإجراءات حماية حقوق القُصّر والتنسيق مع الهيئة العامة لشؤون القصر.
+5. خارطة طريق إجرائية وقضائية محددة الخطوات يتبعها مكتب المحاماة أمام التوثيقات والمحكمة الكلية.
+`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: GEMINI_MODEL,
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        config: {
+          temperature: 0.2
+        }
+      });
+
+      res.json({ consultation: response.text || getDynamicKuwaitiLegalFallback(), isFallback: false });
+    } catch (error: any) {
+      console.warn(`[AI Consultant Error] ${error?.message || error}, serving dynamic legal fallback.`);
+      res.json({ consultation: getDynamicKuwaitiLegalFallback(), isFallback: true });
     }
   });
 

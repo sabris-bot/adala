@@ -211,7 +211,7 @@ const EmployeeContractsPage: React.FC = () => {
                         {/* Left column: English translation aligned exactly */}
                         <div className="space-y-4 text-left" style={{ direction: 'ltr' }}>
                             <h3 className="font-black text-[10px] text-slate-900">First Party: The Employer</h3>
-                            <p>Al-Wagayan & Al-Rodhan Advocates & Legal Advisors, represented by HR Director Counselor Sabry Shatta.</p>
+                            <p>Sabry Shatta Law Firm, represented by HR Director Counselor Sabry Shatta.</p>
 
                             <h3 className="font-black text-[10px] text-slate-900">Second Party: The Employee</h3>
                             <p>Mr./Ms: <strong>{selectedContract.employeeNameEn}</strong>, passport/civil ID number: {selectedContract.passportOrCivilId}.</p>

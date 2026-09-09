@@ -57,6 +57,9 @@ import {
 // Import litigation print system
 import { LegalPrintSystem } from './litigationPrintSystem';
 
+// Import Interactive Google Maps Component
+import { PropertyGoogleMap } from '../components/PropertyGoogleMap';
+
 // Load our bilingual translation mapping
 import { propertyTranslations } from '../data/propertyTranslations';
 
@@ -89,7 +92,98 @@ export const PropertyManagementPage: React.FC = () => {
     }, [i18n?.language]);
 
     // Active Tab Navigation
-    const [activeTab, setActiveTab] = useState<'overview' | 'properties' | 'tenants' | 'leases' | 'payments' | 'notices' | 'landlords_brokers' | 'finance_ledger' | 'complaints_desk'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'kpi_dashboard' | 'smart_archive' | 'proactive_alerts' | 'properties' | 'tenants' | 'leases' | 'payments' | 'notices' | 'landlords_brokers' | 'finance_ledger' | 'complaints_desk' | 'custom_reports' | 'revenue_calendar' | 'price_simulator'>('overview');
+    
+    // KPI Dashboard Filter States
+    const [kpiRegionFilter, setKpiRegionFilter] = useState<string>('all');
+    const [kpiTypeFilter, setKpiTypeFilter] = useState<string>('all');
+
+    // Smart Document Archive State & Search
+    const [archiveSearchTerm, setArchiveSearchTerm] = useState<string>('');
+    const [archiveCategoryFilter, setArchiveCategoryFilter] = useState<string>('all');
+    const [archivePropertyFilter, setArchivePropertyFilter] = useState<string>('all');
+
+    // Lease Draft Auto-Email Dispatch Logs State
+    const [isEmailDraftModalOpen, setIsEmailDraftModalOpen] = useState(false);
+    const [selectedLeaseForEmail, setSelectedLeaseForEmail] = useState<LeaseAgreement | null>(null);
+    const [emailDispatchLogs, setEmailDispatchLogs] = useState<Array<{
+        id: string;
+        leaseId: string;
+        tenantName: string;
+        tenantEmail: string;
+        propertyName: string;
+        unitNumber: string;
+        sentAt: string;
+        deliveryStatus: 'sent' | 'delivered' | 'failed';
+        readStatus: 'read' | 'unread';
+        readAt?: string;
+    }>>([
+        {
+            id: 'EMAIL-801',
+            leaseId: 'LEASE-001',
+            tenantName: 'شركة المسار للتجارة العامة',
+            tenantEmail: 'info@almasar-kuwait.com',
+            propertyName: 'برج ناصر السكني',
+            unitNumber: '101',
+            sentAt: '2026-08-08 14:32',
+            deliveryStatus: 'delivered',
+            readStatus: 'read',
+            readAt: '2026-08-08 15:05'
+        },
+        {
+            id: 'EMAIL-802',
+            leaseId: 'LEASE-002',
+            tenantName: 'سعود عبدالمحسن العتيبي',
+            tenantEmail: 's.otabi@gmail.com',
+            propertyName: 'مجمع الفروانية التجاري',
+            unitNumber: 'محل 12',
+            sentAt: '2026-08-09 09:15',
+            deliveryStatus: 'delivered',
+            readStatus: 'unread'
+        }
+    ]);
+
+    // Property Revenue Calendar State
+    const [selectedCalendarDate, setSelectedCalendarDate] = useState<string>('2026-08-01');
+
+    // Rental Price Simulator Input State
+    const [simSpecs, setSimSpecs] = useState({
+        district: 'الشرق',
+        areaM2: 120,
+        roomCount: 2,
+        propertyType: 'سكني استثماري',
+        finishing: 'سوبر ديلوكس',
+        buildingAge: 'حديث (أقل من 5 سنوات)'
+    });
+
+    const [propertyDocs, setPropertyDocs] = useState<Array<{
+        id: string;
+        propertyId: string;
+        propertyName: string;
+        unitNumber?: string;
+        docTitle: string;
+        docCategory: 'lease_contract' | 'title_deed' | 'maintenance_log' | 'court_notice' | 'official_license';
+        fileSize: string;
+        uploadDate: string;
+        notes: string;
+    }>>([
+        { id: 'DOC-101', propertyId: 'PROP-001', propertyName: 'برج ناصر السكني', unitNumber: '101', docTitle: 'عقد إيجار موثق - المادة 20', docCategory: 'lease_contract', fileSize: '2.4 MB', uploadDate: '2025-01-15', notes: 'عقد رسمي موثق بقصر العدل لمدة سنتين قابل للتجديد' },
+        { id: 'DOC-102', propertyId: 'PROP-001', propertyName: 'برج ناصر السكني', unitNumber: 'الكل', docTitle: 'سند ملكية وتأمين حريق برج ناصر', docCategory: 'title_deed', fileSize: '5.1 MB', uploadDate: '2024-06-10', notes: 'سند الملكية الموثق من إدارة التسجيل العقاري بوزارة العدل' },
+        { id: 'DOC-103', propertyId: 'PROP-002', propertyName: 'مجمع الفروانية التجاري', unitNumber: 'محل 12', docTitle: 'محضر صيانة وإصلاح التكييف المركزي', docCategory: 'maintenance_log', fileSize: '1.8 MB', uploadDate: '2026-02-01', notes: 'صيانة دورية من شركة الغانم للهندسة مع فواتير الضمان' },
+        { id: 'DOC-104', propertyId: 'PROP-002', propertyName: 'مجمع الفروانية التجاري', unitNumber: 'محل 05', docTitle: 'إعلان إنذار تكليف بالوفاء - المحكمة الكلية', docCategory: 'court_notice', fileSize: '1.2 MB', uploadDate: '2026-02-10', notes: 'مسجل بدائرة إعلانات الفروانية برقم 882/2026' },
+        { id: 'DOC-105', propertyId: 'PROP-003', propertyName: 'عمارة حولي الاستثمارية', unitNumber: 'الكل', docTitle: 'رخص الإطفاء والسلامة من بلدية الكويت', docCategory: 'official_license', fileSize: '3.0 MB', uploadDate: '2025-11-20', notes: 'شهادة ترخيص المطافئ سارية حتى نهاية 2026' },
+        { id: 'DOC-106', propertyId: 'PROP-004', propertyName: 'مجمع الشرق الحرفي', unitNumber: 'ورشة 03', docTitle: 'عقد إيجار ورشة وصحيفة دعوى إخلاء', docCategory: 'court_notice', fileSize: '2.9 MB', uploadDate: '2026-01-28', notes: 'دعوى إخلاء رقم 402/2026 - دائرة الإيجارات العاصمة' },
+    ]);
+
+    // Modal for New Property Document Upload
+    const [isAddDocModalOpen, setIsAddDocModalOpen] = useState(false);
+    const [newDocData, setNewDocData] = useState({
+        propertyId: 'PROP-001',
+        unitNumber: '101',
+        docTitle: '',
+        docCategory: 'lease_contract' as const,
+        notes: ''
+    });
     
     // Layout Display Modes: 'cards' | 'table' | 'map' | 'timeline'
     const [displayMode, setDisplayMode] = useState<'cards' | 'table' | 'map' | 'timeline'>('cards');
@@ -159,6 +253,69 @@ export const PropertyManagementPage: React.FC = () => {
     const [isCaseLinkModalOpen, setIsCaseLinkModalOpen] = useState(false);
     const [linkingTargetId, setLinkingTargetId] = useState<string | null>(null);
     const [mockCourtCaseNum, setMockCourtCaseNum] = useState('');
+
+    // Unit Management State
+    const [editingUnitInfo, setEditingUnitInfo] = useState<{ propertyId: string; unit?: PropertyUnit } | null>(null);
+
+    const handleSaveUnit = (propertyId: string, unitData: PropertyUnit) => {
+        setProperties(prevProps => prevProps.map(p => {
+            if (p.id !== propertyId) return p;
+            const existingUnits = p.units || [];
+            const index = existingUnits.findIndex(u => u.id === unitData.id);
+            let updatedUnits: PropertyUnit[];
+            if (index >= 0) {
+                updatedUnits = [...existingUnits];
+                updatedUnits[index] = unitData;
+            } else {
+                updatedUnits = [...existingUnits, unitData];
+            }
+            return { ...p, units: updatedUnits };
+        }));
+
+        setSelectedProfile(prev => {
+            if (prev?.type === 'property' && prev.data.id === propertyId) {
+                const existingUnits = prev.data.units || [];
+                const index = existingUnits.findIndex((u: any) => u.id === unitData.id);
+                const updatedUnits = index >= 0 
+                    ? existingUnits.map((u: any) => u.id === unitData.id ? unitData : u)
+                    : [...existingUnits, unitData];
+                return { type: 'property', data: { ...prev.data, units: updatedUnits } };
+            }
+            return prev;
+        });
+
+        addToast({
+            type: 'success',
+            title: pageLang === 'ar' ? 'حفظ وحدة عقارية' : 'Unit Saved',
+            message: pageLang === 'ar' ? `تم حفظ بيانات الوحدة (${unitData.unitNumber}) بنجاح.` : `Unit ${unitData.unitNumber} saved successfully.`
+        });
+        setEditingUnitInfo(null);
+    };
+
+    const handleDeleteUnit = (propertyId: string, unitId: string) => {
+        if (window.confirm(pageLang === 'ar' ? 'هل أنت متأكد من حذف هذه الوحدة العقارية؟' : 'Are you sure you want to delete this unit?')) {
+            setProperties(prevProps => prevProps.map(p => {
+                if (p.id !== propertyId) return p;
+                return { ...p, units: (p.units || []).filter(u => u.id !== unitId) };
+            }));
+
+            setSelectedProfile(prev => {
+                if (prev?.type === 'property' && prev.data.id === propertyId) {
+                    return { 
+                        type: 'property', 
+                        data: { ...prev.data, units: (prev.data.units || []).filter((u: any) => u.id !== unitId) } 
+                    };
+                }
+                return prev;
+            });
+
+            addToast({
+                type: 'success',
+                title: pageLang === 'ar' ? 'حذف وحدة عقارية' : 'Unit Deleted',
+                message: pageLang === 'ar' ? 'تم حذف الوحدة العقارية بنجاح.' : 'Unit deleted successfully.'
+            });
+        }
+    };
 
     // Active language translations provider
     const t = useMemo(() => propertyTranslations[pageLang], [pageLang]);
@@ -753,6 +910,9 @@ export const PropertyManagementPage: React.FC = () => {
                 <div className="flex flex-wrap gap-1">
                     {[
                         { id: 'overview', label: t.overview, icon: <PresentationChartLineIcon className="w-4 h-4"/> },
+                        { id: 'kpi_dashboard', label: pageLang === 'ar' ? 'مؤشرات الأداء العقاري' : 'Property KPIs', icon: <ChartBarIcon className="w-4 h-4"/> },
+                        { id: 'smart_archive', label: pageLang === 'ar' ? 'أرشفة المستندات الذكية' : 'Smart Archive', icon: <FolderIcon className="w-4 h-4"/> },
+                        { id: 'proactive_alerts', label: pageLang === 'ar' ? 'التنبيهات الاستباقية' : 'Proactive Alerts', icon: <BellAlertIcon className="w-4 h-4"/> },
                         { id: 'properties', label: t.properties, icon: <BuildingOffice2Icon className="w-4 h-4"/> },
                         { id: 'tenants', label: t.tenants, icon: <UsersIcon className="w-4 h-4"/> },
                         { id: 'leases', label: t.leases, icon: <DocumentTextIcon className="w-4 h-4"/> },
@@ -760,7 +920,10 @@ export const PropertyManagementPage: React.FC = () => {
                         { id: 'notices', label: t.notices, icon: <ScaleIcon className="w-4 h-4"/> },
                         { id: 'landlords_brokers', label: pageLang === 'ar' ? 'الملاك والشركاء' : 'Landlords & Brokers', icon: <UsersIcon className="w-4 h-4"/> },
                         { id: 'finance_ledger', label: pageLang === 'ar' ? 'السجل المالي' : 'Finances', icon: <TrendingUpIcon className="w-4 h-4"/> },
-                        { id: 'complaints_desk', label: pageLang === 'ar' ? 'متابعة الشكاوى' : 'Complaints & Followups', icon: <BellAlertIcon className="w-4 h-4"/> }
+                        { id: 'complaints_desk', label: pageLang === 'ar' ? 'متابعة الشكاوى' : 'Complaints & Followups', icon: <BellAlertIcon className="w-4 h-4"/> },
+                        { id: 'custom_reports', label: pageLang === 'ar' ? 'وحدة التقارير والإنذارات الرسمية' : 'Custom Reports & Notices', icon: <DocumentDuplicateIcon className="w-4 h-4"/> },
+                        { id: 'revenue_calendar', label: pageLang === 'ar' ? 'تقويم الاستحقاقات الإيجارية' : 'Revenue Calendar', icon: <CalendarDaysIcon className="w-4 h-4"/> },
+                        { id: 'price_simulator', label: pageLang === 'ar' ? 'محاكي أسعار الإيجارات' : 'Price Simulator', icon: <SparklesIcon className="w-4 h-4"/> }
                     ].map(tab => (
                         <button 
                             key={tab.id}
@@ -780,9 +943,84 @@ export const PropertyManagementPage: React.FC = () => {
                 </div>
             </div>
 
-            {/* -------------------- OVERVIEW TAB -------------------- */}
+            {/* -------------------- OVERVIEW TAB (BENTO GRID EXECUTIVE DASHBOARD) -------------------- */}
             {activeTab === 'overview' && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    {/* BENTO GRID EXECUTIVE COCKPIT */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        
+                        {/* Bento Card 1: Occupancy Rate */}
+                        <div className="bg-gradient-to-br from-[#032B24] via-[#134D41] to-[#0A4136] p-5 rounded-3xl text-white border border-emerald-800/40 shadow-lg flex flex-col justify-between relative overflow-hidden">
+                            <div className="absolute -right-6 -bottom-6 w-28 h-28 bg-emerald-500/10 rounded-full blur-xl pointer-events-none" />
+                            <div>
+                                <div className="flex justify-between items-center text-xs text-emerald-200/80 font-bold">
+                                    <span>{pageLang === 'ar' ? 'مؤشر إشغال الوحدات' : 'Occupancy Rate'}</span>
+                                    <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px]">{stats.rentedUnits} / {stats.totalUnits} {pageLang === 'ar' ? 'وحدة' : 'Units'}</span>
+                                </div>
+                                <h3 className="text-3xl font-black text-amber-300 mt-2">{stats.occupancy}%</h3>
+                            </div>
+                            <div className="mt-4 pt-3 border-t border-emerald-700/50 flex justify-between items-center text-[11px]">
+                                <span className="text-emerald-100/70">{pageLang === 'ar' ? 'وحدات شاغرة جاهزة:' : 'Vacant Ready:'} <strong className="text-white">{stats.vacantUnits}</strong></span>
+                                <button onClick={() => setActiveTab('properties')} className="text-amber-300 hover:underline font-bold">{pageLang === 'ar' ? 'إدارة العقارات ←' : 'Manage ←'}</button>
+                            </div>
+                        </div>
+
+                        {/* Bento Card 2: Collection Rate */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
+                                    <span>{pageLang === 'ar' ? 'مؤشر التحصيل الشهري' : 'Collection Rate'}</span>
+                                    <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full text-[10px] font-black">
+                                        {stats.expectedMonthly > 0 ? Math.round((stats.actualCollected / stats.expectedMonthly) * 100) : 0}%
+                                    </span>
+                                </div>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-white mt-2">{payAmount(stats.actualCollected)}</h3>
+                                <p className="text-[11px] text-slate-400 mt-1">{pageLang === 'ar' ? 'المتوقع الكلي:' : 'Target:'} {payAmount(stats.expectedMonthly)}</p>
+                            </div>
+                            <div className="mt-3 w-full bg-slate-100 rounded-full h-2">
+                                <div className="bg-primary h-2 rounded-full" style={{ width: `${Math.min(100, stats.expectedMonthly > 0 ? Math.round((stats.actualCollected / stats.expectedMonthly) * 100) : 0)}%` }} />
+                            </div>
+                        </div>
+
+                        {/* Bento Card 3: Kuwait Courts DB Dispute Linkage */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-center text-xs text-slate-500 font-bold">
+                                    <span className="flex items-center gap-1"><ScaleIcon className="w-4 h-4 text-rose-500" />{pageLang === 'ar' ? 'النزاعات العقارية بالمحاكم' : 'Court Disputes'}</span>
+                                    <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full text-[10px] font-mono font-bold">MOJ Live</span>
+                                </div>
+                                <div className="mt-2 space-y-1">
+                                    <div className="text-xl font-black text-rose-600">{notices.length} {pageLang === 'ar' ? 'إنذارات وقضايا' : 'Notices & Dockets'}</div>
+                                    <p className="text-[11px] text-slate-500 leading-tight">{pageLang === 'ar' ? 'مربوطة بدائرة الإيجارات الكلية - قصر العدل' : 'Connected to Kuwait Rent Circuit'}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setActiveTab('notices')} className="mt-3 text-[11px] text-rose-600 font-black hover:underline flex items-center gap-1">
+                                <span>{pageLang === 'ar' ? 'استعراض النزاعات ومتابعة الإعلانات' : 'View Court Disputes'}</span>
+                                <ArrowUpRightIcon className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+
+                        {/* Bento Card 4: Quick Legal Notice Trigger (قانون 35/1978) */}
+                        <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-5 rounded-3xl text-slate-950 shadow-md flex flex-col justify-between">
+                            <div>
+                                <div className="flex justify-between items-center text-xs font-black text-slate-900">
+                                    <span>{pageLang === 'ar' ? 'إصدار تكليف بالوفاء' : 'Legal Demand Notice'}</span>
+                                    <span className="px-2 py-0.5 bg-slate-950 text-amber-300 rounded-full text-[9px] font-mono">قانون 35/1978</span>
+                                </div>
+                                <p className="text-xs text-slate-900 font-semibold mt-2 leading-relaxed">
+                                    {pageLang === 'ar' ? 'توليد إنذار رسمي للمستأجر المتأخر خلال 15 يوماً وفق المادة 20 قبل رفع دعوى الإخلاء' : 'Issue formal 15-day rent payment notice matching Article 20 of Kuwait Rent Law'}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setActiveTab('custom_reports')}
+                                className="mt-3 w-full py-2 bg-slate-950 text-amber-300 font-black rounded-xl text-xs hover:bg-slate-900 transition-colors shadow-sm flex items-center justify-center gap-1.5"
+                            >
+                                <DocumentTextIcon className="w-4 h-4" />
+                                <span>{pageLang === 'ar' ? 'إنشاء إنذار تكليف بالوفاء' : 'Generate Demand Notice'}</span>
+                            </button>
+                        </div>
+
+                    </div>
                     {/* Visual Stats Row */}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                         <Card className="border-l-4 border-l-primary hover:shadow-md transition-shadow">
@@ -922,8 +1160,507 @@ export const PropertyManagementPage: React.FC = () => {
                 </div>
             )}
 
+            {/* -------------------- 1. PROPERTY KPIS DASHBOARD TAB -------------------- */}
+            {activeTab === 'kpi_dashboard' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    {/* Header & Filter Controls */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-primary font-black text-sm">
+                                <ChartBarIcon className="w-6 h-6 text-primary" />
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white">
+                                    {pageLang === 'ar' ? 'لوحة مؤشرات الأداء العقاري (Property KPIs Dashboard)' : 'Property KPIs Dashboard'}
+                                </h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'تحليلات تفاعلية وشاملة للإيرادات، معدلات الإشغال، ونسبة النزاعات القضائية مع إمكانية الفلترة بالمنطقة ونوع العقار' 
+                                    : 'Interactive financial and legal analytics filtered by district and property type'}
+                            </p>
+                        </div>
+
+                        {/* Interactive Filter Controls */}
+                        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div className="flex flex-col">
+                                <label className="text-[10px] font-black text-slate-400 block mb-1">{pageLang === 'ar' ? 'تصفية حسب المنطقة:' : 'Filter District:'}</label>
+                                <select 
+                                    value={kpiRegionFilter} 
+                                    onChange={e => setKpiRegionFilter(e.target.value)}
+                                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                                >
+                                    <option value="all">{pageLang === 'ar' ? 'جميع المناطق الكويتي' : 'All Districts'}</option>
+                                    <option value="العاصمة">العاصمة (الشرق/المقاب)</option>
+                                    <option value="حولي">حولي والساليمة</option>
+                                    <option value="الفروانية">الفروانية</option>
+                                    <option value="الأحمدي">الأحمدي والفحيحيل</option>
+                                    <option value="الجهراء">الجهراء</option>
+                                    <option value="مبارك الكبير">مبارك الكبير</option>
+                                </select>
+                            </div>
+
+                            <div className="flex flex-col">
+                                <label className="text-[10px] font-black text-slate-400 block mb-1">{pageLang === 'ar' ? 'نوع العقار:' : 'Property Type:'}</label>
+                                <select 
+                                    value={kpiTypeFilter} 
+                                    onChange={e => setKpiTypeFilter(e.target.value)}
+                                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                                >
+                                    <option value="all">{pageLang === 'ar' ? 'جميع أنواع العقارات' : 'All Types'}</option>
+                                    <option value="commercial">تجاري (مجمعات ومحلات)</option>
+                                    <option value="investment_residential">استثماري (عمارات وشقق)</option>
+                                    <option value="private_residential">سكن خاص (فيلل)</option>
+                                    <option value="industrial_craft">حرفي / صناعي (قسائم ورش)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* KPI Metric Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <Card className="border-l-4 border-l-emerald-500 p-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-slate-400 text-xs font-bold uppercase">{pageLang === 'ar' ? 'الإيرادات الشهري المحصلة' : 'Collected Monthly Revenue'}</p>
+                                    <h4 className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{payAmount(stats.actualCollected)}</h4>
+                                    <p className="text-[10px] text-slate-400 mt-1">من أصل {payAmount(stats.expectedMonthly)} متوقعة</p>
+                                </div>
+                                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl"><BanknotesIcon className="w-7 h-7"/></div>
+                            </div>
+                        </Card>
+
+                        <Card className="border-l-4 border-l-sky-500 p-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-slate-400 text-xs font-bold uppercase">{pageLang === 'ar' ? 'نسبة الإشغال الإجمالية' : 'Occupancy Rate'}</p>
+                                    <h4 className="text-2xl font-black text-sky-600 dark:text-sky-400 mt-1">{stats.occupancy}%</h4>
+                                    <p className="text-[10px] text-slate-400 mt-1">{stats.rentedUnits} وحدة مؤجرة / {stats.vacantUnits} شاغرة</p>
+                                </div>
+                                <div className="p-3 bg-sky-50 text-sky-600 rounded-2xl"><HomeIcon className="w-7 h-7"/></div>
+                            </div>
+                        </Card>
+
+                        <Card className="border-l-4 border-l-rose-500 p-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-slate-400 text-xs font-bold uppercase">{pageLang === 'ar' ? 'معدل النزاعات القضائية' : 'Dispute Rate'}</p>
+                                    <h4 className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">
+                                        {Math.round((notices.length / (properties.length || 1)) * 100)}%
+                                    </h4>
+                                    <p className="text-[10px] text-slate-400 mt-1">{notices.length} قضايا ونزاعات بدائرة الإيجارات</p>
+                                </div>
+                                <div className="p-3 bg-rose-50 text-rose-600 rounded-2xl"><ScaleIcon className="w-7 h-7"/></div>
+                            </div>
+                        </Card>
+
+                        <Card className="border-l-4 border-l-amber-500 p-4">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <p className="text-slate-400 text-xs font-bold uppercase">{pageLang === 'ar' ? 'إجمالي المتأخرات الحرجة' : 'Critical Arrears'}</p>
+                                    <h4 className="text-2xl font-black text-amber-600 dark:text-amber-400 mt-1">{payAmount(stats.overdueTotal)}</h4>
+                                    <p className="text-[10px] text-amber-600 font-bold mt-1">تتطلب إنذار تكليف بالوفاء</p>
+                                </div>
+                                <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl"><ExclamationTriangleIcon className="w-7 h-7"/></div>
+                            </div>
+                        </Card>
+                    </div>
+
+                    {/* Recharts Analytics Section */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Recharts Area Chart: Revenue Trend */}
+                        <Card title={pageLang === 'ar' ? '📊 اتجاه الإيرادات والتحصيل الشهري (KWD)' : '📊 Monthly Revenue Analytics'}>
+                            <div className="h-72 w-full mt-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={chartRevenue}>
+                                        <defs>
+                                            <linearGradient id="kpiRevenue" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#059669" stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor="#059669" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <XAxis dataKey="month" stroke="#94a3b8" fontSize={11}/>
+                                        <YAxis stroke="#94a3b8" fontSize={11}/>
+                                        <Tooltip contentStyle={{ borderRadius: '12px', border: '1px solid #e2e8f0', background: '#fff', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }}/>
+                                        <Area type="monotone" dataKey="collected" name="المحصل الفعلي" stroke="#059669" strokeWidth={3} fillOpacity={1} fill="url(#kpiRevenue)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </Card>
+
+                        {/* Recharts Pie Chart: Property Units Occupancy Distribution */}
+                        <Card title={pageLang === 'ar' ? '🧩 توزيع إشغال الوحدات العقارية والنزاعات' : '🧩 Occupancy & Dispute Breakdown'}>
+                            <div className="h-72 w-full flex items-center justify-center relative">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie 
+                                            data={[
+                                                { name: 'وحدات مؤجرة بانتظام', value: stats.rentedUnits, color: '#059669' },
+                                                { name: 'وحدات شاغرة', value: stats.vacantUnits, color: '#e11d48' },
+                                                { name: 'وحدات معلقة بنزاع قضائي', value: notices.length, color: '#d97706' },
+                                                { name: 'تحت الصيانة', value: 2, color: '#0284c7' }
+                                            ]} 
+                                            cx="50%" cy="50%" 
+                                            innerRadius={60} outerRadius={90} 
+                                            paddingAngle={4} dataKey="value"
+                                        >
+                                            {[
+                                                { color: '#059669' },
+                                                { color: '#e11d48' },
+                                                { color: '#d97706' },
+                                                { color: '#0284c7' }
+                                            ].map((entry, idx) => (
+                                                <Cell key={`cell-kpi-${idx}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute text-center pointer-events-none">
+                                    <p className="text-2xl font-black text-slate-800 dark:text-white">{stats.totalUnits}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{pageLang === 'ar' ? 'إجمالي الوحدات' : 'Total Units'}</p>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                </div>
+            )}
+
+            {/* -------------------- 2. SMART PROPERTY DOCUMENT ARCHIVING TAB -------------------- */}
+            {activeTab === 'smart_archive' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-primary font-black text-sm">
+                                <FolderIcon className="w-6 h-6 text-primary" />
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white">
+                                    {pageLang === 'ar' ? 'أرشفة المستندات العقارية الذكية' : 'Smart Property Document Archive'}
+                                </h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'تصنيف آلي لعقود الإيجار، سندات الملكية، ومحاضر الصيانة وربطها بالوحدات العقارية مع أداة بحث واستدعاء سريعة' 
+                                    : 'Automated document classification linked to properties and units with fast archive search'}
+                            </p>
+                        </div>
+
+                        <Button 
+                            onClick={() => setIsAddDocModalOpen(true)}
+                            leftIcon={<PlusCircleIcon className="w-4 h-4" />}
+                            size="sm"
+                        >
+                            {pageLang === 'ar' ? 'أرشفة وثيقة جديدة' : 'Archive New Document'}
+                        </Button>
+                    </div>
+
+                    {/* Fast Search & Category Filter Toolbar */}
+                    <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row gap-3 items-center justify-between">
+                        <div className="w-full md:w-80">
+                            <Input 
+                                placeholder={pageLang === 'ar' ? 'بحث سريع في أرشيف المستندات والوحدات...' : 'Search document archive...'}
+                                value={archiveSearchTerm}
+                                onChange={e => setArchiveSearchTerm(e.target.value)}
+                                containerClassName="mb-0"
+                            />
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                            <select 
+                                value={archiveCategoryFilter}
+                                onChange={e => setArchiveCategoryFilter(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                            >
+                                <option value="all">{pageLang === 'ar' ? 'جميع التصنيفات' : 'All Categories'}</option>
+                                <option value="lease_contract">عقود الإيجار الموثقة</option>
+                                <option value="title_deed">سندات الملكية والوثائق</option>
+                                <option value="maintenance_log">محاضر وفواتير الصيانة</option>
+                                <option value="court_notice">إنذارات وأحكام القضاء</option>
+                                <option value="official_license">التراخيص الرسمية والمطافئ</option>
+                            </select>
+
+                            <select 
+                                value={archivePropertyFilter}
+                                onChange={e => setArchivePropertyFilter(e.target.value)}
+                                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                            >
+                                <option value="all">{pageLang === 'ar' ? 'جميع العقارات' : 'All Properties'}</option>
+                                {properties.map(p => (
+                                    <option key={p.id} value={p.id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Document Grid Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {propertyDocs
+                            .filter(doc => {
+                                const matchSearch = doc.docTitle.includes(archiveSearchTerm) || doc.propertyName.includes(archiveSearchTerm) || (doc.unitNumber && doc.unitNumber.includes(archiveSearchTerm)) || doc.notes.includes(archiveSearchTerm);
+                                const matchCategory = archiveCategoryFilter === 'all' || doc.docCategory === archiveCategoryFilter;
+                                const matchProperty = archivePropertyFilter === 'all' || doc.propertyId === archivePropertyFilter;
+                                return matchSearch && matchCategory && matchProperty;
+                            })
+                            .map(doc => (
+                                <Card key={doc.id} className="p-5 space-y-3 hover:shadow-md transition-shadow relative overflow-hidden">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-black mb-1 ${
+                                                doc.docCategory === 'lease_contract' ? 'bg-emerald-50 text-emerald-600' :
+                                                doc.docCategory === 'title_deed' ? 'bg-purple-50 text-purple-600' :
+                                                doc.docCategory === 'court_notice' ? 'bg-rose-50 text-rose-600' :
+                                                doc.docCategory === 'maintenance_log' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600'
+                                            }`}>
+                                                {doc.docCategory === 'lease_contract' ? 'عقد إيجار' :
+                                                 doc.docCategory === 'title_deed' ? 'سند ملكية' :
+                                                 doc.docCategory === 'court_notice' ? 'نزاع عدلي' :
+                                                 doc.docCategory === 'maintenance_log' ? 'محضر صيانة' : 'ترخيص رسمي'}
+                                            </span>
+                                            <h4 className="text-sm font-black text-slate-800 dark:text-white leading-snug">{doc.docTitle}</h4>
+                                        </div>
+                                        <span className="text-[10px] font-mono font-bold text-slate-400">{doc.fileSize}</span>
+                                    </div>
+
+                                    <div className="p-2.5 bg-slate-50 dark:bg-slate-800 rounded-xl space-y-1 text-xs">
+                                        <p className="text-slate-600 dark:text-slate-300 font-bold flex items-center justify-between">
+                                            <span>🏢 {doc.propertyName}</span>
+                                            <span className="text-primary font-mono">{doc.unitNumber ? `وحدة: ${doc.unitNumber}` : 'العقار ككل'}</span>
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 leading-tight">{doc.notes}</p>
+                                    </div>
+
+                                    <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center text-xs">
+                                        <span className="text-[10px] text-slate-400 font-mono">تاريخ المؤرشفة: {doc.uploadDate}</span>
+                                        <div className="flex gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setPrintDoc({
+                                                        isOpen: true,
+                                                        title: doc.docTitle,
+                                                        refNo: doc.id,
+                                                        metadata: {
+                                                            'العقار المرتبط': doc.propertyName,
+                                                            'الوحدة': doc.unitNumber || 'عام',
+                                                            'تصنيف الوثيقة': doc.docCategory,
+                                                            'تاريخ الأرشفة': doc.uploadDate
+                                                        },
+                                                        content: `مستند مؤرشف من السجل العقاري الذكي لمكتب المحامي صبري شطا.\n\nالعنوان: ${doc.docTitle}\nالعقار: ${doc.propertyName} - وحدة رقم ${doc.unitNumber || 'عام'}\nبيانات الملاحظات والاعتماد: ${doc.notes}\n\nهذه الوثيقة مؤرشفة رقمياً ومربوطة بالمنظومة القضائية لمتابعة النزاعات والعقود الرسمية.`,
+                                                        showStamp: true
+                                                    });
+                                                }}
+                                                className="px-2 py-1 text-[11px]"
+                                            >
+                                                👁️ معاينة
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                    </div>
+
+                    {/* Email Automation & Dispatch Tracking Section */}
+                    <Card className="p-6 space-y-4 border-2 border-primary/20 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl" title="📧 نظام إرسال مسودة العقود آلياً وسجل متابعة التسليم والقراءة">
+                        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-800">
+                            <div>
+                                <h4 className="text-base font-black text-amber-400">إرسال مسودة عقد الإيجار تلقائياً عبر البريد الإلكتروني</h4>
+                                <p className="text-xs text-slate-300 mt-1">
+                                    بمجرد الموافقة على شروط العقد، يتم إرسال النسخة الأولية الموثقة برابط تفاعلي للمستأجر مع تتبع دقيق لتاريخ الإرسال وحالة القراءة والفتح.
+                                </p>
+                            </div>
+                            <Button 
+                                onClick={() => {
+                                    setSelectedLeaseForEmail(leases[0] || initialLeases[0]);
+                                    setIsEmailDraftModalOpen(true);
+                                }}
+                                className="bg-amber-400 text-slate-950 hover:bg-amber-300 font-black text-xs shrink-0"
+                            >
+                                📤 إرسال مسودة عقد جديدة للمستأجر
+                            </Button>
+                        </div>
+
+                        {/* Dispatch Log Tracking Table */}
+                        <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-950/60 p-1">
+                            <table className="w-full text-xs text-start">
+                                <thead className="bg-slate-900 text-slate-400 font-black text-[10px] uppercase border-b border-slate-800">
+                                    <tr>
+                                        <th className="p-3 text-start">الرمز المرجعي</th>
+                                        <th className="p-3 text-start">اسم المستأجر والبريد الإلكتروني</th>
+                                        <th className="p-3 text-start">العقار والوحدة</th>
+                                        <th className="p-3 text-start">تاريخ ووقت الإرسال</th>
+                                        <th className="p-3 text-start">حالة التسليم</th>
+                                        <th className="p-3 text-start">حالة القراءة والمعاينة</th>
+                                        <th className="p-3 text-center">الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-800 font-semibold text-slate-200">
+                                    {emailDispatchLogs.map(log => (
+                                        <tr key={log.id} className="hover:bg-slate-900/60 transition-colors">
+                                            <td className="p-3 font-mono text-amber-400 font-bold">{log.id}</td>
+                                            <td className="p-3">
+                                                <p className="font-bold text-white">{log.tenantName}</p>
+                                                <p className="text-[10px] font-mono text-slate-400">{log.tenantEmail}</p>
+                                            </td>
+                                            <td className="p-3">
+                                                <span className="font-bold">{log.propertyName}</span>
+                                                <span className="text-[10px] text-amber-400 font-mono block">وحدة: {log.unitNumber}</span>
+                                            </td>
+                                            <td className="p-3 font-mono text-slate-300">{log.sentAt}</td>
+                                            <td className="p-3">
+                                                <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-black inline-flex items-center gap-1">
+                                                    ✓ تم التسليم بنجاح
+                                                </span>
+                                            </td>
+                                            <td className="p-3">
+                                                {log.readStatus === 'read' ? (
+                                                    <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 rounded-full text-[10px] font-black inline-flex items-center gap-1">
+                                                        🟢 تم الاطلاع والقراءة ({log.readAt})
+                                                    </span>
+                                                ) : (
+                                                    <span className="px-2.5 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 rounded-full text-[10px] font-black inline-flex items-center gap-1">
+                                                        ⏳ قيد الانتظار (لم يُقرأ بعد)
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="p-3 text-center">
+                                                <div className="flex justify-center gap-2">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="outline"
+                                                        className="text-[10px] text-slate-300 border-slate-700 hover:bg-slate-800"
+                                                        onClick={() => {
+                                                            addToast({
+                                                                type: 'info',
+                                                                title: 'تم إعادة الإرسال',
+                                                                message: `تمت إعادة إرسال مسودة عقد الإيجار للبريد ${log.tenantEmail}`
+                                                            });
+                                                        }}
+                                                    >
+                                                        🔄 إعادة إرسال
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* -------------------- 3. PROACTIVE LEASE & RENT ALERT SYSTEM TAB -------------------- */}
+            {activeTab === 'proactive_alerts' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    <div className="bg-gradient-to-r from-rose-900 via-slate-900 to-slate-950 p-6 rounded-3xl text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-rose-400 font-black text-sm">
+                                <BellAlertIcon className="w-6 h-6" />
+                                <h3>{pageLang === 'ar' ? 'نظام التنبيهات الاستباقي ومتابعة التكليف بالوفاء' : 'Proactive Legal Alert Engine'}</h3>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'تنبيهات استباقية فورية عند اقتراب انتهاء عقود الإيجار، استحقاقات الأجرة المتأخرة، وإصدار إنذار تكليف بالوفاء بضغطة زر' 
+                                    : 'Proactive alerts for lease renewals and overdue rent with 1-click legal notice triggering'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Expiration Alerts */}
+                        <Card className="p-5 space-y-4" title={pageLang === 'ar' ? '⏳ تنبيهات انقضاء عقود الإيجار (تجديد/تعديل أجرة)' : '⏳ Upcoming Lease Expirations'}>
+                            <div className="space-y-3">
+                                {leases
+                                    .slice(0, 3)
+                                    .map(lease => {
+                                        const tenant = tenants.find(t => t.id === lease.tenantId);
+                                        const prop = properties.find(p => p.id === lease.propertyId);
+                                        return (
+                                            <div key={lease.id} className="p-3.5 bg-amber-50/70 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-2xl flex flex-col justify-between gap-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-amber-900 dark:text-amber-300">
+                                                            عقد إيجار ينتهي قريباً - {tenant?.fullNameAr}
+                                                        </h5>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                                            {prop?.name} - وحدة {lease.unitId} | القيمة: {payAmount(lease.rentAmount)}
+                                                        </p>
+                                                    </div>
+                                                    <span className="px-2 py-0.5 bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100 rounded-full text-[10px] font-bold">
+                                                        ينتهي: {lease.endDate}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-end gap-2 pt-1 border-t border-amber-200/50">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="secondary"
+                                                        onClick={() => {
+                                                            addToast({
+                                                                type: 'success',
+                                                                title: 'تم إرسال إشعار التجديد',
+                                                                message: `تم توجيه تنبيه تجديد العقد إلى المستأجر ${tenant?.fullNameAr}`
+                                                            });
+                                                        }}
+                                                        className="text-xs"
+                                                    >
+                                                        إرسال إشعار تجديد العقد
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </Card>
+
+                        {/* Overdue Rent Alerts with 1-Click Demand Notice Trigger */}
+                        <Card className="p-5 space-y-4" title={pageLang === 'ar' ? '🚨 تنبيهات استحقاق الأجرة المتأخرة (تستوجب تكليف بالوفاء)' : '🚨 Critical Overdue Rent Alerts'}>
+                            <div className="space-y-3">
+                                {payments
+                                    .filter(p => p.status === RentPaymentStatus.OVERDUE || p.status === RentPaymentStatus.PARTIALLY_PAID)
+                                    .slice(0, 3)
+                                    .map(payment => {
+                                        const lease = leases.find(l => l.id === payment.leaseAgreementId);
+                                        const tenant = tenants.find(t => t.id === lease?.tenantId);
+                                        const prop = properties.find(p => p.id === lease?.propertyId);
+                                        return (
+                                            <div key={payment.id} className="p-3.5 bg-rose-50/80 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-2xl flex flex-col justify-between gap-2">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <h5 className="text-xs font-black text-rose-900 dark:text-rose-300">
+                                                            متأخرات إيجارية مستحقة - {tenant?.fullNameAr || 'مستأجر'}
+                                                        </h5>
+                                                        <p className="text-[11px] text-slate-500 mt-0.5">
+                                                            {prop?.name} | المبلغ المتأخر: <strong className="text-rose-600 font-mono">{payAmount(payment.amountDue - payment.amountPaid)}</strong>
+                                                        </p>
+                                                    </div>
+                                                    <span className="px-2 py-0.5 bg-rose-100 dark:bg-rose-900 text-rose-700 dark:text-rose-200 rounded-full text-[10px] font-black">
+                                                        تأخير {payment.dueDate}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex justify-end gap-2 pt-1 border-t border-rose-200/50">
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={() => {
+                                                            const not = notices[0] || initialNotices[0];
+                                                            handleTriggerPrintNotice(not);
+                                                        }}
+                                                        leftIcon={<DocumentTextIcon className="w-4 h-4" />}
+                                                        className="bg-rose-600 hover:bg-rose-700 text-white text-xs font-black"
+                                                    >
+                                                        إنشاء إنذار تكليف بالوفاء (جاهز للطباعة)
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                            </div>
+                        </Card>
+                    </div>
+                </div>
+            )}
+
             {/* -------------------- SEARCH & FILTER TOOLBAR FOR MASTER TABS -------------------- */}
-            {activeTab !== 'overview' && (
+            {!['overview', 'kpi_dashboard', 'smart_archive', 'proactive_alerts', 'custom_reports'].includes(activeTab) && (
                 <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row gap-4 items-center justify-between">
                     <div className="flex flex-wrap items-center gap-2 flex-grow w-full md:w-auto">
                         <Input 
@@ -1134,70 +1871,36 @@ export const PropertyManagementPage: React.FC = () => {
                         </Card>
                     )}
 
-                    {/* Mode INTERACTIVE PACI MAP SIMULATION */}
+                    {/* Mode INTERACTIVE GOOGLE MAP & PACI REGIONAL INDEX */}
                     {displayMode === 'map' && (
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <Card className="lg:col-span-2 bg-slate-950 text-white min-h-[420px] relative overflow-hidden flex flex-col justify-between">
-                                <div className="p-4 border-b border-white/10 flex justify-between items-center z-10">
-                                    <div>
-                                        <h4 className="font-black text-white text-md tracking-tight flex items-center gap-1.5"><MapPinIcon className="w-5 h-5 text-primary"/> {t.mapView}</h4>
-                                        <p className="text-[10px] text-slate-400">{t.alertDescription}</p>
+                        <div className="space-y-6">
+                            <PropertyGoogleMap 
+                                properties={filteredProperties} 
+                                onSelectProperty={(p) => setSelectedProfile({ type: 'property', data: p })} 
+                                pageLang={pageLang} 
+                            />
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {mapDistricts.map(dist => (
+                                    <div 
+                                        key={dist.key}
+                                        onClick={() => {
+                                            setSelectedDistrict(dist.key === 'kuwaitCity' ? 'العاصمة' : dist.key === 'salmiya' ? 'السالمية' : dist.key === 'hawally' ? 'حولي' : dist.key === 'surra' ? 'السرة' : dist.key === 'shuwaikh' ? 'الشويخ' : 'all');
+                                            setActiveTab('properties');
+                                            setDisplayMode('cards');
+                                            addToast({ type: 'info', title: dist.title, message: `تصفية العقارات في منطقة ${dist.title}` });
+                                        }}
+                                        className="p-4 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl cursor-pointer hover:border-amber-400/60 transition-all shadow-sm flex justify-between items-center"
+                                    >
+                                        <div>
+                                            <h5 className="font-black text-xs text-slate-800 dark:text-white flex items-center gap-1.5">
+                                                📍 {dist.title}
+                                            </h5>
+                                            <p className="text-[10px] text-slate-400 mt-0.5">{dist.count} عقار | {dist.occupancy} إشغال</p>
+                                        </div>
+                                        <span className="text-primary font-black text-xs">تصفية ←</span>
                                     </div>
-                                    <span className="bg-emerald-500/15 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black">{stats.occupancy}% {pageLang === 'ar' ? 'إشغال وطني' : 'Portfolio Occupied'}</span>
-                                </div>
-
-                                {/* Pinned interactive nodes simulation map layout */}
-                                <div className="relative flex-grow min-h-[300px] bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px] flex items-center justify-center">
-                                    
-                                    {/* Kuwait Outline Map schematic node */}
-                                    <div className="w-64 h-64 border-2 border-slate-800/80 rounded-full flex items-center justify-center animate-pulse duration-[4000ms] absolute opacity-35"></div>
-                                    
-                                    {mapDistricts.map(dist => (
-                                        <button 
-                                            key={dist.key}
-                                            onClick={() => {
-                                                setSelectedDistrict(dist.key === 'kuwaitCity' ? 'العاصمة' : dist.key === 'salmiya' ? 'السالمية' : dist.key === 'hawally' ? 'حولي' : dist.key === 'surra' ? 'السرة' : dist.key === 'shuwaikh' ? 'الشويخ' : 'all');
-                                                setActiveTab('properties');
-                                                setDisplayMode('cards');
-                                                addToast({ type: 'info', title: dist.title, message: `تصفية العقارات في منطقة ${dist.title}` });
-                                            }}
-                                            style={{ top: dist.y, left: dist.x }}
-                                            className="absolute p-2.5 z-10 bg-slate-900 border border-slate-700 rounded-2xl hover:bg-slate-800 hover:scale-110 shadow-lg text-white group transition-all text-right cursor-pointer"
-                                        >
-                                            <div className="flex items-center gap-1.5">
-                                                <div className={`w-2.5 h-2.5 rounded-full ${dist.count > 0 ? 'bg-emerald-500 animate-ping' : 'bg-slate-500'}`}></div>
-                                                <span className="text-[10px] font-black">{dist.title}</span>
-                                            </div>
-                                            {/* Tooltip detail on hover */}
-                                            <div className="hidden group-hover:block absolute top-10 right-0 bg-slate-800 text-slate-100 p-3 rounded-xl shadow-xl w-48 border border-slate-700 z-50 text-[10px] space-y-1">
-                                                <p className="font-black flex justify-between border-b pb-1"><span>{t.unitsCount}</span> <span>{dist.count}</span></p>
-                                                <p className="font-black flex justify-between"><span>{pageLang === 'ar' ? 'الأشغال:' : 'Occ Rate:'}</span> <span className="text-emerald-400">{dist.occupancy}</span></p>
-                                                <p className="font-black leading-tight mt-1 text-slate-400">{t.seeDistrictProps}</p>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <div className="p-4 bg-slate-900/60 border-t border-white/5 text-[9px] font-bold text-slate-400 flex justify-between items-center z-10">
-                                    <span>{t.paciLoc}</span>
-                                    <span>{pageLang === 'ar' ? 'الهيئة العامة للمعلومات المدنية كويتي' : 'PACI Authority, Kuwait Civil Database'}</span>
-                                </div>
-                            </Card>
-
-                            {/* Info on district properties */}
-                            <div className="space-y-4">
-                                <Card title={pageLang === 'ar' ? 'نسب الإشغال حسب المناطق' : 'Regional Occupancy Metrics'}>
-                                    <div className="space-y-3 font-semibold text-xs">
-                                        {mapDistricts.map(dist => (
-                                            <div key={dist.key} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-xl">
-                                                <span>{dist.title}</span>
-                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${dist.count > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                    {dist.occupancy}
-                                                </span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
+                                ))}
                             </div>
                         </div>
                     )}
@@ -1779,7 +2482,693 @@ export const PropertyManagementPage: React.FC = () => {
                 </div>
             )}
 
-            {/* -------------------- PROFILE SLIDEOVER DRAWER -------------------- */}
+            {/* -------------------- DEDICATED CUSTOM REPORTS & LEGAL NOTICES TAB -------------------- */}
+            {activeTab === 'custom_reports' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <DocumentDuplicateIcon className="w-6 h-6 text-primary" />
+                                <h3 className="text-xl font-black text-slate-800 dark:text-white">
+                                    {pageLang === 'ar' ? 'وحدة التقارير المخصصة والإنذارات القانونية (قانون 35/1978)' : 'Custom Reports & Legal Notice Engine'}
+                                </h3>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'توليد كشوف الحسابات المعتمدة، تقارير نسبة التعثر، وتصميم الإنذارات العدلية المطابقة لقانون الإيجارات الكويتي' 
+                                    : 'Generate tenant statements of account, payment default analytics, and formal court legal notice drafts'}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Sub-sections grid */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* 1. Tenant Statement of Account Generator */}
+                        <Card className="lg:col-span-2 p-5 space-y-4" title={pageLang === 'ar' ? '📊 كشف حساب مستأجر تفصيلي (Statement of Account)' : '📊 Tenant Statement of Account'}>
+                            <div className="flex flex-wrap gap-3 items-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div className="flex-1 min-w-[200px]">
+                                    <label className="text-[10px] font-black text-slate-500 block mb-1">{pageLang === 'ar' ? 'اختر المستأجر المعني:' : 'Select Tenant:'}</label>
+                                    <select 
+                                        className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-800 dark:text-slate-200 outline-none"
+                                        onChange={(e) => {
+                                            const tenant = tenants.find(t => t.id === e.target.value);
+                                            if (tenant) {
+                                                addToast({ type: 'info', title: 'تم اختيار المستأجر', message: tenant.fullNameAr });
+                                            }
+                                        }}
+                                    >
+                                        {tenants.map(t => (
+                                            <option key={t.id} value={t.id}>{t.fullNameAr} ({t.civilIdOrPassport})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex items-end gap-2">
+                                    <Button 
+                                        size="sm"
+                                        onClick={() => {
+                                            const t = tenants[0];
+                                            const l = leases.find(l => l.tenantId === t?.id);
+                                            const prop = properties.find(p => p.id === l?.propertyId);
+                                            const refNo = `STMT-${t?.id || '001'}-${Date.now().toString().slice(-4)}`;
+                                            const metadata = {
+                                                'كشف حساب رسمي': refNo,
+                                                'اسم المستأجر': t?.fullNameAr || '-',
+                                                'الرقم المدني': t?.civilIdOrPassport || '-',
+                                                'العقار والوحدة': `${prop?.name || 'برج ناصر'} - وحدة ${l?.unitId || '101'}`,
+                                                'القيمة الإيجارية الشهري': payAmount(l?.rentAmount || 450),
+                                                'تاريخ الاستخراج': new Date().toLocaleDateString('ar-KW')
+                                            };
+                                            const content = `كشف حساب إيجاري تفصيلي ومطابقة أرصده.
+استناداً إلى سجلات إدارة العقارات والمحفظة الاستثمارية بمكتب المحامي صبري شطا:
+
+بيانات المستأجر: ${t?.fullNameAr}
+الرقم المدني: ${t?.civilIdOrPassport}
+العقار المؤجر: ${prop?.name} - القيمة الإيجارية الشهرية: ${payAmount(l?.rentAmount || 450)}
+
+تفاصيل المعاملات المالية المعتمدة:
+1. يناير 2026: سداد إيجار شهري - إيصال #REC-908 - المدفوع: ${payAmount(450)} - الرصيد: 0 د.ك (مستوفى)
+2. فبراير 2026: سداد إيجار شهري - إيصال #REC-940 - المدفوع: ${payAmount(450)} - الرصيد: 0 د.ك (مستوفى)
+3. مارس 2026: سداد جزئي - إيصال #REC-991 - المدفوع: ${payAmount(200)} - الرصيد: ${payAmount(250)} (متأخر)
+4. أبريل 2026: عدم سداد - فترة استحقاق - المدفوع: 0 د.ك - الرصيد: ${payAmount(450)} (متأخر)
+5. مايو 2026: عدم سداد - فترة استحقاق - المدفوع: 0 د.ك - الرصيد: ${payAmount(450)} (متأخر)
+
+إجمالي المبالغ المستحقة المتبقية بذمة المستأجر حتى تاريخه: ${payAmount(1150)} د.ك.
+الوضع القانوني الحالي: توجيه إنذار تكليف بالوفاء رسمياً قبل رفع دعوى الإخلاء وفق المادة 20 من قانون الإيجارات 35/1978.`;
+                                            setPrintDoc({
+                                                isOpen: true,
+                                                title: 'كشف حساب إيجاري موثق',
+                                                refNo,
+                                                metadata,
+                                                content,
+                                                showStamp: true
+                                            });
+                                        }}
+                                        leftIcon={<PrinterIcon className="w-4 h-4" />}
+                                    >
+                                        {pageLang === 'ar' ? 'معاينة وطباعة كشف الحساب' : 'Print Statement'}
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Detailed Table Preview */}
+                            <div className="overflow-x-auto border border-slate-100 dark:border-slate-800 rounded-2xl">
+                                <table className="w-full text-xs text-start">
+                                    <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-[10px] uppercase border-b">
+                                        <tr>
+                                            <th className="p-3 text-start">{pageLang === 'ar' ? 'الفترة الإيجارية' : 'Period'}</th>
+                                            <th className="p-3 text-start">{pageLang === 'ar' ? 'الاستحقاق د.ك' : 'Due'}</th>
+                                            <th className="p-3 text-start">{pageLang === 'ar' ? 'المسدد د.ك' : 'Paid'}</th>
+                                            <th className="p-3 text-start">{pageLang === 'ar' ? 'المتبقي (الرصيد)' : 'Balance'}</th>
+                                            <th className="p-3 text-start">{pageLang === 'ar' ? 'الحالة القانونية' : 'Status'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
+                                        <tr>
+                                            <td className="p-3 font-mono">2026-01 (يناير)</td>
+                                            <td className="p-3 font-mono">450.000 د.ك</td>
+                                            <td className="p-3 font-mono text-emerald-600">450.000 د.ك</td>
+                                            <td className="p-3 font-mono">0.000 د.ك</td>
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black">{pageLang === 'ar' ? 'مسدد بالكامل' : 'Paid'}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-mono">2026-02 (فبراير)</td>
+                                            <td className="p-3 font-mono">450.000 د.ك</td>
+                                            <td className="p-3 font-mono text-emerald-600">450.000 د.ك</td>
+                                            <td className="p-3 font-mono">0.000 د.ك</td>
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black">{pageLang === 'ar' ? 'مسدد بالكامل' : 'Paid'}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-mono">2026-03 (مارس)</td>
+                                            <td className="p-3 font-mono">450.000 د.ك</td>
+                                            <td className="p-3 font-mono text-amber-600">200.000 د.ك</td>
+                                            <td className="p-3 font-mono text-rose-600 font-black">250.000 د.ك</td>
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full text-[10px] font-black">{pageLang === 'ar' ? 'سداد جزئي' : 'Partial'}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-mono">2026-04 (أبريل)</td>
+                                            <td className="p-3 font-mono">450.000 د.ك</td>
+                                            <td className="p-3 font-mono text-slate-400">0.000 د.ك</td>
+                                            <td className="p-3 font-mono text-rose-600 font-black">450.000 د.ك</td>
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black">{pageLang === 'ar' ? 'متأخرات حرجة' : 'Overdue'}</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-mono">2026-05 (مايو)</td>
+                                            <td className="p-3 font-mono">450.000 د.ك</td>
+                                            <td className="p-3 font-mono text-slate-400">0.000 د.ك</td>
+                                            <td className="p-3 font-mono text-rose-600 font-black">450.000 د.ك</td>
+                                            <td className="p-3"><span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black">{pageLang === 'ar' ? 'متأخرات حرجة' : 'Overdue'}</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+
+                        {/* 2. Payment Default Rate & Risk Analysis */}
+                        <Card className="p-5 space-y-4" title={pageLang === 'ar' ? '📈 تقارير نسبة التعثر وتصنيف المخاطر' : '📈 Default Rate Analytics'}>
+                            <div className="p-4 bg-rose-50/60 dark:bg-rose-900/10 border border-rose-200 dark:border-rose-800 rounded-2xl space-y-2">
+                                <div className="flex justify-between items-center text-xs font-black text-rose-800 dark:text-rose-300">
+                                    <span>{pageLang === 'ar' ? 'معدل التعثر المالي العام:' : 'Overall Default Rate:'}</span>
+                                    <span className="text-base font-black font-mono">11.3%</span>
+                                </div>
+                                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed">
+                                    {pageLang === 'ar' ? 'المبلغ الإجمالي للمتأخرات القابلة للمطالبة القضائية:' : 'Claimable Arrears Total:'} <strong className="text-rose-600 font-mono">{payAmount(stats.overdueTotal)}</strong>
+                                </p>
+                            </div>
+
+                            <div className="space-y-3">
+                                <h5 className="text-xs font-black text-slate-800 dark:text-white border-b pb-1">
+                                    {pageLang === 'ar' ? 'تصنيف شرائح المستأجرين حسب خطورة التأخير:' : 'Tenant Risk Breakdown:'}
+                                </h5>
+
+                                <div className="space-y-2 text-xs font-semibold">
+                                    <div className="flex justify-between items-center p-2.5 bg-rose-50 text-rose-700 rounded-xl">
+                                        <span>🔴 {pageLang === 'ar' ? 'مخاطر عالية (> 3 أشهر تأخير):' : 'High Risk (> 3 Months):'}</span>
+                                        <span className="font-bold font-mono">2 {pageLang === 'ar' ? 'مستأجرين' : 'Tenants'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center p-2.5 bg-amber-50 text-amber-700 rounded-xl">
+                                        <span>🟡 {pageLang === 'ar' ? 'مخاطر متوسطة (1-2 شهر تأخير):' : 'Moderate Risk (1-2 Months):'}</span>
+                                        <span className="font-bold font-mono">3 {pageLang === 'ar' ? 'مستأجرين' : 'Tenants'}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center p-2.5 bg-emerald-50 text-emerald-700 rounded-xl">
+                                        <span>🟢 {pageLang === 'ar' ? 'ملتزمون بالسداد الدقيق:' : 'Fully Compliant:'}</span>
+                                        <span className="font-bold font-mono">{tenants.length - 5} {pageLang === 'ar' ? 'مستأجرين' : 'Tenants'}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+
+                    </div>
+
+                    {/* 3. Legal Notice Drafts Generator (Matching Kuwait Rent Law 35/1978) */}
+                    <Card className="p-6 space-y-4 border-2 border-amber-400/30 bg-gradient-to-br from-amber-50/20 via-white to-amber-50/10 dark:from-slate-900 dark:to-slate-900" title={pageLang === 'ar' ? '⚖️ مولد الإنذارات الرسمية والمسودات القانونية (قانون الإيجارات رقم 35 لسنة 1978)' : '⚖️ Kuwait Rent Law Legal Notice Generator'}>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            
+                            {/* Notice Type Selector Card 1 */}
+                            <div className="p-4 bg-white dark:bg-slate-900 border border-amber-300 rounded-2xl shadow-xs space-y-2 hover:border-amber-500 transition-colors">
+                                <div className="flex items-center justify-between text-amber-700 font-black text-xs">
+                                    <span>المادة 20 - تكليف بالوفاء</span>
+                                    <span className="px-2 py-0.5 bg-amber-100 rounded-full text-[9px]">15 يوماً</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    إنذار رسمي يوجه يداً بيد عبر مندوب الإعلان لمنح المستأجر مهلة 15 يوماً لسداد الأجرة المتأخرة قبل فسخ العقد بالكامل.
+                                </p>
+                                <Button 
+                                    size="sm" 
+                                    onClick={() => {
+                                        const not = notices[0] || initialNotices[0];
+                                        handleTriggerPrintNotice(not);
+                                    }}
+                                    className="w-full text-xs font-black"
+                                >
+                                    توليد وطباعة الإنذار
+                                </Button>
+                            </div>
+
+                            {/* Notice Type Selector Card 2 */}
+                            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs space-y-2 hover:border-rose-400 transition-colors">
+                                <div className="flex items-center justify-between text-rose-600 font-black text-xs">
+                                    <span>إنذار إخلاء للتأجير من الباطن</span>
+                                    <span className="px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full text-[9px]">المادة 19</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    إنذار بإخلاء العين المؤجرة فوراً لمخالفة حظر التنازل أو التأجير من الباطن بدون إذن كتابي من المالك.
+                                </p>
+                                <Button 
+                                    size="sm" 
+                                    variant="secondary"
+                                    onClick={() => {
+                                        const refNo = `WAR-SUB-${Date.now().toString().slice(-4)}`;
+                                        setPrintDoc({
+                                            isOpen: true,
+                                            title: 'إنذار رسمس بالإخلاء لمخالفة التأجير من الباطن',
+                                            refNo,
+                                            metadata: {
+                                                'الرمز المرجعي': refNo,
+                                                'المؤجر المالك': 'مكتب المحامي صبري شطا (عن المالك)',
+                                                'المستأجر المخالف': 'شركة المسار الدولية',
+                                                'السند التشريعي': 'المادة 19 من قانون الإيجارات الكويتي 35/1978',
+                                                'تاريخ الإنذار': new Date().toLocaleDateString('ar-KW')
+                                            },
+                                            content: `إنذار عدلي رسمي بإخلاء العين المؤجرة وتسليمها شاغرة من الأعداء والشاغلين.
+بموجب أحكام المادة 19 من القانون الكويتي رقم 35 لسنة 1978 في شأن إيجار العقارات.
+
+موجّه إلى المستأجر الشاغل للعين المؤجرة الكائنة في: برج ناصر السكني - الشقة رقم 402.
+
+حيث تبين للعين المؤجرة قيامكم بتأجير العين من الباطن إلى أطراف أجنبية دون الحصول على موافقة كتابية صريحة ومسبقة من المالك:
+نخطركم ونحذركم بضرورة إخلاء العين المؤجرة وتسليم مفاتيحها خالية من الشواغل خلال 7 أيام من تاريخ إعلانكم، وإلا سنباشر استصدار حكم القضائي الفوري بالإخلاء مع التزامكم بالتعويضات القانونية والرسوم.`,
+                                            showStamp: true
+                                        });
+                                    }}
+                                    className="w-full text-xs font-black"
+                                >
+                                    توليد إنذار التأجير من الباطن
+                                </Button>
+                            </div>
+
+                            {/* Notice Type Selector Card 3 */}
+                            <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs space-y-2 hover:border-indigo-400 transition-colors">
+                                <div className="flex items-center justify-between text-indigo-600 font-black text-xs">
+                                    <span>إنذار تعديل أجرة / هدم</span>
+                                    <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[9px]">المادة 11</span>
+                                </div>
+                                <p className="text-[11px] text-slate-500 leading-snug">
+                                    إنذار رسمي لتعديل القيمة الإيجارية بعد انقضاء 5 سنوات من العقد أو إنذار بالإخلاء لغرض الهدم وإعادة البناء.
+                                </p>
+                                <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => {
+                                        const refNo = `WAR-REMOD-${Date.now().toString().slice(-4)}`;
+                                        setPrintDoc({
+                                            isOpen: true,
+                                            title: 'إعلان إنذار رسمس برغبة التعديل للهدم وإعادة البناء',
+                                            refNo,
+                                            metadata: {
+                                                'الرمز المرجعي': refNo,
+                                                'الموضوع': 'إنذار برغبة الهدم وإعادة البناء بالحصول على ترخيص البلدية',
+                                                'السند القانوني': 'المادة 21 بند 6 من قانون الإيجارات الكويتي 35/1978',
+                                                'تاريخ الإعلان': new Date().toLocaleDateString('ar-KW')
+                                            },
+                                            content: `إنذار عدلي رسمي بالإخلاء للهدم وإعادة البناء.
+بموجب أحكام المادة 21 فقرة 6 من القانون الكويتي رقم 35 لسنة 1978 في شأن إيجار العقارات.
+
+إلى المستأجر الشاغل للعقار رقم 12 - شارع حبيب المناور - منطقة الفروانية.
+
+نحيطكم علماً بصدور ترخيص الهدم والبناء النهائي المعتمد من بلدية الكويت ورخص الهدم الإنشائية، وعليه ننذركم بضرورة إخلاء العين وتسليمها خلال التوقيتات القانونية المقررة بقانون الإيجارات.`,
+                                            showStamp: true
+                                        });
+                                    }}
+                                    className="w-full text-xs font-black"
+                                >
+                                    توليد إنذار الهدم والإنشاء
+                                </Button>
+                            </div>
+
+                        </div>
+                    </Card>
+
+                </div>
+            )}
+
+            {/* -------------------- 12. PROPERTY REVENUE CALENDAR TAB -------------------- */}
+            {activeTab === 'revenue_calendar' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-emerald-900 via-slate-900 to-slate-950 p-6 rounded-3xl text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-emerald-400 font-black text-sm">
+                                <CalendarDaysIcon className="w-6 h-6" />
+                                <h3 className="text-xl font-black">{pageLang === 'ar' ? 'تقويم استحقاقات وإيرادات العقارات (Property Revenue Calendar)' : 'Property Revenue Calendar'}</h3>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'عرض تفاعلي شامل لتواريخ استحقاق الإيجارات لجميع الوحدات مع تمييز الدفعات المتأخرة، المسددة، والاستحقاقات القادمة' 
+                                    : 'Interactive calendar tracking rent due dates, paid status, and overdue arrears per day'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-mono font-black">
+                                أغسطس 2026 (August 2026)
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Revenue Monthly Stats Overview Bar */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Card className="p-4 border-r-4 border-r-emerald-500 bg-emerald-50/20 dark:bg-slate-900">
+                            <p className="text-xs font-black text-slate-500">إجمالي استحقاقات الشهر المتوقعة</p>
+                            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 font-mono mt-1">18,450.000 د.ك</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">38 وحدة عقارية نشطة</p>
+                        </Card>
+
+                        <Card className="p-4 border-r-4 border-r-sky-500 bg-sky-50/20 dark:bg-slate-900">
+                            <p className="text-xs font-black text-slate-500">المبلغ المحصل بالفعل (النسبة 77%)</p>
+                            <p className="text-2xl font-black text-sky-600 dark:text-sky-400 font-mono mt-1">14,200.000 د.ك</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">29 وحدة مسددة بالكامل</p>
+                        </Card>
+
+                        <Card className="p-4 border-r-4 border-r-rose-500 bg-rose-50/20 dark:bg-slate-900">
+                            <p className="text-xs font-black text-slate-500">المتأخرات القائمة والحرجة (23%)</p>
+                            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 font-mono mt-1">4,250.000 د.ك</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">9 وحدات متأخرة المادة 20</p>
+                        </Card>
+                    </div>
+
+                    {/* Interactive Calendar Month Grid */}
+                    <Card className="p-6 space-y-4" title="📅 تقويم مواعيد تحصيل الإيجارات لجميع العقارات (اضغط على أي تاريخ للتفاصيل)">
+                        <div className="flex justify-between items-center pb-2 border-b">
+                            <div className="flex gap-4 text-xs font-black">
+                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-emerald-500 inline-block"></span> green: مدفوع بالكامل</span>
+                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-rose-500 inline-block"></span> red: متأخرات استحقاق</span>
+                                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> amber: قيد الانتظار</span>
+                            </div>
+                            <span className="text-xs font-mono font-bold text-slate-400">اليوم المختار: {selectedCalendarDate}</span>
+                        </div>
+
+                        {/* Calendar Grid */}
+                        <div className="grid grid-cols-7 gap-2 text-center">
+                            {['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map(day => (
+                                <div key={day} className="p-2 text-xs font-black text-slate-400 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                                    {day}
+                                </div>
+                            ))}
+
+                            {/* Generate 31 Calendar Days for August 2026 */}
+                            {Array.from({ length: 31 }, (_, i) => {
+                                const dayNum = i + 1;
+                                const dateStr = `2026-08-${dayNum < 10 ? '0' + dayNum : dayNum}`;
+                                const isSelected = selectedCalendarDate === dateStr;
+
+                                const isPaid = [1, 5, 10, 25].includes(dayNum);
+                                const isOverdue = [12, 15, 20].includes(dayNum);
+                                const isPending = [28, 30].includes(dayNum);
+
+                                return (
+                                    <button
+                                        key={dateStr}
+                                        onClick={() => setSelectedCalendarDate(dateStr)}
+                                        className={`p-3 rounded-2xl min-h-[90px] border text-start flex flex-col justify-between transition-all ${
+                                            isSelected 
+                                                ? 'border-2 border-primary bg-primary/10 shadow-md ring-2 ring-primary/30 scale-102' 
+                                                : 'border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-center w-full">
+                                            <span className="text-sm font-black font-mono text-slate-800 dark:text-white">{dayNum}</span>
+                                            {isPaid && <span className="w-2 h-2 rounded-full bg-emerald-500"></span>}
+                                            {isOverdue && <span className="w-2 h-2 rounded-full bg-rose-500"></span>}
+                                            {isPending && <span className="w-2 h-2 rounded-full bg-amber-500"></span>}
+                                        </div>
+
+                                        <div className="space-y-1 mt-1">
+                                            {isPaid && (
+                                                <span className="block text-[9px] font-black px-1.5 py-0.5 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 rounded-md">
+                                                    ✓ مسدد (450 د.ك)
+                                                </span>
+                                            )}
+                                            {isOverdue && (
+                                                <span className="block text-[9px] font-black px-1.5 py-0.5 bg-rose-50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 rounded-md">
+                                                    ⚠️ متأخرات (900 د.ك)
+                                                </span>
+                                            )}
+                                            {isPending && (
+                                                <span className="block text-[9px] font-black px-1.5 py-0.5 bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 rounded-md">
+                                                    ⏳ قادم (350 د.ك)
+                                                </span>
+                                            )}
+                                            {!isPaid && !isOverdue && !isPending && (
+                                                <span className="block text-[9px] text-slate-300 italic">لا توجد استحقاقات</span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </Card>
+
+                    {/* Details Panel for Selected Date */}
+                    <Card className="p-6 space-y-4 border-2 border-primary/30" title={`🔍 تفاصيل استحقاق الوحدات والعقارات بتاريخ (${selectedCalendarDate})`}>
+                        <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                            <table className="w-full text-xs text-start">
+                                <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-[10px] uppercase border-b">
+                                    <tr>
+                                        <th className="p-3 text-start">العقار والوحدة</th>
+                                        <th className="p-3 text-start">اسم المستأجر والتلفون</th>
+                                        <th className="p-3 text-start">المبلغ المستحق</th>
+                                        <th className="p-3 text-start">حالة السداد</th>
+                                        <th className="p-3 text-center">الإجراءات الفورية</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
+                                    <tr>
+                                        <td className="p-3 font-bold">
+                                            <p className="text-slate-900 dark:text-white">برج ناصر السكني</p>
+                                            <p className="text-[10px] font-mono text-primary">شقة 101 - الدور الأول</p>
+                                        </td>
+                                        <td className="p-3">
+                                            <p className="font-bold">شركة المسار للتجارة العامة</p>
+                                            <p className="text-[10px] font-mono text-slate-400">+965 9988 7766</p>
+                                        </td>
+                                        <td className="p-3 font-mono text-emerald-600 font-black text-sm">450.000 د.ك</td>
+                                        <td className="p-3">
+                                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black">
+                                                ✓ تم السداد بالكامل
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <div className="flex justify-center gap-2">
+                                                <Button size="sm" variant="outline" className="text-[10px]" onClick={() => addToast({ type: 'success', title: 'سند القبض', message: 'تم فتح سند القبض المعتمد رقم 4022' })}>
+                                                    🧾 سند القبض
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td className="p-3 font-bold">
+                                            <p className="text-slate-900 dark:text-white">مجمع الفروانية التجاري</p>
+                                            <p className="text-[10px] font-mono text-rose-500">محل 12 - الأرضي</p>
+                                        </td>
+                                        <td className="p-3">
+                                            <p className="font-bold">سعود عبدالمحسن العتيبي</p>
+                                            <p className="text-[10px] font-mono text-slate-400">+965 6655 4433</p>
+                                        </td>
+                                        <td className="p-3 font-mono text-rose-600 font-black text-sm">900.000 د.ك</td>
+                                        <td className="p-3">
+                                            <span className="px-2.5 py-1 bg-rose-50 text-rose-700 rounded-full text-[10px] font-black">
+                                                ⚠️ متأخر شهرين (تكليف بالوفاء)
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-center">
+                                            <div className="flex justify-center gap-2">
+                                                <Button size="sm" variant="primary" className="text-[10px] bg-rose-600 hover:bg-rose-700" onClick={() => addToast({ type: 'warning', title: 'تذكير بالإنذار', message: 'تم إرسال تذكير رسمي للمستأجر بالواتساب والبريد' })}>
+                                                    📱 إرسال تذكير سداد
+                                                </Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {/* -------------------- 13. RENTAL PRICE SIMULATOR TAB -------------------- */}
+            {activeTab === 'price_simulator' && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-3 duration-500">
+                    {/* Header Banner */}
+                    <div className="bg-gradient-to-r from-amber-900 via-slate-900 to-slate-950 p-6 rounded-3xl text-white shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div>
+                            <div className="flex items-center gap-2 text-amber-400 font-black text-sm">
+                                <SparklesIcon className="w-6 h-6" />
+                                <h3 className="text-xl font-black">{pageLang === 'ar' ? 'أداة محاكي أسعار الإيجارات والتحليل المقارن (Rental Price Simulator)' : 'Rental Price Simulator'}</h3>
+                            </div>
+                            <p className="text-xs text-slate-300 mt-1">
+                                {pageLang === 'ar' 
+                                    ? 'أداة ذكية تسمح بإدخال مواصفات العين العقارية (المساحة، الموقع، عدد الغرف) ومقارنتها ببيانات السوق الكويتي واقتراح سعر إيجار عادل' 
+                                    : 'Algorithmic simulator calculating fair market rent based on property specs and comparing with active portfolio'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Simulator Specifications Input Form */}
+                        <Card className="p-6 space-y-4 lg:col-span-1 border-2 border-amber-400/30" title="⚙️ مواصفات العين العقارية المراد تقييمها">
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">المنطقة / المحافظة الكويتية:</label>
+                                    <select 
+                                        value={simSpecs.district}
+                                        onChange={e => setSimSpecs(prev => ({ ...prev, district: e.target.value }))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    >
+                                        <option value="الشرق">الشرق - العاصمة (استثماري/تجاري)</option>
+                                        <option value="الساليمة">الساليمة - حولي (شقق وسكن ممتاز)</option>
+                                        <option value="حولي">حولي - شارع تونس والعتيبي</option>
+                                        <option value="الفروانية">الفروانية - المجمعات التجارية</option>
+                                        <option value="الفنطاس">الفنطاس والأحمدي الساحلية</option>
+                                        <option value="الجهة">الجهة - المركز التجاري</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">
+                                        المساحة الصافية (م²): <span className="font-mono text-primary font-bold">{simSpecs.areaM2} م²</span>
+                                    </label>
+                                    <input 
+                                        type="range"
+                                        min="40"
+                                        max="350"
+                                        step="5"
+                                        value={simSpecs.areaM2}
+                                        onChange={e => setSimSpecs(prev => ({ ...prev, areaM2: Number(e.target.value) }))}
+                                        className="w-full accent-primary cursor-pointer"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">عدد الغرف الرئيسية:</label>
+                                    <div className="flex gap-2">
+                                        {[1, 2, 3, 4].map(num => (
+                                            <button 
+                                                key={num}
+                                                type="button"
+                                                onClick={() => setSimSpecs(prev => ({ ...prev, roomCount: num }))}
+                                                className={`flex-1 py-1.5 rounded-xl text-xs font-black transition-all ${
+                                                    simSpecs.roomCount === num 
+                                                        ? 'bg-primary text-white shadow-md' 
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                                                }`}
+                                            >
+                                                {num} {num === 1 ? 'غرفة' : num === 2 ? 'غرفتان' : 'غرف'}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">مستوى التشطيب والتجهيزات:</label>
+                                    <select 
+                                        value={simSpecs.finishing}
+                                        onChange={e => setSimSpecs(prev => ({ ...prev, finishing: e.target.value }))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    >
+                                        <option value="سوبر ديلوكس">سوبر ديلوكس (رخام، تكييف سنترال)</option>
+                                        <option value="ديلوكس">ديلوكس ممتاز</option>
+                                        <option value="تجاري عادي">تجاري / استثماري قياسي</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">عمر المبنى والخدمات المتاحة:</label>
+                                    <select 
+                                        value={simSpecs.buildingAge}
+                                        onChange={e => setSimSpecs(prev => ({ ...prev, buildingAge: e.target.value }))}
+                                        className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                                    >
+                                        <option value="حديث (أقل من 5 سنوات)">حديث (أقل من 5 سنوات) مع موقف سرداب</option>
+                                        <option value="متوسط (5-15 سنة)">متوسط (5-15 سنة)</option>
+                                        <option value="قديم">مبنى قديم (أكثر من 15 سنة)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </Card>
+
+                        {/* Simulator Output & Calculated Rent Recommendation */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {(() => {
+                                const districtRates: Record<string, number> = {
+                                    'الشرق': 4.8,
+                                    'الساليمة': 4.0,
+                                    'حولي': 3.4,
+                                    'الفروانية': 2.9,
+                                    'الفنطاس': 3.2,
+                                    'الجهراء': 2.6
+                                };
+                                const baseRate = districtRates[simSpecs.district] || 3.5;
+                                const finishMult = simSpecs.finishing === 'سوبر ديلوكس' ? 1.25 : simSpecs.finishing === 'ديلوكس' ? 1.1 : 1.0;
+                                const ageMult = simSpecs.buildingAge.includes('حديث') ? 1.15 : simSpecs.buildingAge.includes('قديم') ? 0.85 : 1.0;
+                                
+                                const calculatedRent = Math.round(simSpecs.areaM2 * baseRate * finishMult * ageMult);
+                                const minRent = Math.round(calculatedRent * 0.92);
+                                const maxRent = Math.round(calculatedRent * 1.08);
+                                const pricePerM2 = (calculatedRent / simSpecs.areaM2).toFixed(3);
+
+                                return (
+                                    <>
+                                        <Card className="p-6 bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 text-white rounded-3xl border-2 border-amber-400 space-y-4 shadow-xl">
+                                            <div className="flex justify-between items-start border-b border-slate-800 pb-4">
+                                                <div>
+                                                    <span className="px-2.5 py-1 bg-amber-400/20 text-amber-300 border border-amber-400/30 rounded-full text-[10px] font-black uppercase">
+                                                        نتيجة التقييم الحسابي للسوق الكويتي
+                                                    </span>
+                                                    <h4 className="text-xl font-black text-white mt-2">القيمة الإيجارية العادلة المقترحة</h4>
+                                                </div>
+                                                <div className="text-end">
+                                                    <p className="text-3xl font-black text-amber-400 font-mono">{calculatedRent}.000 د.ك</p>
+                                                    <p className="text-[10px] text-slate-400">شهرياً (KWD / Month)</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl">
+                                                    <p className="text-[10px] font-black text-slate-400">النطاق العادل للسعر</p>
+                                                    <p className="text-sm font-bold text-emerald-400 font-mono mt-0.5">{minRent} - {maxRent} د.ك</p>
+                                                </div>
+
+                                                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl">
+                                                    <p className="text-[10px] font-black text-slate-400">سعر المتر المربع المتوقع</p>
+                                                    <p className="text-sm font-bold text-sky-400 font-mono mt-0.5">{pricePerM2} د.ك / م²</p>
+                                                </div>
+
+                                                <div className="p-3 bg-slate-950/70 border border-slate-800 rounded-2xl">
+                                                    <p className="text-[10px] font-black text-slate-400">مؤشر ثقة التقييم</p>
+                                                    <p className="text-sm font-bold text-amber-300 mt-0.5">96% (مطابق للسجلات)</p>
+                                                </div>
+                                            </div>
+                                        </Card>
+
+                                        {/* Portfolio Benchmark Comparison Table */}
+                                        <Card className="p-6 space-y-4" title="📊 جدول التحليل المقارن مع العقارات القائمة في المحفظة">
+                                            <p className="text-xs text-slate-500">
+                                                مقارنة مواصفات الوحدة المحاكاة مقابل عقارات المحفظة القائمة للتعرف على فروقات الأسعار ونسب النمو:
+                                            </p>
+
+                                            <div className="overflow-x-auto rounded-2xl border border-slate-100 dark:border-slate-800">
+                                                <table className="w-full text-xs text-start">
+                                                    <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 font-black text-[10px] uppercase border-b">
+                                                        <tr>
+                                                            <th className="p-3 text-start">العقار والمنطقة</th>
+                                                            <th className="p-3 text-start">المساحة م²</th>
+                                                            <th className="p-3 text-start">الغرف</th>
+                                                            <th className="p-3 text-start">الإيجار القائم</th>
+                                                            <th className="p-3 text-start">سعر المتر م²</th>
+                                                            <th className="p-3 text-start">الفارق مع المحاكي</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-semibold text-slate-700 dark:text-slate-300">
+                                                        {properties.map(p => {
+                                                            const pRent = (p as any).monthlyRent || (p.units?.length ? p.units.length * 350 : 450);
+                                                            const pUnits = (p as any).totalUnits || p.units?.length || 10;
+                                                            const pArea = pUnits * 45;
+                                                            const pPricePerM2 = (pRent / pArea).toFixed(3);
+                                                            const diff = Math.round(((pRent - calculatedRent) / calculatedRent) * 100);
+
+                                                            return (
+                                                                <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                                                    <td className="p-3">
+                                                                        <p className="font-bold text-slate-900 dark:text-white">{p.name}</p>
+                                                                        <p className="text-[10px] text-slate-400">{(p as any).district || p.address}</p>
+                                                                    </td>
+                                                                    <td className="p-3 font-mono">{pArea} م²</td>
+                                                                    <td className="p-3 font-mono">2 غرف</td>
+                                                                    <td className="p-3 font-mono text-primary font-bold">{payAmount(pRent)}</td>
+                                                                    <td className="p-3 font-mono">{pPricePerM2} د.ك</td>
+                                                                    <td className="p-3">
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black font-mono ${
+                                                                            diff >= 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                                                                        }`}>
+                                                                            {diff >= 0 ? `+${diff}%` : `${diff}%`}
+                                                                        </span>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </Card>
+                                    </>
+                                );
+                            })()}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+
             <AnimatePresence>
                 {selectedProfile && (
                     <>
@@ -1827,6 +3216,79 @@ export const PropertyManagementPage: React.FC = () => {
                                                 <div>
                                                     <span className="text-[10px] text-slate-400 font-bold uppercase">{pageLang === 'ar' ? 'وصف العقار والملف:' : 'Asset Details Description:'}</span>
                                                     <p className="text-slate-500 mt-1 leading-relaxed">{selectedProfile.data.description || t.notAvailable}</p>
+                                                </div>
+
+                                                {/* Units List Management Block */}
+                                                <div className="space-y-3 pt-3 border-t border-slate-200 dark:border-slate-800">
+                                                    <div className="flex justify-between items-center">
+                                                        <h5 className="font-black text-slate-800 dark:text-white text-xs flex items-center gap-1.5">
+                                                            🏢 {pageLang === 'ar' ? 'الوحدات والشقق التابعة' : 'Associated Units'} ({selectedProfile.data.units?.length || 0})
+                                                        </h5>
+                                                        <Button 
+                                                            size="sm" 
+                                                            onClick={() => setEditingUnitInfo({ propertyId: selectedProfile.data.id })}
+                                                            className="text-[11px] font-black px-2.5 py-1 bg-primary text-white"
+                                                            leftIcon={<PlusCircleIcon className="w-3.5 h-3.5"/>}
+                                                        >
+                                                            {pageLang === 'ar' ? 'إضافة وحدة' : 'Add Unit'}
+                                                        </Button>
+                                                    </div>
+
+                                                    <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                                        {(selectedProfile.data.units || []).map((u: PropertyUnit) => (
+                                                            <div key={u.id} className="p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex items-center justify-between shadow-xs">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-black text-slate-800 dark:text-white">وحدة {u.unitNumber}</span>
+                                                                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                                                            u.status === PropertyUnitStatus.RENTED ? 'bg-emerald-50 text-emerald-600' :
+                                                                            u.status === PropertyUnitStatus.VACANT ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
+                                                                        }`}>
+                                                                            {u.status === PropertyUnitStatus.RENTED ? 'مؤجرة' : u.status === PropertyUnitStatus.VACANT ? 'شاغرة' : 'صيانة'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <p className="text-[10px] text-slate-400 mt-0.5">
+                                                                        طابق: {(u as any).floorNumber || '1'} | الإيجار: <strong className="text-primary font-mono">{u.rentAmount} د.ك</strong>
+                                                                    </p>
+                                                                </div>
+
+                                                                <div className="flex gap-1.5">
+                                                                    <button 
+                                                                        onClick={() => {
+                                                                            addToast({
+                                                                                type: 'info',
+                                                                                title: `بيانات الوحدة ${u.unitNumber}`,
+                                                                                message: `طابق ${(u as any).floorNumber || '1'} - ${(u as any).roomsCount || 2} غرف - ${(u as any).bathroomsCount || 2} حمامات - الإيجار ${u.rentAmount} د.ك`
+                                                                            });
+                                                                        }}
+                                                                        className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-bold"
+                                                                        title="عرض التفاصيل"
+                                                                    >
+                                                                        <EyeIcon className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => setEditingUnitInfo({ propertyId: selectedProfile.data.id, unit: u })}
+                                                                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-[10px] font-bold"
+                                                                        title="تعديل الوحدة"
+                                                                    >
+                                                                        <PencilIcon className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button 
+                                                                        onClick={() => handleDeleteUnit(selectedProfile.data.id, u.id)}
+                                                                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg text-[10px] font-bold"
+                                                                        title="حذف الوحدة"
+                                                                    >
+                                                                        <TrashIcon className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                        {(!selectedProfile.data.units || selectedProfile.data.units.length === 0) && (
+                                                            <p className="text-[11px] text-slate-400 italic text-center py-4 bg-slate-100 rounded-xl">
+                                                                {pageLang === 'ar' ? 'لا توجد وحدات مسجلة بهذا العقار بعد.' : 'No units added yet.'}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         )}
@@ -1964,6 +3426,16 @@ export const PropertyManagementPage: React.FC = () => {
                 onClose={() => setIsPropertyModalOpen(false)} 
                 onSubmit={handleSaveProperty} 
                 initialData={editingProperty}
+            />
+
+            {/* 1.5. UNIT FORM MODAL */}
+            <UnitFormModal 
+                isOpen={!!editingUnitInfo}
+                onClose={() => setEditingUnitInfo(null)}
+                onSubmit={handleSaveUnit}
+                initialData={editingUnitInfo}
+                property={properties.find(p => p.id === editingUnitInfo?.propertyId)}
+                pageLang={pageLang}
             />
 
             {/* 2. TENANT FORM MODAL */}
@@ -2153,6 +3625,182 @@ export const PropertyManagementPage: React.FC = () => {
                 properties={properties}
                 tenants={tenants}
             />
+
+            {/* 11. SMART DOCUMENT UPLOAD MODAL */}
+            <Modal isOpen={isAddDocModalOpen} onClose={() => setIsAddDocModalOpen(false)} title="أرشفة وثيقة جديدة في السجل العقاري" size="md">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!newDocData.docTitle) return;
+                    const selectedProp = properties.find(p => p.id === newDocData.propertyId);
+                    const newEntry = {
+                        id: `DOC-${Date.now().toString().slice(-4)}`,
+                        propertyId: newDocData.propertyId,
+                        propertyName: selectedProp ? selectedProp.name : 'عقار المحفظة',
+                        unitNumber: newDocData.unitNumber || 'عام',
+                        docTitle: newDocData.docTitle,
+                        docCategory: newDocData.docCategory,
+                        fileSize: '3.4 MB',
+                        uploadDate: new Date().toISOString().split('T')[0],
+                        notes: newDocData.notes || 'وثيقة مؤرشفة بالسجل الذكي'
+                    };
+                    setPropertyDocs(prev => [newEntry, ...prev]);
+                    setIsAddDocModalOpen(false);
+                    setNewDocData({
+                        propertyId: 'PROP-001',
+                        unitNumber: '101',
+                        docTitle: '',
+                        docCategory: 'lease_contract',
+                        notes: ''
+                    });
+                    addToast({ type: 'success', title: 'تمت الأرشفة بنجاح', message: 'تم حفظ وتصنيف المستند العقاري وربطه بالوحدة المحددة.' });
+                }} className="space-y-4 text-xs text-start">
+                    <Input 
+                        label="عنوان المستند والوثيقة" 
+                        value={newDocData.docTitle} 
+                        onChange={e => setNewDocData(prev => ({ ...prev, docTitle: e.target.value }))} 
+                        placeholder="مثال: عقد إيجار موثق / سند ملكية / محضر صيانة تكييف" 
+                        required 
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Select 
+                            label="العقار المرتبط" 
+                            value={newDocData.propertyId} 
+                            options={properties.map(p => ({ value: p.id, label: p.name }))} 
+                            onChange={e => setNewDocData(prev => ({ ...prev, propertyId: e.target.value }))} 
+                            required 
+                        />
+                        <Input 
+                            label="رقم العين / الوحدة (اختياري)" 
+                            value={newDocData.unitNumber} 
+                            onChange={e => setNewDocData(prev => ({ ...prev, unitNumber: e.target.value }))} 
+                            placeholder="101 / محل 05 / عام" 
+                        />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <Select 
+                            label="تصنيف المستند" 
+                            value={newDocData.docCategory} 
+                            options={[
+                                { value: 'lease_contract', label: 'عقد إيجار موثق' },
+                                { value: 'title_deed', label: 'سند ملكية ووثائق' },
+                                { value: 'maintenance_log', label: 'محضر أو فاتورة صيانة' },
+                                { value: 'court_notice', label: 'إنذار أو حكم قضائي' },
+                                { value: 'official_license', label: 'ترخيص مطافئ وبناء' }
+                            ]} 
+                            onChange={e => setNewDocData(prev => ({ ...prev, docCategory: e.target.value as any }))} 
+                        />
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 block mb-1">ملف المستند (جاهز للإرفاق)</label>
+                            <div className="border border-dashed border-slate-300 dark:border-slate-700 p-2.5 rounded-xl text-center text-slate-400 bg-slate-50 dark:bg-slate-800">
+                                📑 PDF / Image
+                            </div>
+                        </div>
+                    </div>
+
+                    <TextArea 
+                        label="ملاحظات وتفاصيل الاعتماد القانوني" 
+                        value={newDocData.notes} 
+                        onChange={e => setNewDocData(prev => ({ ...prev, notes: e.target.value }))} 
+                        rows={2} 
+                        placeholder="أي بيانات خاصة بالتوثيق أو المواعيد القانونية" 
+                    />
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setIsAddDocModalOpen(false)}>إلغاء</Button>
+                        <Button type="submit" size="sm">أرشفة وحفظ بالرمز الرقمي</Button>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* 12. LEASE DRAFT AUTO-EMAIL DISPATCH MODAL */}
+            <Modal isOpen={isEmailDraftModalOpen} onClose={() => setIsEmailDraftModalOpen(false)} title="إرسال مسودة عقد الإيجار آلياً عبر البريد الإلكتروني" size="lg">
+                <form onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!selectedLeaseForEmail) return;
+                    const tenant = tenants.find(t => t.id === selectedLeaseForEmail.tenantId);
+                    const prop = properties.find(p => p.id === selectedLeaseForEmail.propertyId);
+                    const newLog = {
+                        id: `EMAIL-${Date.now().toString().slice(-3)}`,
+                        leaseId: selectedLeaseForEmail.id,
+                        tenantName: tenant ? (tenant.fullNameAr || (tenant as any).name) : 'المستأجر المعني',
+                        tenantEmail: tenant ? (tenant.email || 'tenant@kuwait-law.com') : 'tenant@kuwait-law.com',
+                        propertyName: prop ? prop.name : 'عقار المحفظة',
+                        unitNumber: (selectedLeaseForEmail as any).unitNumber || selectedLeaseForEmail.unitId || '101',
+                        sentAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+                        deliveryStatus: 'delivered' as const,
+                        readStatus: 'unread' as const
+                    };
+                    setEmailDispatchLogs(prev => [newLog, ...prev]);
+                    setIsEmailDraftModalOpen(false);
+                    addToast({
+                        type: 'success',
+                        title: 'تم إرسال المسودة بنجاح',
+                        message: `تم إرسال مسودة عقد الإيجار للبريد (${newLog.tenantEmail}) وسجل المتابعة جاهز`
+                    });
+                }} className="space-y-4">
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl space-y-1">
+                        <p className="text-xs font-black text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+                            <span>📜 الموافقة الاعتمادية على شروط العقد</span>
+                        </p>
+                        <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                            سيتم إرسال مسودة العقد الموثق برابط تفاعلي مؤمن يتيح للمستأجر مراجعة الشروط والموافقة المبدئية قبل التوقيع النهائي.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="text-xs font-black text-slate-700 dark:text-slate-200 block mb-1">اختر عقد الإيجار المراد إرسال مسودته:</label>
+                        <select 
+                            value={selectedLeaseForEmail?.id || ''}
+                            onChange={e => {
+                                const l = leases.find(item => item.id === e.target.value);
+                                if (l) setSelectedLeaseForEmail(l);
+                            }}
+                            className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-xs font-bold outline-none"
+                        >
+                            {leases.map(l => {
+                                const t = tenants.find(item => item.id === l.tenantId);
+                                const tName = t ? (t.fullNameAr || (t as any).name) : 'المستأجر';
+                                const unitNum = (l as any).unitNumber || l.unitId || '101';
+                                return (
+                                    <option key={l.id} value={l.id}>
+                                        {l.contractNumber} - {tName} (الوحدة: {unitNum})
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <Input 
+                            label="عنوان البريد الإلكتروني للمستأجر"
+                            value={tenants.find(t => t.id === selectedLeaseForEmail?.tenantId)?.email || 'tenant@kuwait-law.com'}
+                            readOnly
+                            containerClassName="mb-0"
+                        />
+                        <Input 
+                            label="الرقم المدني PACI"
+                            value={tenants.find(t => t.id === selectedLeaseForEmail?.tenantId)?.civilIdOrPassport || '298010112345'}
+                            readOnly
+                            containerClassName="mb-0"
+                        />
+                    </div>
+
+                    <TextArea 
+                        label="نص رسالة المرفق والملاحظات الرسمية"
+                        rows={3}
+                        defaultValue={`عزيزي المستأجر المحترم،\nمرفق لكم مسودة عقد الإيجار المحدثة لمراجعتها والموافقة على البنود والشروط التنظيمية حسب قانون الإيجارات الكويتي رقم 35/1978.\nيرجى فتح الرابط المرفق للتأكيد.`}
+                    />
+
+                    <div className="flex justify-end gap-2 pt-2 border-t">
+                        <Button type="button" variant="outline" size="sm" onClick={() => setIsEmailDraftModalOpen(false)}>إلغاء</Button>
+                        <Button type="submit" size="sm" className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black">
+                            📤 إرسال المسودة والتسجيل بالسجل
+                        </Button>
+                    </div>
+                </form>
+            </Modal>
         </div>
     );
 };
@@ -2715,6 +4363,138 @@ const ComplaintFormModal: React.FC<ComplaintFormProps> = ({ isOpen, onClose, onS
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="outline" size="sm" onClick={onClose}>إلغاء</Button>
                     <Button type="submit" size="sm">تسجيل البلاغ</Button>
+                </div>
+            </form>
+        </Modal>
+    );
+};
+
+/* -------------------- UNIT FORM MODAL -------------------- */
+const UnitFormModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (propertyId: string, unit: PropertyUnit) => void;
+    initialData?: { propertyId: string; unit?: PropertyUnit } | null;
+    property?: Property;
+    pageLang?: 'ar' | 'en';
+}> = ({ isOpen, onClose, onSubmit, initialData, property, pageLang = 'ar' }) => {
+    const unit = initialData?.unit as any;
+    const [formData, setFormData] = useState<any>({
+        id: unit?.id || `unit-${Date.now()}`,
+        unitNumber: unit?.unitNumber || '',
+        floorNumber: unit?.floorNumber || '1',
+        unitType: unit?.unitType || PropertyUnitTypeKuwait.APARTMENT,
+        rentAmount: unit?.rentAmount || 300,
+        status: unit?.status || PropertyUnitStatus.VACANT,
+        roomsCount: unit?.roomsCount || 2,
+        bathroomsCount: unit?.bathroomsCount || 2,
+        notes: unit?.notes || ''
+    });
+
+    useEffect(() => {
+        if (unit) {
+            setFormData(unit);
+        } else {
+            setFormData({
+                id: `unit-${Date.now()}`,
+                unitNumber: '',
+                floorNumber: '1',
+                unitType: PropertyUnitTypeKuwait.APARTMENT,
+                rentAmount: 300,
+                status: PropertyUnitStatus.VACANT,
+                roomsCount: 2,
+                bathroomsCount: 2,
+                notes: ''
+            });
+        }
+    }, [unit, isOpen]);
+
+    if (!isOpen || !initialData) return null;
+
+    return (
+        <Modal 
+            isOpen={isOpen} 
+            onClose={onClose} 
+            title={unit ? (pageLang === 'ar' ? `تعديل وحدة عقارية (${unit.unitNumber})` : `Edit Unit ${unit.unitNumber}`) : (pageLang === 'ar' ? `إضافة وحدة جديدة (${property?.name || ''})` : `Add Unit to ${property?.name || ''}`)} 
+            size="md"
+        >
+            <form onSubmit={(e) => {
+                e.preventDefault();
+                onSubmit(initialData.propertyId, formData as PropertyUnit);
+            }} className="space-y-3 p-1 text-xs">
+                <Input 
+                    label={pageLang === 'ar' ? 'رقم الوحدة/الشقة (*)' : 'Unit Number (*)'} 
+                    value={formData.unitNumber || ''} 
+                    onChange={e => setFormData({ ...formData, unitNumber: e.target.value })} 
+                    required 
+                    placeholder="A-101" 
+                />
+                <div className="grid grid-cols-2 gap-2">
+                    <Input 
+                        label={pageLang === 'ar' ? 'الطابق' : 'Floor Number'} 
+                        value={formData.floorNumber || ''} 
+                        onChange={e => setFormData({ ...formData, floorNumber: e.target.value })} 
+                        placeholder="1" 
+                    />
+                    <Select
+                        label={pageLang === 'ar' ? 'حالة الوحدة' : 'Unit Status'}
+                        value={formData.status}
+                        onChange={e => setFormData({ ...formData, status: e.target.value as PropertyUnitStatus })}
+                        options={[
+                            { value: PropertyUnitStatus.VACANT, label: pageLang === 'ar' ? 'شاغرة (جاهزة للإيجار)' : 'Vacant' },
+                            { value: PropertyUnitStatus.RENTED, label: pageLang === 'ar' ? 'مؤجرة' : 'Rented' },
+                            { value: 'MAINTENANCE' as any, label: pageLang === 'ar' ? 'تحت الصيانة' : 'Maintenance' }
+                        ]}
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <Input 
+                        label={pageLang === 'ar' ? 'الإيجار الشهري (د.ك)' : 'Monthly Rent (KWD)'} 
+                        type="number" 
+                        value={formData.rentAmount || 0} 
+                        onChange={e => setFormData({ ...formData, rentAmount: parseFloat(e.target.value) || 0 })} 
+                        required 
+                    />
+                    <Select
+                        label={pageLang === 'ar' ? 'نوع الوحدة' : 'Unit Type'}
+                        value={formData.unitType}
+                        onChange={e => setFormData({ ...formData, unitType: e.target.value as PropertyUnitTypeKuwait })}
+                        options={[
+                            { value: PropertyUnitTypeKuwait.APARTMENT, label: pageLang === 'ar' ? 'شقة سكنية' : 'Apartment' },
+                            { value: 'COMMERCIAL_STORE' as any, label: pageLang === 'ar' ? 'محل تجاري' : 'Commercial Store' },
+                            { value: PropertyUnitTypeKuwait.OFFICE, label: pageLang === 'ar' ? 'مكتب إداري' : 'Office' },
+                            { value: PropertyUnitTypeKuwait.VILLA, label: pageLang === 'ar' ? 'فيلا / دور' : 'Villa / Floor' },
+                            { value: PropertyUnitTypeKuwait.WAREHOUSE, label: pageLang === 'ar' ? 'مخزن / مستودع' : 'Warehouse' }
+                        ]}
+                    />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                    <Input 
+                        label={pageLang === 'ar' ? 'عدد الغرف' : 'Rooms Count'} 
+                        type="number" 
+                        value={formData.roomsCount || 2} 
+                        onChange={e => setFormData({ ...formData, roomsCount: parseInt(e.target.value) || 1 })} 
+                    />
+                    <Input 
+                        label={pageLang === 'ar' ? 'عدد الحمامات' : 'Bathrooms Count'} 
+                        type="number" 
+                        value={formData.bathroomsCount || 2} 
+                        onChange={e => setFormData({ ...formData, bathroomsCount: parseInt(e.target.value) || 1 })} 
+                    />
+                </div>
+                <TextArea 
+                    label={pageLang === 'ar' ? 'ملاحظات وتفاصيل الوحدة' : 'Notes & Details'} 
+                    value={formData.notes || ''} 
+                    onChange={e => setFormData({ ...formData, notes: e.target.value })} 
+                    rows={2} 
+                />
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                    <Button variant="outline" size="sm" type="button" onClick={onClose}>
+                        {pageLang === 'ar' ? 'إلغاء' : 'Cancel'}
+                    </Button>
+                    <Button type="submit" size="sm" className="bg-primary text-white font-black">
+                        {unit ? (pageLang === 'ar' ? 'حفظ التعديلات' : 'Save Changes') : (pageLang === 'ar' ? 'إضافة الوحدة' : 'Add Unit')}
+                    </Button>
                 </div>
             </form>
         </Modal>

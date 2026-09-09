@@ -5,7 +5,8 @@ import {
     Printer, Plus, Search, Trash2, Edit, ChevronDown, ChevronRight, 
     SlidersHorizontal, Shield, Bell, AlertTriangle, Briefcase, 
     MapPin, Share2, DollarSign, FileCheck, Landmark, Compass, 
-    Award, Building2, History, Check, X, Info, Download, ArrowUpRight
+    Award, Building2, History, Check, X, Info, Download, ArrowUpRight, Brain,
+    Mic, Volume2
 } from 'lucide-react';
 
 import { useToast } from '../components/ui/Toast';
@@ -24,6 +25,8 @@ import {
 } from './litigationData';
 
 import { LegalPrintSystem } from './litigationPrintSystem';
+import { LitigationSimulatorPanel } from './components/LitigationSimulatorPanel';
+import { CourtHearingSimulatorPanel } from './components/CourtHearingSimulatorPanel';
 
 // Organize modules logical groupings (8 organized categories as requested)
 interface ModuleGroup {
@@ -50,6 +53,7 @@ const MODULE_GROUPS: ModuleGroup[] = [
         icon: Calendar,
         tabs: [
             { id: 'hearings', label: 'رول الجلسات اليومي', icon: Gavel },
+            { id: 'court_hearing_simulator', label: 'محاكي الجلسات القضائية', icon: Mic },
             { id: 'appointments', label: 'الأجندة والمواعيد', icon: Calendar }
         ]
     },
@@ -105,6 +109,15 @@ const MODULE_GROUPS: ModuleGroup[] = [
             { id: 'notifications', label: 'سجل الإعلانات القضائية', icon: Bell },
             { id: 'courts', label: 'سجل المحاكم الكويتية', icon: Building2 },
             { id: 'circuits', label: 'الدوائر الدستورية والقضائية', icon: Land_Indicator_Icon_Mapper('Scale') }
+        ]
+    },
+    {
+        id: 'litigation_simulator_group',
+        title: 'محاكاة الجلسات والتنبؤ القضائي',
+        icon: Brain,
+        tabs: [
+            { id: 'court_hearing_simulator', label: 'محاكي الجلسات والمرافعة الشفهية', icon: Mic },
+            { id: 'litigation_simulator', label: 'محاكي التقاضي والتمييز', icon: Scale }
         ]
     }
 ];
@@ -623,6 +636,30 @@ const LitigationToolsPage: React.FC<LitigationToolsPageProps> = ({ initialTab = 
                                                 <h4 className="font-extrabold text-xs text-purple-800 flex items-center gap-1"><Scale className="w-3.5 h-3.5" /> فتح ملف تنفيذي</h4>
                                                 <p className="text-[10px] text-slate-500 mt-1 font-bold">متابعة صيغ الإعلان والأحكام الصادرة</p>
                                             </button>
+
+                                            <button 
+                                                onClick={() => setActiveTab('court_hearing_simulator')}
+                                                className="p-3.5 border border-dashed border-amber-400 hover:border-amber-600 bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-teal-500/10 hover:bg-amber-100/50 rounded-xl text-right transition-all cursor-pointer sm:col-span-4 flex items-center justify-between shadow-xs"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-black shadow-sm">
+                                                        <Mic className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-black text-xs text-slate-900 flex items-center gap-1.5">
+                                                            محاكي الجلسات القضائية والمرافعة الشفهية
+                                                            <span className="px-2 py-0.5 rounded-full bg-amber-400/20 border border-amber-400/40 text-amber-800 text-[9px] font-black">أداة تفاعلية جديدة</span>
+                                                        </h4>
+                                                        <p className="text-[10px] text-slate-600 mt-0.5 font-bold">
+                                                            تجهيز المرافعة، تجربة الإلقاء شفهياً مع مؤقت وميكروفون، تقييم نقاط القوة والضعف، ومباغتات القضاة
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs font-black text-amber-700 hover:underline flex items-center gap-1">
+                                                    دخول المحاكي
+                                                    <ArrowUpRight className="w-3.5 h-3.5 rtl:rotate-[-90deg]" />
+                                                </span>
+                                            </button>
                                         </div>
                                     </div>
 
@@ -852,7 +889,7 @@ const LitigationToolsPage: React.FC<LitigationToolsPageProps> = ({ initialTab = 
                             )}
 
                             {/* --- FALLBACKS MAP RENDER TABLES FOR ALL OTHER TAB DESIGNS (Modules 4 to 18) --- */}
-                            {activeTab !== 'dashboard' && activeTab !== 'cases' && activeTab !== 'hearings' && activeTab !== 'enforce' && (
+                            {activeTab !== 'dashboard' && activeTab !== 'cases' && activeTab !== 'hearings' && activeTab !== 'enforce' && activeTab !== 'litigation_simulator' && (
                                 <div className="bg-white border rounded-2xl p-5 shadow-xs">
                                     <div className="flex items-center justify-between mb-4 pb-2 border-b">
                                         <h3 className="font-extrabold text-sm text-teal-900">سجلات وجدول العمل المصنف بقاعدة التقاضي</h3>
@@ -1102,6 +1139,21 @@ const LitigationToolsPage: React.FC<LitigationToolsPageProps> = ({ initialTab = 
                                         </table>
                                     </div>
                                 </div>
+                            )}
+
+                            {activeTab === 'litigation_simulator' && (
+                                <LitigationSimulatorPanel 
+                                    handleTriggerPrint={handleTriggerPrint}
+                                    addToast={addToast}
+                                />
+                            )}
+
+                            {activeTab === 'court_hearing_simulator' && (
+                                <CourtHearingSimulatorPanel 
+                                    handleTriggerPrint={handleTriggerPrint}
+                                    addToast={addToast}
+                                    cases={cases}
+                                />
                             )}
 
                         </motion.div>

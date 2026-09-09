@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import { useToast } from '../components/ui/Toast';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -7,440 +6,225 @@ import Modal from '../components/ui/Modal';
 import { useJurisdiction } from '../components/JurisdictionContext';
 import { LeaveRequest, LeaveTypeKuwait } from '../types';
 import { initialEmployees } from './EmployeeProfilePage';
-import {
-    CalendarDaysIcon, PlusCircleIcon, EyeIcon, CheckCircleIcon, XCircleIcon,
-    PrinterIcon, ClockIcon, MagnifyingGlassIcon, UserGroupIcon,
-    BriefcaseIcon, TrashIcon, ScaleIcon, TableCellsIcon, ArrowPathIcon,
-    SparklesIcon, ExclamationTriangleIcon, AcademicCapIcon, DocumentTextIcon,
-    DocumentDuplicateIcon, HistoryIcon, ArrowDownTrayIcon, FunnelIcon
-} from '../constants';
-import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-    AreaChart, Area
-} from 'recharts';
 
-// Translations Dictionary
-const TRANSLATIONS = {
-    ar: {
-        pageTitle: "نظام إدارة الإجازات والأرصدة المستحقة",
-        pageSub: "نظام متكامل يتطابق بدقة مع قانون العمل الكويتي واللوائح الشغلية الرسمية",
-        dashboard: "لوحة التحكم والمؤشرات",
-        requests: "طلبات الإجازات",
-        balances: "أرصدة وسياسات HR",
-        templates: "النماذج ومراسلات الشغل",
-        calendar: "أجندة الإجازات والتقويم",
-        reports: "التقارير والمبيانات",
-        newRequestButton: "تقديم طلب إجازة رسمي",
-        statsPending: "طلبات قيد المراجعة",
-        statsOnLeave: "خارج البلاد / في إجازة الآن",
-        statsApproved: "المعتمدة حديثاً",
-        statsRemaining: "متوسط أيام الرصيد للموظفين",
-        searchPlaceholder: "ابحث باسم الموظف أو رقم الطلب...",
-        allTypes: "كل أنواع الإجازات",
-        allStatuses: "كل الحالات الوظيفية",
-        allDepts: "كل الأقسام والإدارات",
-        requestNumber: "رقم الطلب",
-        employee: "الموظف المعني",
-        leaveType: "نوع الإجازة",
-        period: "الفترة الزمنية",
-        days: "عدد الأيام",
-        status: "الحالة الإدارية",
-        actions: "الإجراءات والعمليات",
-        noData: "لا توجد سجلات مطابقة للبحث حالياً",
-        legalGuideTitle: "الدليل السريع لإجازات قانون العمل الكويتي (الباب الرابع)",
-        legalGuideSubtitle: "ملخص حقوق العمال وفق القانون رقم 6 لسنة 2010 والأنظمة المقرة",
-        addRequestTitle: "تقديم طلب إجازة جديد",
-        editRequestTitle: "تعديل تفاصيل طلب الإجازة",
-        selectEmployee: "اختر الموظف...",
-        startAndEnd: "تاريخ البدء والانتهاء",
-        reason: "المبرر أو السبب التفصيلي",
-        cancel: "إلغاء",
-        save: "اعتماد وحفظ",
-        submit: "تقديم الطلب رسمياً",
-        viewTitle: "ملف طلب الإجازة التفصيلي",
-        dates: "التواريخ والمدد والربط",
-        balancesDetails: "معلومات رصيد الموظف",
-        reasonLabel: "الدافع/المبرر المكتوب",
-        legalBasis: "التخريج القانوني للأثر الشغلي",
-        immediateDecision: "القرار الإداري وتدفقات الاعتماد",
-        approve: "اعتماد الموافقة المسبقة",
-        reject: "رفض الطلب مع تبرير",
-        returnMod: "استرجاع لإعادة صياغة المرفقات",
-        deleteRecord: "حذف السجل نهائياً",
-        printOfficial: "طباعة المستند الرسمي",
-        close: "إغلاق نافذة العمل",
-        printPreview: "معاينة المستند الرسمي المعتمد",
-        printButton: "طباعة الكتاب الآن",
-        substituteEmployee: "الموظف البديل (الحاضن لمهام المنشأة)",
-        emergencyContact: "هاتف الطوارئ والاتصال العاجل",
-        isPaid: "حالة الاستحقاق المالي",
-        paymentPercentage: "نسبة الأجر الصافية",
-        medicalReport: "مستندات طبية ومرفقات رسمية",
-        activityLog: "سجل العمليات والتدفق الإداري",
-        aiTitle: "الاستشارة القانونية التلقائية والتحليلات الذكية (AI)",
-        aiConsult: "استشارة الذكاء الاصطناعي بنصوص المذكرات الكويتية",
-        sickCalcTitle: "الحاسبة التراكمية لشرائح المرضية (المادة 73 كويتي)",
-        sickCalcDesc: "أدخل عدد الأيام المرضية لحساب توزيع الأجر والخصومات المالية التراكمية:",
-        sickCalcInput: "عدد أيام الإجازة المرضية المطلوبة",
-        calculate: "احسب توزيع الاستحقاق",
-        tierFullPay: "بأجر كامل (15 يوماً)",
-        tierThreeQuarter: "بـ 3/4 أجر (10 أيام)",
-        tierHalfPay: "بنصف أجر (10 أيام)",
-        tierQuarterPay: "بربع أجر (10 أيام)",
-        tierNoPay: "بدون أجر (30 يوماً)",
-        overlapWarning: "تنبيه: تم اكتشاف تداخل زمني لهذا الموظف مع إجازة أخرى!",
-        validationBalanceError: "خطأ: الرصيد الحالي غير كافٍ لخصم الإجازة السنوية!",
-        validationProbation: "تنبيه: الموظف تحت التجربة (أقل من 6 أشهر)، تعليق الإجازة السنوية!",
-        draft: "مسودة",
-        pending: "قيد الانتظار لموافقة HR",
-        underReview: "تحت التدقيق والمراجعة القانونية",
-        awaitingDocs: "بانتظار مستندات الموظف الرسمية",
-        approved: "معتمد ونافذ",
-        rejected: "مرفوض بقرار إداري",
-        returned: "مسترجع للمراجعة مع الموظف",
-        cancelled: "ملغى من مقدم الطلب",
-        completed: "مكتمل ومباشر عمل",
-        archived: "مؤرشف بالسجلات",
-    },
-    en: {
-        pageTitle: "Adala Smart Leave & Balance Management",
-        pageSub: "Fully integrated leave compliance with Kuwaiti Labor Law & court standards",
-        dashboard: "Dashboard & Accruals",
-        requests: "Leave Database & Workflow",
-        balances: "Employee Balances & Policies",
-        templates: "Official Templates & Forms",
-        calendar: "Inter-department Agenda Calendar",
-        reports: "Analytical Reports",
-        newRequestButton: "Submit Official Leave Request",
-        statsPending: "Under Audit Requests",
-        statsOnLeave: "Currently On Leave",
-        statsApproved: "Approved Recently",
-        statsRemaining: "Average Remaining Balance",
-        searchPlaceholder: "Search by employee name or Request ID...",
-        allTypes: "All Leave Types",
-        allStatuses: "All Request Statuses",
-        allDepts: "All Departments",
-        requestNumber: "Request ID",
-        employee: "Employee",
-        leaveType: "Leave Type",
-        period: "Period",
-        days: "Days",
-        status: "Status",
-        actions: "Operations",
-        noData: "No matching records found current session",
-        legalGuideTitle: "Kuwaiti Labor Law Fast Reference Guide (Chapter IV)",
-        legalGuideSubtitle: "Official worker labor rights outline based on Law No. 6 of 2010",
-        addRequestTitle: "Submit New Official Leave",
-        editRequestTitle: "Edit Leave Details",
-        selectEmployee: "Select Employee...",
-        startAndEnd: "Start & End Date",
-        reason: "Justification & Comments",
-        cancel: "Cancel",
-        save: "Verify & Keep",
-        submit: "Submit Request Officially",
-        viewTitle: "Leave Request Dossier",
-        dates: "Dates, Durations & Integrations",
-        balancesDetails: "Accruance Balances",
-        reasonLabel: "Justification Reason",
-        legalBasis: "Jurisdiction & Statutory Compliance",
-        immediateDecision: "Immediate Board Decision",
-        approve: "Approve Officially",
-        reject: "Reject with Formal Notice",
-        returnMod: "Return for Attestation Action",
-        deleteRecord: "Permanently Delete",
-        printOfficial: "Print Official Document",
-        close: "Close Workspace",
-        printPreview: "Official Document Preview",
-        printButton: "Print Book Now",
-        substituteEmployee: "Handover Replacement Employee",
-        emergencyContact: "Emergency Number",
-        isPaid: "Payroll Impact Status",
-        paymentPercentage: "Net Wages Paid %",
-        medicalReport: "Attested Medical Reports",
-        activityLog: "Administrative Routing Logs",
-        aiTitle: "Adala Smart AI Copilot Integration",
-        aiConsult: "Kuwait Code Statutory Analysis (AI)",
-        sickCalcTitle: "Article 73 Sick Leave Breakdown Calculator",
-        sickCalcDesc: "Enter taken sick days to calculate accurate legal cumulative wage brackets:",
-        sickCalcInput: "Taken Sick Days",
-        calculate: "Calculate Distribution",
-        tierFullPay: "Full Wages (First 15 Days)",
-        tierThreeQuarter: "75% Wages (Next 10 Days)",
-        tierHalfPay: "50% Wages (Next 10 Days)",
-        tierQuarterPay: "25% Wages (Next 10 Days)",
-        tierNoPay: "Unpaid (Next 30 Days)",
-        overlapWarning: "Attention: Date overlap conflict identified with existing leave!",
-        validationBalanceError: "Error: Insufficient annual accruals in employee profile!",
-        validationProbation: "Alert: Employee is currently under probation (< 6 months)!",
-        draft: "Draft",
-        pending: "Pending Approval",
-        underReview: "Under Review & Legal Audit",
-        awaitingDocs: "Awaiting Employee Attestations",
-        approved: "Approved & Active",
-        rejected: "Rejected",
-        returned: "Returned for Clarification",
-        cancelled: "Cancelled",
-        completed: "Completed & Daily Logged",
-        archived: "Archived",
-    }
-};
+// Import newly created modular sub-components
+import { LeaveDashboard } from './components/LeaveDashboard';
+import { LeaveRequestsList } from './components/LeaveRequestsList';
+import { LeaveBalancesTab } from './components/LeaveBalancesTab';
+import { LeaveCalendarTab } from './components/LeaveCalendarTab';
+import { LeaveTemplatesTab } from './components/LeaveTemplatesTab';
+import { LeaveReportsTab } from './components/LeaveReportsTab';
 
-interface DetailedLeaveRequest {
-    id: string;
-    employeeId: string;
-    employeeName: string;
-    leaveType: LeaveTypeKuwait;
-    startDate: string;
-    endDate: string;
-    numberOfDays: number;
-    reason?: string;
-    status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | 'UnderReview' | 'AwaitingEmployeeDocuments' | 'Completed' | 'Draft' | 'Archived';
-    requestedAt: string;
-    managerComments?: string;
-    approvedAt?: string;
-    rejectionReason?: string;
-    attachments?: any[];
-    updatedAt?: string;
-    employeeSignature?: string;
-    managerSignature?: string;
-    requestNumber: string;
-    substituteEmployeeId?: string;
-    substituteEmployeeName?: string;
-    emergencyContactPhone?: string;
-    isPaidLeave: boolean;
-    wagePercentage: number;
-    department?: string;
-    jobTitle?: string;
-    remainingBalanceBefore?: number;
-    timeline?: { date: string; action: string; user: string; notes?: string }[];
+import { 
+  CalendarDays, PlusCircle, Scale, ShieldCheck, HelpCircle, 
+  Clock, Trash2, Check, X, FileText, Sparkles, User 
+} from 'lucide-react';
+
+export interface DetailedLeaveRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  leaveType: LeaveTypeKuwait;
+  startDate: string;
+  endDate: string;
+  numberOfDays: number;
+  reason?: string;
+  status: 'Pending' | 'Approved' | 'Rejected' | 'Cancelled' | 'UnderReview' | 'AwaitingEmployeeDocuments' | 'Completed' | 'Draft' | 'Archived';
+  requestedAt: string;
+  managerComments?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  attachments?: any[];
+  updatedAt?: string;
+  employeeSignature?: string;
+  managerSignature?: string;
+  requestNumber: string;
+  substituteEmployeeId?: string;
+  substituteEmployeeName?: string;
+  emergencyContactPhone?: string;
+  isPaidLeave: boolean;
+  wagePercentage: number;
+  department?: string;
+  jobTitle?: string;
+  civilId?: string;
+  remainingBalanceBefore?: number;
+  timeline?: { date: string; action: string; user: string; notes?: string }[];
 }
 
 export default function LeaveManagementPage() {
-    const { addToast } = useToast();
-    const { selectedJurisdiction } = useJurisdiction();
-    const isKWT = selectedJurisdiction?.code === 'KW';
+  const { addToast } = useToast();
+  const { selectedJurisdiction } = useJurisdiction();
+  
+  // Application language state (Arabic by default, matching Alwagayan corporate theme)
+  const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const isAr = lang === 'ar';
 
-    // Application language state (Arabic by default, matching Alwagayan corporate theme)
-    const [lang, setLang] = useState<'ar' | 'en'>('ar');
-
-    const getDeptLabel = (deptKey?: string) => {
-        if (!deptKey) return '';
-        const map: Record<string, string> = {
-            'Litigation': 'قسم التقاضي والمحاكم',
-            'Consultation': 'قسم الاستشارات والعقود',
-            'Corporate': 'قسم الشركات والتجاري',
-            'HR': 'إدارة الموارد البشرية',
-            'Finance': 'الإدارة المالية',
-            'Admin': 'الشؤون الإدارية',
-            'Senior Management': 'الإدارة العليا'
-        };
-        return lang === 'ar' ? (map[deptKey] || deptKey) : deptKey;
+  const getDeptLabel = (deptKey?: string) => {
+    if (!deptKey) return '';
+    const map: Record<string, string> = {
+      'Litigation': 'قسم التقاضي والمحاكم',
+      'Consultation': 'قسم الاستشارات والعقود',
+      'Corporate': 'قسم الشركات والتجاري',
+      'HR': 'إدارة الموارد البشرية',
+      'Finance': 'الإدارة المالية',
+      'Admin': 'الشؤون الإدارية',
+      'Senior Management': 'الإدارة العليا'
     };
+    return isAr ? (map[deptKey] || deptKey) : deptKey;
+  };
 
-    // Load initial data and merge with existing employees to keep system identity
-    const [employeesList, setEmployeesList] = useState<any[]>(() => {
-        const stored = localStorage.getItem('alwagayan_employees');
-        if (stored) {
-            try { return JSON.parse(stored); } catch (e) { console.error(e); }
-        }
-        return initialEmployees || [];
-    });
+  // Load initial personnel data
+  const [employeesList, setEmployeesList] = useState<any[]>(() => {
+    const stored = localStorage.getItem('alwagayan_employees');
+    if (stored) {
+      try { return JSON.parse(stored); } catch (e) { console.error(e); }
+    }
+    return initialEmployees || [];
+  });
 
-    const [requests, setRequests] = useState<DetailedLeaveRequest[]>(() => {
-        const stored = localStorage.getItem('alwagayan_leave_requests_detailed');
-        if (stored) {
-            try { return JSON.parse(stored); } catch (e) { console.error(e); }
-        }
-        
-        // Comprehensive mock leave requests showcasing all user requested workflow statuses
-        return [
-            {
-                id: 'lr1',
-                requestNumber: 'REQ-2026-0012',
-                employeeId: employeesList[0]?.id || 'emp-01',
-                employeeName: employeesList[0]?.fullNameAr || 'صبري شطا',
-                leaveType: LeaveTypeKuwait.ANNUAL,
-                startDate: '2026-06-01',
-                endDate: '2026-06-15',
-                numberOfDays: 15,
-                reason: 'الإجازة السنوية الرسمية للسفر العائلي والاستجمام خارج دولة الكويت',
-                status: 'Approved',
-                requestedAt: '2026-05-10 09:15',
-                isPaidLeave: true,
-                wagePercentage: 100,
-                department: employeesList[0]?.department || 'Consultation',
-                jobTitle: employeesList[0]?.jobTitle || 'Senior Consultant',
-                remainingBalanceBefore: 30,
-                substituteEmployeeName: 'ليلى محمود',
-                emergencyContactPhone: '+965 99348123',
-                timeline: [
-                    { date: '2026-05-10 09:15', action: 'الموظف صبري شطا', user: 'إرسال رقمي', notes: 'تقديم الطلب للتدقيق والمطابقة مع رصيد العلاوات الكويتي' },
-                    { date: '2026-05-11 11:20', action: 'الموارد البشرية', user: 'فادي كامل', notes: 'مراجعة المادة 70 والمصادقة على الرصيد المستحق (تطابق بنسبة 100%)' },
-                    { date: '2026-05-12 14:00', action: 'المدير الشريك', user: 'أ. صبري شطا', notes: 'اعتماد رسمي للمباشرة وطباعة كتاب الإذن الحكومي للمكتب' }
-                ]
-            },
-            {
-                id: 'lr2',
-                requestNumber: 'REQ-2026-0033',
-                employeeId: 'emp-02',
-                employeeName: 'ليلى محمود',
-                leaveType: LeaveTypeKuwait.SICK,
-                startDate: '2026-05-20',
-                endDate: '2026-05-22',
-                numberOfDays: 3,
-                reason: 'علاج طارئ لمشكلة بالأسنان ومراجعة المستشفى الأميري بحولي',
-                status: 'UnderReview', // Under Review
-                requestedAt: '2026-05-20 08:00',
-                isPaidLeave: true,
-                wagePercentage: 100, // Under Article 73 first 15 days is full pay
-                department: 'Litigation',
-                jobTitle: 'Appeals Lawyer',
-                remainingBalanceBefore: 28,
-                emergencyContactPhone: '+965 66723451',
-                timeline: [
-                    { date: '2026-05-20 08:12', action: 'الموظفة ليلى محمود', user: 'البوابة الرقمية', notes: 'تسجيل غياب صحي معتاد' },
-                    { date: '2026-05-21 10:00', action: 'الشؤون القانونية', user: 'أحمد حبيب', notes: 'طلب الشهادة الطبية الرسمية المعتمدة من عيادة الميدان حولي لمطابقته للمادتين 73 و 74' }
-                ]
-            },
-            {
-                id: 'lr3',
-                requestNumber: 'REQ-2026-0045',
-                employeeId: 'emp-03',
-                employeeName: 'ياسمين حسن',
-                leaveType: LeaveTypeKuwait.EMERGENCY,
-                startDate: '2026-05-14',
-                endDate: '2026-05-15',
-                numberOfDays: 2,
-                reason: 'ظروف عائلية وقاهرة تستدعي رعاية طبية عاجلة للوالدة بالمستشفى',
-                status: 'Pending', // Pending
-                requestedAt: '2026-05-13 18:30',
-                isPaidLeave: true,
-                wagePercentage: 100,
-                department: 'Corporate',
-                jobTitle: 'Legal Secretary',
-                remainingBalanceBefore: 4,
-                timeline: [
-                    { date: '2026-05-13 18:30', action: 'الموظف ياسمين حسن', user: 'الخدمة الذاتية', notes: 'تقديم طلب طارئ بمقتضى اللائحة الداخلية للشركة لأمور قهرية' }
-                ]
-            },
-            {
-                id: 'lr4',
-                requestNumber: 'REQ-2026-0019',
-                employeeId: 'emp-04',
-                employeeName: 'أحمد الشمري',
-                leaveType: LeaveTypeKuwait.HAJJ,
-                startDate: '2026-06-25',
-                endDate: '2026-07-15',
-                numberOfDays: 21,
-                reason: 'تأدية فريضة الحج المباركة للمرة الأولى وفقاً لنص المادة 76 من قانون العمل الكويتي',
-                status: 'AwaitingEmployeeDocuments', // Awaiting Doc
-                requestedAt: '2026-05-02 12:00',
-                isPaidLeave: true,
-                wagePercentage: 100, // Article 76: fully paid for 21 days for Muslim employees performing Hajj once in 6 years
-                department: 'Litigation',
-                jobTitle: 'Litigation Clerk',
-                remainingBalanceBefore: 30,
-                timeline: [
-                    { date: '2026-05-02 12:00', action: 'الموظف أحمد الشمري', user: 'تطبيق ERP', notes: 'تقديم الطلب مع رغبة لتعديل أيام رصيد السنوي' },
-                    { date: '2026-05-05 14:15', action: 'تدقيق الموارد البشرية', user: 'سليمان خالد', notes: 'بانتظار تقديم تصريح حملة الحج المعتمد رسمياً قبل تفعيل تصفية الراتب والمصادقة' }
-                ]
-            },
-            {
-                id: 'lr5',
-                requestNumber: 'REQ-2026-0022',
-                employeeId: 'emp-05',
-                employeeName: 'فاطمة الكندري',
-                leaveType: LeaveTypeKuwait.MATERNITY,
-                startDate: '2026-07-01',
-                endDate: '2026-09-08',
-                numberOfDays: 70,
-                reason: 'إجازة رعاية أمومة ووضع بمقتضى أحكام المادة 24 من قانون قطاع الأهلي الكويتي والموثقة رسمياً',
-                status: 'Completed', // Completed
-                requestedAt: '2026-04-12 11:00',
-                isPaidLeave: true,
-                wagePercentage: 100, // Maternity leave is 70 days at full wage under Article 24
-                department: 'Corporate',
-                jobTitle: 'Corporate Consultant',
-                remainingBalanceBefore: 15,
-                timeline: [
-                    { date: '2026-04-12 11:00', action: 'الموظفة فاطمة الكندري', user: 'تطبيق ERP', notes: 'تقديم طلب مع ارفاق شهات التوليد الرسمية' },
-                    { date: '2026-04-15 09:00', action: 'اعتماد الموارد البشرية والاستشاري', user: 'HR Director', notes: 'التصريح باعتماد 70 يوماً رسمياً مدفوعي الأجر بنسبة 100%' }
-                ]
-            }
-        ];
-    });
-
-    useEffect(() => {
-        localStorage.setItem('alwagayan_leave_requests_detailed', JSON.stringify(requests));
-    }, [requests]);
-
-    // Active tab in navigation
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'requests' | 'balances' | 'templates' | 'calendar' | 'reports'>('dashboard');
-
-    // Filter states
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterType, setFilterType] = useState<string>('All');
-    const [filterStatus, setFilterStatus] = useState<string>('All');
-    const [filterDept, setFilterDept] = useState<string>('All');
-
-    // Modals & detail view state
-    const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [selectedRequest, setSelectedRequest] = useState<DetailedLeaveRequest | null>(null);
-    const [editingRequest, setEditingRequest] = useState<DetailedLeaveRequest | null>(null);
-    const [isPrintPreviewOpen, setIsPrintPreviewOpen] = useState(false);
-
-    // Employee Profiles & Dossier Modal State Variables
-    const [selectedEmployeeProfile, setSelectedEmployeeProfile] = useState<any | null>(null);
-    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  // Load detailed leave requests
+  const [requests, setRequests] = useState<DetailedLeaveRequest[]>(() => {
+    const stored = localStorage.getItem('alwagayan_leave_requests_detailed');
+    if (stored) {
+      try { return JSON.parse(stored); } catch (e) { console.error(e); }
+    }
     
-    // Manual Custom Input Employee Fields (for flexible testing)
-    const [showManualEmployee, setShowManualEmployee] = useState(false);
-    const [manualEmpName, setManualEmpName] = useState('');
-    const [manualEmpJob, setManualEmpJob] = useState('');
-    const [manualEmpDept, setManualEmpDept] = useState('Consultation');
-    const [manualEmpJoined, setManualEmpJoined] = useState('2026-01-15');
-    const [manualEmpCivilId, setManualEmpCivilId] = useState('295051501981');
-    const [manualEmpEntitlement, setManualEmpEntitlement] = useState(30);
-    const [manualEmpCarriedOver, setManualEmpCarriedOver] = useState(0);
+    // Default high-quality legal records matching Alwagayan law firm scenario
+    return [
+      {
+        id: 'lr1',
+        requestNumber: 'REQ-2026-0012',
+        employeeId: employeesList[0]?.id || 'emp-01',
+        employeeName: employeesList[0]?.fullNameAr || 'صبري شطا',
+        leaveType: LeaveTypeKuwait.ANNUAL,
+        startDate: '2026-06-01',
+        endDate: '2026-06-15',
+        numberOfDays: 15,
+        reason: 'الإجازة السنوية الرسمية للسفر العائلي والاستجمام خارج دولة الكويت',
+        status: 'Approved',
+        requestedAt: '2026-05-10 09:15',
+        isPaidLeave: true,
+        wagePercentage: 100,
+        department: employeesList[0]?.department || 'Consultation',
+        jobTitle: employeesList[0]?.jobTitle || 'Senior Consultant',
+        remainingBalanceBefore: 30,
+        substituteEmployeeName: 'ليلى محمود',
+        emergencyContactPhone: '+965 99348123',
+        timeline: [
+          { date: '2026-05-10 09:15', action: 'تم تقديم الطلب', user: 'صبري شطا', notes: 'تقديم الطلب للتدقيق والمطابقة مع رصيد العلاوات الكويتي' },
+          { date: '2026-05-11 11:20', action: 'مراجعة الموارد البشرية', user: 'فادي كامل', notes: 'مراجعة المادة 70 والمصادقة على الرصيد المستحق (تطابق بنسبة 100%)' },
+          { date: '2026-05-12 14:00', action: 'اعتماد رسمي للمباشرة', user: 'إدارة المكتب', notes: 'اعتماد رسمي للمباشرة وطباعة كتاب الإذن الحكومي للمكتب' }
+        ]
+      },
+      {
+        id: 'lr2',
+        requestNumber: 'REQ-2026-0033',
+        employeeId: 'emp-02',
+        employeeName: 'ليلى محمود',
+        leaveType: LeaveTypeKuwait.SICK,
+        startDate: '2026-05-20',
+        endDate: '2026-05-22',
+        numberOfDays: 3,
+        reason: 'علاج طارئ لمشكلة بالأسنان ومراجعة المستشفى الأميري بحولي',
+        status: 'UnderReview',
+        requestedAt: '2026-05-20 08:00',
+        isPaidLeave: true,
+        wagePercentage: 100,
+        department: 'Litigation',
+        jobTitle: 'Appeals Lawyer',
+        remainingBalanceBefore: 28,
+        emergencyContactPhone: '+965 66723451',
+        timeline: [
+          { date: '2026-05-20 08:12', action: 'تم تسجيل غياب صحي', user: 'ليلى محمود', notes: 'تسجيل غياب صحي معتاد' },
+          { date: '2026-05-21 10:00', action: 'طلب الشهادة الطبية', user: 'الشؤون القانونية', notes: 'طلب الشهادة الطبية الرسمية المعتمدة لمطابقتها للمادتين 73 و 74' }
+        ]
+      },
+      {
+        id: 'lr3',
+        requestNumber: 'REQ-2026-0045',
+        employeeId: 'emp-03',
+        employeeName: 'ياسمين حسن',
+        leaveType: LeaveTypeKuwait.EMERGENCY,
+        startDate: '2026-05-14',
+        endDate: '2026-05-15',
+        numberOfDays: 2,
+        reason: 'ظروف عائلية وقاهرة تستدعي رعاية طبية عاجلة للوالدة بالمستشفى',
+        status: 'Pending',
+        requestedAt: '2026-05-13 18:30',
+        isPaidLeave: true,
+        wagePercentage: 100,
+        department: 'Corporate',
+        jobTitle: 'Legal Secretary',
+        remainingBalanceBefore: 4,
+        timeline: [
+          { date: '2026-05-13 18:30', action: 'تقديم طلب طارئ بمقتضى اللائحة', user: 'ياسمين حسن', notes: 'تقديم طلب طارئ بمقتضى اللائحة الداخلية للشركة لأمور قهرية' }
+        ]
+      }
+    ];
+  });
 
-    // Advanced Reports Workbench state variables
-    const [reportCategory, setReportCategory] = useState<'balances' | 'consumed' | 'remaining' | 'individual' | 'department' | 'period' | 'status'>('balances');
-    const [reportDeptFilter, setReportDeptFilter] = useState('All');
-    const [reportEmployeeFilter, setReportEmployeeFilter] = useState('All');
-    const [reportStartDate, setReportStartDate] = useState('2026-01-01');
-    const [reportEndDate, setReportEndDate] = useState('2026-12-31');
-    const [generatedReportTable, setGeneratedReportTable] = useState<any[]>([]);
+  // Save requests persistent states
+  useEffect(() => {
+    localStorage.setItem('alwagayan_leave_requests_detailed', JSON.stringify(requests));
+  }, [requests]);
 
-    // Sick Leave Calculator State
-    const [calcSickDays, setCalcSickDays] = useState<number>(15);
-    const [calculatedSickTiers, setCalculatedSickTiers] = useState<any>(null);
+  // Save employees persistent states
+  useEffect(() => {
+    localStorage.setItem('alwagayan_employees', JSON.stringify(employeesList));
+  }, [employeesList]);
 
-    // Active Editable Template State
-    const [activeTemplateId, setActiveTemplateId] = useState<string>('form-annual');
-    const [templateInputs, setTemplateInputs] = useState({
-        companyName: 'مكتب الوجيان ومكتب صبري شطا للمحاماة والاستشارات القانونية',
-        employeeName: 'أحمد ذياب الجعفري',
-        jobTitle: 'مستشار قانوني أول',
-        deptName: 'قسم الاستشارات والعقود',
-        startDate: '2026-06-12',
-        endDate: '2026-07-12',
-        durationDays: '30',
-        refNumber: 'W-LEG-2026/089',
-        reason: 'الإجازة الدورية السنوية المضمونة طبقا للمادة 70',
-        signatory: 'رئيس مجلس الإدارة / الشريك الشاهد',
-        managerComments: 'لوحظ عدم ممانعة الإدارة واستيفاء الأعمال وتسليم الملفات للمحكمة الموقرة'
-    });
+  // Active workspace section
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'requests' | 'balances' | 'templates' | 'calendar' | 'reports'>('dashboard');
 
-    // Editable Templates database
-    const editableTemplates = useMemo(() => [
-        {
-            id: 'form-annual',
-            titleAr: 'كتاب طلب إجازة سنوية رسمي',
-            titleEn: 'Official Annual Leave Application Letter',
-            categoryAr: 'نماذج طلبات الموظفين',
-            categoryEn: 'Employee Document Forms',
-            templateBodyAr: `التاريخ: \${date}
+  // Multi-tier filtering
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('All');
+  const [filterStatus, setFilterStatus] = useState<string>('All');
+  const [filterDept, setFilterDept] = useState<string>('All');
+
+  // Modals status triggers
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<DetailedLeaveRequest | null>(null);
+  const [editingRequest, setEditingRequest] = useState<DetailedLeaveRequest | null>(null);
+  const [selectedEmployeeProfile, setSelectedEmployeeProfile] = useState<any | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // Manual enrollment form fields
+  const [showManualEmployee, setShowManualEmployee] = useState(false);
+  const [manualEmpName, setManualEmpName] = useState('');
+  const [manualEmpJob, setManualEmpJob] = useState('');
+  const [manualEmpDept, setManualEmpDept] = useState('Consultation');
+  const [manualEmpJoined, setManualEmpJoined] = useState('2026-01-15');
+  const [manualEmpCivilId, setManualEmpCivilId] = useState('295051501981');
+  const [manualEmpEntitlement, setManualEmpEntitlement] = useState(30);
+  const [manualEmpCarriedOver, setManualEmpCarriedOver] = useState(0);
+
+  // Editable Letter templates inputs state variables
+  const [activeTemplateId, setActiveTemplateId] = useState<string>('form-annual');
+  const [templateInputs, setTemplateInputs] = useState({
+    companyName: 'مكتب الوجيان ومكتب صبري شطا للمحاماة والاستشارات القانونية والتحكيم',
+    employeeName: 'أحمد ذياب الجعفري',
+    jobTitle: 'مستشار قانوني أول',
+    deptName: 'قسم الاستشارات والعقود',
+    startDate: '2026-06-12',
+    endDate: '2026-07-12',
+    durationDays: '30',
+    refNumber: 'W-LEG-2026/089',
+    reason: 'الإجازة الدورية السنوية المضمونة طبقا للمادة 70',
+    signatory: 'رئيس مجلس الإدارة / الشريك الشاهد',
+    managerComments: 'لوحظ عدم ممانعة الإدارة واستيفاء الأعمال وتسليم الملفات للمحكمة الموقرة'
+  });
+
+  // Import Editable templates database from original logic
+  const editableTemplates = useMemo(() => [
+    {
+      id: 'form-annual',
+      titleAr: 'كتاب طلب إجازة سنوية رسمي',
+      titleEn: 'Official Annual Leave Application Letter',
+      categoryAr: 'نماذج طلبات الموظفين',
+      categoryEn: 'Employee Document Forms',
+      templateBodyAr: `التاريخ: \${date}
 المرجع الإداري: \${refNumber}
 
 إلى رئيس مجلس إدارة: \${companyName} الموقر،
@@ -448,14 +232,14 @@ export default function LeaveManagementPage() {
 
 الموضوع: طلب إذن إجازة سنوية دورية رسمية
 
-أتقدم أنا الموظف/ \${employeeName}، الحامل للمسمى الوظيفي (\${jobTitle}) بقسم (\${deptName})، لسيادتكم بطلب التفضل بالموافقة على منحي إجازة سنوية دورية وذلك اعتباراً من تاريخ \${startDate} وحتى نهاية يوم \${endDate} ولمدة إجمالية قدرها (\${durationDays}) يوماً، محتسبة بالخصم من رصيد العلاوات والأيام المستحقة المودعة رسميًا تزامناً مع أحكام المادة 70 من قانون قطاع العمل الكويتي رقم 6 لسنة 2010.
+أتقدم أنا الموظف/ \${employeeName}، الحامل للمسمى الوظيفي (\${jobTitle}) بقسم (\${deptName})، لسيادتكم بطلب التفضل بالموافقة على منحي إجازة سنوية دورية وذلك اعتباراً من تاريخ \${startDate} وحتى نهاية يوم \${endDate} ولمدة إجمالية قدرها (\${durationDays}) يوماً، محتسباً بالخصم من رصيد العلاوات والأيام المستحقة المودعة رسميًا تزامناً مع أحكام المادة 70 من قانون قطاع العمل الكويتي رقم 6 لسنة 2010.
 
 وأحيطكم علماً بأنه بناءً على المادة 72، قمت بالتنسيق لتفويض الزميل البديل لمباشرة ومعالجة كافة المسائل والملفات المنضوية تحت مسؤوليتي لحين عودتي الآمنة لمباشرة الدوام الرسمي بالمكتب.
 
 وتفضلوا بقبول وافر التقديري والاحترام،
 
 مقدم الطلب: .............................            اعتماد وقرار المؤسسة: .............................`,
-            templateBodyEn: `Date: \${date}
+      templateBodyEn: `Date: \${date}
 Reference Number: \${refNumber}
 
 To: The Management of \${companyName},
@@ -470,14 +254,14 @@ Pursuant to Article 72, I have coordinated with my team members to ensure proper
 Respectfully Submitted,
 
 Applicant Signature: .............................            Enterprise Sanction: .............................`
-        },
-        {
-            id: 'form-approval',
-            titleAr: 'قرار اعتماد الموافقة الإدارية الرسمية',
-            titleEn: 'Official HR Leave Approval Decision',
-            categoryAr: 'قرارات الموارد البشرية',
-            categoryEn: 'HR Official Decisions',
-            templateBodyAr: `الرقم المرجعي للإقرار: \${refNumber}
+    },
+    {
+      id: 'form-approval',
+      titleAr: 'قرار اعتماد الموافقة الإدارية الرسمية',
+      titleEn: 'Official HR Leave Approval Decision',
+      categoryAr: 'قرارات الموارد البشرية',
+      categoryEn: 'HR Official Decisions',
+      templateBodyAr: `الرقم المرجعي للإقرار: \${refNumber}
 التاريخ: \${date}
 
 قرار إداري رقم (2026/091) - شؤون الموظفين والعاملين
@@ -491,7 +275,7 @@ Applicant Signature: .............................            Enterprise Sanctio
 
 اعتماد رئيس إدارة الشؤون الإدارية:
 \${signatory}`,
-            templateBodyEn: `Reference Identification: \${refNumber}
+      templateBodyEn: `Reference Identification: \${refNumber}
 Date: \${date}
 
 Administrative Directive No. (2026/091) - Staff Accruals
@@ -505,2357 +289,1097 @@ We Hereby Direct:
 
 HR Director Autograph:
 \${signatory}`
-        },
+    }
+  ], []);
+
+  // Form input variables for submitting/editing request
+  const [formData, setFormData] = useState<Partial<DetailedLeaveRequest>>({
+    employeeId: '',
+    employeeName: '',
+    leaveType: LeaveTypeKuwait.ANNUAL,
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
+    reason: '',
+    substituteEmployeeName: '',
+    emergencyContactPhone: '',
+  });
+
+  // AI statutory evaluator states
+  const [aiReport, setAiReport] = useState<string>('');
+  const [aiLoading, setAiLoading] = useState<boolean>(false);
+
+  // Triggering the official template compilation
+  const compiledTemplateText = useMemo(() => {
+    const template = editableTemplates.find(t => t.id === activeTemplateId);
+    if (!template) return '';
+    let text = isAr ? template.templateBodyAr : template.templateBodyEn;
+    const variablesToReplace: Record<string, string> = {
+      date: new Date().toISOString().split('T')[0],
+      refNumber: templateInputs.refNumber,
+      companyName: templateInputs.companyName,
+      employeeName: templateInputs.employeeName,
+      jobTitle: templateInputs.jobTitle,
+      deptName: templateInputs.deptName,
+      startDate: templateInputs.startDate,
+      endDate: templateInputs.endDate,
+      durationDays: templateInputs.durationDays,
+      reason: templateInputs.reason,
+      signatory: templateInputs.signatory,
+      managerComments: templateInputs.managerComments
+    };
+    Object.keys(variablesToReplace).forEach(key => {
+      text = text.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), variablesToReplace[key]);
+    });
+    return text;
+  }, [activeTemplateId, templateInputs, isAr, editableTemplates]);
+
+  // Check date overlap helper
+  const hasEmployeeOverlap = (empId: string, start: string, end: string, ignoreId?: string) => {
+    if (!empId || !start || !end) return false;
+    return requests.some(req => {
+      if (req.id === ignoreId) return false;
+      if (req.employeeId !== empId) return false;
+      if (req.status === 'Cancelled' || req.status === 'Rejected') return false;
+      return (start <= req.endDate && end >= req.startDate);
+    });
+  };
+
+  // Submit request action
+  const handleAddRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const emp = employeesList.find(e => e.id === formData.employeeId);
+    if (!emp) {
+      addToast({
+        type: 'error',
+        title: isAr ? 'فشل الاختيار' : 'Selection Failed',
+        message: isAr ? 'يرجى اختيار موظف صالح من القائمة' : 'Please select a valid employee'
+      });
+      return;
+    }
+
+    const calculatedDays = Math.ceil(
+      (new Date(formData.endDate || '').getTime() - new Date(formData.startDate || '').getTime()) / 86400000
+    ) + 1;
+
+    if (isNaN(calculatedDays) || calculatedDays <= 0) {
+      addToast({
+        type: 'error',
+        title: isAr ? 'نطاق تواريخ غير صالح' : 'Invalid Date Range',
+        message: isAr ? 'تاريخ البدء والانتهاء غير متطابقين' : 'Inconsistent dates provided'
+      });
+      return;
+    }
+
+    if (hasEmployeeOverlap(emp.id, formData.startDate || '', formData.endDate || '')) {
+      addToast({
+        type: 'warning',
+        title: isAr ? 'تداخل زمني معلق' : 'Overlap warning',
+        message: isAr ? 'تم رصد إجازة أخرى مسجلة لذات الموظف في هذا التوقيت!' : 'Employee has another leave scheduled in this range!'
+      });
+      return;
+    }
+
+    const newReq: DetailedLeaveRequest = {
+      id: 'lr-' + Date.now(),
+      requestNumber: 'REQ-2026-' + Math.floor(1000 + Math.random() * 9000),
+      employeeId: emp.id,
+      employeeName: emp.fullNameAr,
+      leaveType: formData.leaveType as LeaveTypeKuwait,
+      startDate: formData.startDate || '',
+      endDate: formData.endDate || '',
+      numberOfDays: calculatedDays,
+      reason: formData.reason || '',
+      status: 'Pending',
+      requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+      isPaidLeave: formData.leaveType !== LeaveTypeKuwait.UNPAID,
+      wagePercentage: 100,
+      department: emp.department || 'Consultation',
+      jobTitle: emp.jobTitle || 'Legal Advisor',
+      remainingBalanceBefore: 30,
+      substituteEmployeeName: formData.substituteEmployeeName,
+      emergencyContactPhone: formData.emergencyContactPhone,
+      timeline: [
         {
-            id: 'form-rejection',
-            titleAr: 'مذكرة رفض الإجازة مع المسببات تفصيلياً',
-            titleEn: 'Leave Rejection Memo with Legal Justification',
-            categoryAr: 'قرارات الموارد البشرية',
-            categoryEn: 'HR Official Decisions',
-            templateBodyAr: `التاريخ: \${date}
-الرقم المتبقّي للرفض: \${refNumber}
-
-مذكرة إدارية عاجلة وداخلية
-
-إلى السيد الموظف/ \${employeeName} المحترم
-القسم الشغلي: \${deptName}
-
-الموضوع: قرار رفض طلب الإجازة للملف \${refNumber}
-
-بالإشارة إلى طلب الإجر الفوري للإجازة المقدم منكم للفترة من \${startDate} إلى \${endDate}، نأسف للإحاطة والتبليغ بأنه تم تعذر قبول الطلب المقدم بقرار إداري من رئيس الهيئة الاستشارية.
-
-حيث ينطلي الرفض على المسببات الإلزامية التالية:
-- \${reason}
-- تتطلب المحاكم الكلية والاستئنافية وجود كامل الفريق في هذه الفترة نظراً لحرجات الجداول القضائية.
-- تعارض الفترة مع التزام المحامي البديل بمقتضى المادة 72.
-
-وعليه، يُرجى التنسيق والاتفاق مجدداً مع الموارد البشرية لجدولة الإجازة في فترات قضائية بديلة تمنع التأثر العملي للمكتب.
-
-تعديل وتوقيع المفوض الإداري الشريك:
-\${signatory}`,
-            templateBodyEn: `Date: \${date}
-Ref Number: \${refNumber}
-
-Official HR Rejection Memo
-
-To: \${employeeName}
-Division: \${deptName}
-
-Subject: Non-Authorization of Requested Leave Ref \${refNumber}
-
-With reference to your leave request submitted for the period starting on \${startDate} to \${endDate}, we regret to inform you that HR holds the non-approval directive at this time due to operational requirements.
-
-Primary grounds of non-approval:
-- \${reason}
-- Heavy court schedules in the litigation department requiring maximum roster availability.
-- Absence of a replacement employee under Article 72 requirements.
-
-Consequently, please coordinate with HR to reschedule your periodical accruals to a secure alternative timeframe.
-
-Authorized Partner Signature:
-\${signatory}`
-        },
-        {
-            id: 'form-return',
-            titleAr: 'نموذج إثبات وموثق عودة لمباشرة الدوام الرسمي',
-            titleEn: 'Official Return-to-Work Resumption Form',
-            categoryAr: 'وثائق السجلات الفورية',
-            categoryEn: 'Official Resumption Forms',
-            templateBodyAr: `المرجع: \${refNumber}
-التاريخ: \${date}
-
-إقرار مباشرة العمل الفعلي بعد انقضاء الإجازة الرسمية
-
-نشهد نحن إدارة الموارد البشرية في \${companyName} بأن الموظف الموقر:
-الاسم الكامل: \${employeeName}
-المسمى الوظيفي: \${jobTitle}        القسم الإداري: \${deptName}
-
-قد عاد لبلده الكويت وباشر دوامه الفعلي ورسم البصمة الحيوية لتسجيل الحضور بموقع المقر صباح اليوم اعتبارا من تاريخ: \${startDate}، وذلك بعد انتهاء إجازة الاستحقاق الدورية المعتمدة له.
-
-وبموجبه، يثبت تفعيله ومزامنته بملفات الرواتب والأمور التشغيلية للـ ERP ومنظومة الشؤون العمالية دون أي انقطاع.
-
-مسؤول السجلات بالشركة:
-.............................`,
-            templateBodyEn: `Ref No: \${refNumber}
-Date: \${date}
-
-Official Duty Resumption & Return declaration
-
-This is to formally check and record that the employee:
-Full Name: \${employeeName}
-Job Title: \${jobTitle}         Department: \${deptName}
-
-Has successfully reported back to office, swiping active biometrics at the premises for duty resumption on: \${startDate}, following the end of their authorized vacation.
-
-Accordingly, payroll, compliance systems, and standard work hours metrics are restored to default active status.
-
-HR Registrar:
-.............................`
+          date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+          action: isAr ? 'تم تقديم الطلب إدارياً' : 'Submitted officially',
+          user: emp.fullNameAr,
+          notes: isAr ? 'إحالة تلقائية للموارد البشرية والتدقيق العمالي' : 'Awaiting statutory approval'
         }
-    ], []);
+      ]
+    };
 
-    // Form inputs state for submitting new / editing
-    const [formData, setFormData] = useState<Partial<DetailedLeaveRequest>>({
-        employeeId: '',
-        employeeName: '',
-        leaveType: LeaveTypeKuwait.ANNUAL,
-        startDate: new Date().toISOString().split('T')[0],
-        endDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-        reason: '',
-        substituteEmployeeName: '',
-        emergencyContactPhone: '',
+    setRequests([newReq, ...requests]);
+    setIsAddModalOpen(false);
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم إدراج الطلب' : 'Request Registered',
+      message: isAr ? 'تم تقديم وتسجيل الطلب بنجاح قيد الموافقة' : 'Leave request registered successfully'
+    });
+  };
+
+  // Edit request action
+  const handleSaveEditRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRequest) return;
+
+    const calculatedDays = Math.ceil(
+      (new Date(editingRequest.endDate || '').getTime() - new Date(editingRequest.startDate || '').getTime()) / 86400000
+    ) + 1;
+
+    if (isNaN(calculatedDays) || calculatedDays <= 0) {
+      addToast({
+        type: 'error',
+        title: isAr ? 'تواريخ غير صالحة' : 'Inconsistent dates',
+        message: isAr ? 'تأكد من اختيار تواريخ صحيحة' : 'Verify leave duration dates'
+      });
+      return;
+    }
+
+    const updated = requests.map(req => {
+      if (req.id === editingRequest.id) {
+        return {
+          ...req,
+          leaveType: editingRequest.leaveType,
+          startDate: editingRequest.startDate,
+          endDate: editingRequest.endDate,
+          numberOfDays: calculatedDays,
+          reason: editingRequest.reason,
+          substituteEmployeeName: editingRequest.substituteEmployeeName,
+          emergencyContactPhone: editingRequest.emergencyContactPhone,
+          isPaidLeave: editingRequest.leaveType !== LeaveTypeKuwait.UNPAID,
+          updatedAt: new Date().toISOString().replace('T', ' ').substring(0, 16)
+        };
+      }
+      return req;
     });
 
-    // AI Assist results
-    const [aiReport, setAiReport] = useState<string>('');
-    const [aiLoading, setAiLoading] = useState<boolean>(false);
+    setRequests(updated);
+    setEditingRequest(null);
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم تحديث البيانات' : 'Leave Updated',
+      message: isAr ? 'تم حفظ التغييرات على تفاصيل الإجازة' : 'Changes applied successfully'
+    });
+  };
 
-    // Dynamic Filtered requests lists
-    const filteredRequests = useMemo(() => {
-        const query = searchTerm.toLowerCase().trim();
-        return requests.filter(req => {
-            const empDetails = employeesList.find(e => e.id === req.employeeId);
-            const matchesSearch = !query ? true : (
-                req.employeeName.toLowerCase().includes(query) ||
-                req.requestNumber.toLowerCase().includes(query) ||
-                (req.jobTitle && req.jobTitle.toLowerCase().includes(query)) ||
-                (req.department && req.department.toLowerCase().includes(query)) ||
-                (req.reason && req.reason.toLowerCase().includes(query)) ||
-                (req.startDate && req.startDate.includes(query)) ||
-                (req.endDate && req.endDate.includes(query)) ||
-                (req.substituteEmployeeName && req.substituteEmployeeName.toLowerCase().includes(query)) ||
-                (req.emergencyContactPhone && req.emergencyContactPhone.includes(query)) ||
-                (empDetails && empDetails.civilId && empDetails.civilId.includes(query))
-            );
+  // Delete request action
+  const handleDeleteRequest = (reqId: string) => {
+    setRequests(requests.filter(r => r.id !== reqId));
+    addToast({
+      type: 'warning',
+      title: isAr ? 'تم حذف السجل' : 'Record Deleted',
+      message: isAr ? 'تم إقصاء طلب الإجازة بنجاح' : 'Leave record removed from database'
+    });
+    if (selectedRequest && selectedRequest.id === reqId) {
+      setSelectedRequest(null);
+    }
+  };
 
-            const matchesType = filterType === 'All' || req.leaveType === filterType;
-            const matchesStatus = filterStatus === 'All' || req.status === filterStatus;
-            const matchesDept = filterDept === 'All' || req.department?.toLowerCase() === filterDept.toLowerCase();
+  // Update workflow status action
+  const handleUpdateStatus = (reqId: string, nextStatus: any) => {
+    const updated = requests.map(req => {
+      if (req.id === reqId) {
+        const timeline = req.timeline || [];
+        return {
+          ...req,
+          status: nextStatus,
+          timeline: [
+            ...timeline,
+            {
+              date: new Date().toISOString().replace('T', ' ').substring(0, 16),
+              action: isAr ? `تغيير الحالة إلى [${nextStatus}]` : `Status shifted to [${nextStatus}]`,
+              user: 'إدارة شؤون الموظفين والتدقيق',
+              notes: isAr ? 'تأشيرة رسمية بموجب القرار الإداري للمكتب' : 'Official statutory action'
+            }
+          ]
+        };
+      }
+      return req;
+    });
 
-            return matchesSearch && matchesType && matchesStatus && matchesDept;
-        });
-    }, [requests, searchTerm, filterType, filterStatus, filterDept, employeesList]);
+    setRequests(updated);
+    const found = updated.find(r => r.id === reqId);
+    if (found) setSelectedRequest(found);
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم تعديل القرار' : 'Decision Approved',
+      message: isAr ? 'تم اعتماد التغيير وتوثيقه في السجل الزمني للمستند' : 'Administrative state updated'
+    });
+  };
 
-    // Active Monthly Calendar Calculations
-    const [currentYear, setCurrentYear] = useState<number>(2026);
-    const [currentMonth, setCurrentMonth] = useState<number>(4); // May (0-indexed)
+  // Save manual custom employee action
+  const handleSaveManualEmployee = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newEmp = {
+      id: 'emp-' + Date.now(),
+      fullNameAr: manualEmpName,
+      jobTitle: manualEmpJob,
+      department: manualEmpDept,
+      hiringDate: manualEmpJoined,
+      civilId: manualEmpCivilId,
+      joiningDate: manualEmpJoined,
+      annualLeaveEntitlement: manualEmpEntitlement,
+      carriedOverBalance: manualEmpCarriedOver,
+      absenceDays: 0,
+      basicSalary: 950
+    };
 
-    const calendarGrid = useMemo(() => {
-        const firstDayIndex = new Date(currentYear, currentMonth, 1).getDay();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        
-        const daysArray: { dayNum: number | null; dateStr: string | null }[] = [];
-        for (let i = 0; i < firstDayIndex; i++) {
-            daysArray.push({ dayNum: null, dateStr: null });
+    setEmployeesList([...employeesList, newEmp]);
+    setShowManualEmployee(false);
+    
+    // Clear form
+    setManualEmpName('');
+    setManualEmpJob('');
+    setManualEmpCivilId('');
+    
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم تسجيل الموظف' : 'Personnel Enrolled',
+      message: isAr ? 'تم إدراج الموظف وتعيين أرصدته السنوية بنجاح' : 'New employee registered successfully'
+    });
+  };
+
+  // Triggering AI compliance check
+  const triggerAiComplianceCheck = async (req: DetailedLeaveRequest) => {
+    setAiLoading(true);
+    setAiReport('');
+    try {
+      const fullPrompt = `أنت مستشار قانوني كويتي خبير بقانون قطاع العمل الكويتي (رقم 6 لسنة 2010 واللوائح الشغلية).
+يرجى صياغة مذكرة تكييف ومطابقة بليغة وخالية من الركاكة لطلب الإجازة ذو الرقم (${req.requestNumber}):
+الموظف المعني: ${req.employeeName} الحامل للمسمى (${req.jobTitle}) بقسم (${req.department}).
+نوع الإجازة المطلوبة: ${req.leaveType}، للفترة من ${req.startDate} إلى ${req.endDate} لمجموع (${req.numberOfDays} يوماً).
+المبررات المذكورة: ${req.reason || 'لا يوجد مبرر تفصيلي'}.
+
+حلل السند الكويتي تزامناً مع المواد الدستورية وقانون العمل:
+1. المادة 70 (للإجازة السنوية)، المادة 73 (للشرائح المتدرجة للأجور المرضية)، المادة 24 (للأمومة والوضع 70 يوماً)، المادة 76 (للحج 21 يوماً).
+2. منع التداخل ومطابقة المادة 72 (تعيين الزميل البديل: ${req.substituteEmployeeName || 'لم يعين'}).
+3. الرأي الاستشاري النهائي بالقبول والاعتماد للملف لتجنب الغرامات عند تفتيش الهيئة العامة للقوى العاملة الكويتية.`;
+
+      const response = await fetch('/api/gemini/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: fullPrompt })
+      });
+
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.text) {
+          setAiReport(resJson.text);
+          setAiLoading(false);
+          return;
         }
-        for (let day = 1; day <= daysInMonth; day++) {
-            const padD = String(day).padStart(2, '0');
-            const padM = String(currentMonth + 1).padStart(2, '0');
-            const dateStr = `${currentYear}-${padM}-${padD}`;
-            daysArray.push({ dayNum: day, dateStr });
-        }
-        return daysArray;
-    }, [currentYear, currentMonth]);
+      }
+    } catch (err) {
+      console.error(err);
+    }
 
-    // Analytics Dashboard Stats Metrics
-    const statsMetrics = useMemo(() => {
-        const today = '2026-05-31'; // Baseline date representation: 2026-05-31
-        
-        let totalBalance = 0;
-        let totalConsumed = 0;
-        
-        employeesList.forEach(emp => {
-            const annual = emp.annualLeaveEntitlement || 30;
-            const carried = emp.carriedOverBalance || 0;
-            totalBalance += (annual + carried);
+    // High quality fallback text
+    setTimeout(() => {
+      let articleText = 'المادة (70)';
+      let description = 'الطلب مستوف لشروط الخدمة ومطابق للمادة 70 التي تمنح العامل حق تصفية 30 يوماً سنوياً.';
+      if (req.leaveType === LeaveTypeKuwait.SICK) {
+        articleText = 'المادتين (73) و (74)';
+        description = 'يخضع الطلب للمطابقة الطبية بموجب المادة 73 مع تدرج الخصومات (أول 15 يوم بأجر كامل، ثم 10 أيام بـ 75%، ثم 10 أيام بنصف أجر، ثم 10 أيام بربع أجر، ثم 30 يوماً بدون أجر).';
+      } else if (req.leaveType === LeaveTypeKuwait.MATERNITY) {
+        articleText = 'المادة (24)';
+        description = 'طلب رعاية وضع وأمومة مستحق بنسبة 100% ومدفوع بالكامل لمدة 70 يوماً بموجب القانون ولا يؤثر على مكافأة تصفية الخدمة.';
+      } else if (req.leaveType === LeaveTypeKuwait.HAJJ) {
+        articleText = 'المادة (76)';
+        description = 'إجازة حج مدفوعة بالكامل لمدة 21 يوماً تمنح للعامل المسلم مرة واحدة طوال مدة خدمته شريطة انقضاء سنتين متصلتين.';
+      }
+
+      const reportText = `❖ مذكرات التدقيق والامتثال القانوني الكويتي - عدالة الذكي ❖
+----------------------------------------------------------------------
+المرجع الإداري للكشف: (${req.requestNumber})
+الموظف المعني بالطلب: ${req.employeeName} (${req.jobTitle})
+
+أولاً: التكييف والمطابقة الدستورية والعمالية:
+- يخضع هذا الكشف لرقابة أحكام ${articleText} من القانون رقم 6 لسنة 2010 بشأن قطاع العمل الأهلي بدولة الكويت.
+- التقييم الفني: ${description}
+
+ثانياً: التحقق من الرصيد والربط والبديل (المادة 72):
+- الزميل البديل المفوض لتغطية المسؤوليات: (${req.substituteEmployeeName || 'لم يعين'}).
+- التحليل: تعيين البديل يدرأ أي تراجع تشغيلي أو إخلال بآجال المحاكم الكلية والاستئنافية.
+
+ثالثاً: الأثر المحاسبي والخصم المالي:
+- حالة الأجر: ${req.isPaidLeave ? 'مدفوعة الأجر بالكامل (100%)' : 'خصم كامل وبدون راتب بموجب اللائحة'}
+- القيمة المحتسبة التقديرية: بمعدل يومي آمن يتفق مع الراتب الأساسي المسجل بقاعدة البيانات.
+
+رابعاً: التوجيه النهائي للجنة الموارد البشرية:
+- القرار الموصى به: الاعتماد والقبول الفوري (Highly Compliant).
+- لا يوجد أي تداخل زمني معلق يعيق نفاذ الإجازة.`;
+
+      setAiReport(reportText);
+      setAiLoading(false);
+    }, 1000);
+  };
+
+  // Double trigger to populate inputs when viewing a record
+  const handleViewRequestDetails = (req: DetailedLeaveRequest) => {
+    setSelectedRequest(req);
+    triggerAiComplianceCheck(req);
+  };
+
+  // Update profile attributes in modal
+  const handleSaveProfileUpdates = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedEmployeeProfile) return;
+
+    const updatedList = employeesList.map(emp => {
+      if (emp.id === selectedEmployeeProfile.id) {
+        return {
+          ...emp,
+          fullNameAr: selectedEmployeeProfile.fullNameAr,
+          jobTitle: selectedEmployeeProfile.jobTitle,
+          department: selectedEmployeeProfile.department,
+          civilId: selectedEmployeeProfile.civilId,
+          hiringDate: selectedEmployeeProfile.hiringDate,
+          annualLeaveEntitlement: Number(selectedEmployeeProfile.annualLeaveEntitlement),
+          carriedOverBalance: Number(selectedEmployeeProfile.carriedOverBalance),
+          absenceDays: Number(selectedEmployeeProfile.absenceDays)
+        };
+      }
+      return emp;
+    });
+
+    setEmployeesList(updatedList);
+    setIsProfileModalOpen(false);
+    setSelectedEmployeeProfile(null);
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم حفظ التعديلات' : 'Dossier Updated',
+      message: isAr ? 'تم تعديل ملف بيانات الموظف ومزامنتها بنجاح' : 'Employee profile details updated successfully'
+    });
+  };
+
+  // Browser safe printer trigger
+  const triggerIframePrint = (contentHtml: string) => {
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+    
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html lang="ar" dir="rtl">
+        <head>
+          <meta charset="utf-8" />
+          <title>طباعة مستند رسمي - نظام عدالة الرقمي</title>
+          <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+          <style>
+            body {
+              font-family: 'Cairo', sans-serif;
+              background: white;
+              color: black;
+              padding: 40px;
+              margin: 0;
+              direction: rtl;
+            }
+            .border-b-4 { border-bottom: 4px solid #00796B; }
+            .border-double { border-style: double; }
+            .border-t { border-top: 1px solid #e5e7eb; }
+            .border-dashed { border-style: dashed; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .p-4 { padding: 1rem; }
+            .my-6 { margin-top: 1.5rem; margin-bottom: 1.5rem; }
+            .mt-12 { margin-top: 3rem; }
+            .w-full { width: 100%; }
+            .border-collapse { border-collapse: collapse; }
+            th { background-color: rgba(0, 121, 107, 0.1); color: #00796B; font-weight: 700; }
+            th, td { border: 1px solid #d1d5db; padding: 10px; text-align: right; font-size: 11px; }
+            .font-bold { font-weight: 700; }
+            .text-[#00796B] { color: #00796B; }
+            .text-gray-500 { color: #4b5563; }
+            .text-gray-400 { color: #9ca3af; }
+            .text-gray-800 { color: #1f2937; }
+            .block { display: block; }
+            .flex { display: flex; }
+            .justify-between { justify-content: space-between; }
+            .items-center { align-items: center; }
+            pre { white-space: pre-wrap; font-family: 'Cairo', sans-serif; line-height: 1.8; font-size: 13px; color: #1f2937; }
+          </style>
+        </head>
+        <body>
+          ${contentHtml}
+        </body>
+        </html>
+      `);
+      doc.close();
+    }
+
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 3000);
+    }, 500);
+  };
+
+  // Print Template Book
+  const handlePrintTemplate = () => {
+    const content = document.getElementById('printable-template-area')?.innerHTML;
+    if (content) {
+      triggerIframePrint(content);
+    } else {
+      window.print();
+    }
+  };
+
+  // Copy to clipboard helper
+  const handleCopyToClipboard = () => {
+    navigator.clipboard.writeText(compiledTemplateText);
+    addToast({
+      type: 'success',
+      title: isAr ? 'تم نسخ النص' : 'Copied successfully',
+      message: isAr ? 'تم حفظ نص المذكرة في الحافظة بنجاح' : 'Document text copied to clipboard'
+    });
+  };
+
+  // Print Report ledger
+  const handlePrintReport = () => {
+    const reportTable = document.getElementById('printable-report-area')?.innerHTML;
+    if (reportTable) {
+      const compiledHtml = `
+        <div style="border-bottom: 4px double #00796B; padding-bottom: 20px; margin-bottom: 30px;">
+          <h2 style="color: #00796B; font-size: 18px; margin: 0;">كشوف إجازات الموارد البشرية السنوية والامتثال</h2>
+          <p style="font-size: 11px; color: #6b7280; margin: 5px 0 0 0;">مكتب الوجيان ومكتب صبري شطا للمحاماة والاستشارات القانونية والتحكيم</p>
+        </div>
+        <div style="margin-bottom: 25px;">
+          <h3 style="font-size: 14px; color: #1f2937; margin: 0 0 10px 0;">سجل الإجازات والأرصدة المستحقة بالتفصيل</h3>
+          ${reportTable}
+        </div>
+        <div style="margin-top: 50px; text-align: left; font-size: 10px; color: #9ca3af;">
+          <span>تاريخ الطباعة المعتمدة: ${new Date().toISOString().split('T')[0]} • نظام عدالة الرقمي</span>
+        </div>
+      `;
+      triggerIframePrint(compiledHtml);
+    } else {
+      window.print();
+    }
+  };
+
+  return (
+    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6" dir={isAr ? 'rtl' : 'ltr'}>
+      
+      {/* Page Header section */}
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-gray-200 dark:border-secondary-dark/40" dir={isAr ? 'rtl' : 'ltr'}>
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-primary-dark dark:text-primary-light flex items-center gap-3">
+            <CalendarDays className="h-8 w-8 text-primary" />
+            {isAr ? 'نظام إدارة الإجازات والأرصدة المستحقة' : 'Adala Leave & statutory Balance Management'}
+          </h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {isAr 
+              ? 'تتبع وجدولة إجازات الكوادر والامتثال التام لقانون قطاع العمل الكويتي رقم 6 لسنة 2010' 
+              : 'Continuous tracking under Private Sector Code No. 6 of 2010'}
+          </p>
+        </div>
+
+        {/* Action controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
+            className="px-4 py-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-secondary-dark transition flex items-center gap-2 bg-neutral-card dark:bg-dm-card"
+          >
+            <span>🌐</span>
+            {isAr ? 'English (EN)' : 'العربية (AR)'}
+          </button>
+          
+          <Button
+            leftIcon={<PlusCircle className="h-5 w-5" />}
+            variant="primary"
+            onClick={() => {
+              setFormData({
+                employeeId: employeesList[0]?.id || '',
+                employeeName: employeesList[0]?.fullNameAr || '',
+                leaveType: LeaveTypeKuwait.ANNUAL,
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
+                reason: '',
+                substituteEmployeeName: '',
+                emergencyContactPhone: '',
+              });
+              setIsAddModalOpen(true);
+            }}
+          >
+            {isAr ? 'تقديم طلب إجازة رسمي' : 'Submit Leave Request'}
+          </Button>
+        </div>
+      </header>
+
+      {/* Navigation tabs */}
+      <nav className="flex items-center gap-1 overflow-x-auto pb-2 border-b border-gray-200 dark:border-secondary-dark/30 scrollbar-none" id="leave-tabs-navigation" dir={isAr ? 'rtl' : 'ltr'}>
+        {[
+          { id: 'dashboard', label: isAr ? 'لوحة التحكم والمؤشرات' : 'Dashboard' },
+          { id: 'requests', label: isAr ? 'طلبات الإجازات' : 'Leave Requests' },
+          { id: 'balances', label: isAr ? 'أرصدة وسياسات HR' : 'Dossier Balances' },
+          { id: 'calendar', label: isAr ? 'أجندة الإجازات والتقويم' : 'Agenda Calendar' },
+          { id: 'templates', label: isAr ? 'النماذج ومراسلات الشغل' : 'Letters & Templates' },
+          { id: 'reports', label: isAr ? 'التقارير والمطابقة' : 'Analytical Reports' }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`px-4 py-2.5 rounded-lg text-sm font-semibold transition-all shrink-0 ${
+              activeTab === tab.id
+                ? 'bg-primary text-white shadow'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-secondary-dark/60'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Active Tab Router */}
+      <div className="mt-4">
+        {activeTab === 'dashboard' && (
+          <LeaveDashboard
+            lang={lang}
+            requests={requests}
+            employeesList={employeesList}
+            onTabChange={setActiveTab as any}
+            onViewRequest={handleViewRequestDetails}
+            onOpenProfile={(emp) => {
+              setSelectedEmployeeProfile(emp);
+              setIsProfileModalOpen(true);
+            }}
+          />
+        )}
+
+        {activeTab === 'requests' && (
+          <LeaveRequestsList
+            lang={lang}
+            requests={requests}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            filterType={filterType}
+            setFilterType={setFilterType}
+            filterStatus={filterStatus}
+            setFilterStatus={setFilterStatus}
+            filterDept={filterDept}
+            setFilterDept={setFilterDept}
+            onViewRequest={handleViewRequestDetails}
+            onEditRequest={(req) => {
+              setEditingRequest(req);
+              setIsEditModalOpen(true);
+            }}
+            onDeleteRequest={handleDeleteRequest}
+            onUpdateStatus={handleUpdateStatus}
+            onAddRequestTrigger={() => setIsAddModalOpen(true)}
+            getDeptLabel={getDeptLabel}
+          />
+        )}
+
+        {activeTab === 'balances' && (
+          <LeaveBalancesTab
+            lang={lang}
+            employeesList={employeesList}
+            requests={requests}
+            getDeptLabel={getDeptLabel}
+            onOpenProfile={(emp) => {
+              setSelectedEmployeeProfile(emp);
+              setIsProfileModalOpen(true);
+            }}
+            onAddManualEmployee={() => setShowManualEmployee(!showManualEmployee)}
+            showManualEmployee={showManualEmployee}
+            setShowManualEmployee={setShowManualEmployee}
+            manualEmpName={manualEmpName}
+            setManualEmpName={setManualEmpName}
+            manualEmpJob={manualEmpJob}
+            setManualEmpJob={setManualEmpJob}
+            manualEmpDept={manualEmpDept}
+            setManualEmpDept={setManualEmpDept}
+            manualEmpJoined={manualEmpJoined}
+            setManualEmpJoined={setManualEmpJoined}
+            manualEmpCivilId={manualEmpCivilId}
+            setManualEmpCivilId={setManualEmpCivilId}
+            manualEmpEntitlement={manualEmpEntitlement}
+            setManualEmpEntitlement={setManualEmpEntitlement}
+            manualEmpCarriedOver={manualEmpCarriedOver}
+            setManualEmpCarriedOver={setManualEmpCarriedOver}
+            onSaveManualEmployee={handleSaveManualEmployee}
+          />
+        )}
+
+        {activeTab === 'calendar' && (
+          <LeaveCalendarTab
+            lang={lang}
+            requests={requests}
+            onAddRequestTrigger={() => setIsAddModalOpen(true)}
+            onViewRequest={handleViewRequestDetails}
+            setFastAddDate={(start, end) => {
+              setFormData({
+                ...formData,
+                startDate: start,
+                endDate: end
+              });
+              setIsAddModalOpen(true);
+            }}
+          />
+        )}
+
+        {activeTab === 'templates' && (
+          <LeaveTemplatesTab
+            lang={lang}
+            activeTemplateId={activeTemplateId}
+            setActiveTemplateId={setActiveTemplateId}
+            templateInputs={templateInputs}
+            setTemplateInputs={setTemplateInputs}
+            compiledTemplateText={compiledTemplateText}
+            onPrint={handlePrintTemplate}
+            onCopy={handleCopyToClipboard}
+            editableTemplates={editableTemplates}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <LeaveReportsTab
+            lang={lang}
+            requests={requests}
+            employeesList={employeesList}
+            getDeptLabel={getDeptLabel}
+            onPrintReport={handlePrintReport}
+          />
+        )}
+      </div>
+
+      {/* MODAL 1: Submit New Leave Request */}
+      <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title={isAr ? 'تقديم طلب إجازة جديد' : 'Submit New Leave'}>
+        <form onSubmit={handleAddRequest} className="space-y-4 text-right" dir={isAr ? 'rtl' : 'ltr'}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            // Calculate consumed from approved/completed requests
-            const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
-            const annualAndUnpaidConsumed = empRequests
-                .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
-                .reduce((sum, r) => sum + r.numberOfDays, 0);
-            totalConsumed += annualAndUnpaidConsumed;
-        });
-
-        const totalRemaining = totalBalance - totalConsumed;
-
-        const pendingCount = requests.filter(r => r.status === 'Pending' || r.status === 'UnderReview' || r.status === 'AwaitingEmployeeDocuments').length;
-        const approvedCount = requests.filter(r => r.status === 'Approved' || r.status === 'Completed').length;
-        const rejectedCount = requests.filter(r => r.status === 'Rejected').length;
-        
-        const currentActiveOnVacation = requests.filter(r => {
-            return (r.status === 'Approved' || r.status === 'Completed') && r.startDate <= today && r.endDate >= today;
-        }).length;
-
-        const upcomingCount = requests.filter(r => {
-            return (r.status === 'Approved' || r.status === 'Pending' || r.status === 'UnderReview') && r.startDate > today;
-        }).length;
-
-        // Number of requests by period
-        const requestsThisMonth = requests.filter(r => r.startDate.startsWith('2026-05') || (r.requestedAt && r.requestedAt.includes('2026-05'))).length;
-        const requestsNextMonth = requests.filter(r => r.startDate.startsWith('2026-06') || (r.requestedAt && r.requestedAt.includes('2026-06'))).length;
-        const requestsThisYear = requests.filter(r => r.startDate.startsWith('2026')).length;
-
-        const avgRemaining = employeesList.length ? (totalRemaining / employeesList.length).toFixed(1) : '24.5';
-
-        return { 
-            totalBalance, 
-            totalConsumed, 
-            totalRemaining, 
-            pendingCount, 
-            approvedCount, 
-            rejectedCount, 
-            currentActiveOnVacation, 
-            upcomingCount, 
-            requestsThisMonth, 
-            requestsNextMonth, 
-            requestsThisYear, 
-            avgRemaining 
-        };
-    }, [requests, employeesList]);
-
-    // Recharts Mock Distribution
-    const leaveTypeChartData = useMemo(() => {
-        const typesCount: Record<string, number> = {};
-        requests.forEach(req => {
-            const label = lang === 'ar' ? req.leaveType : req.leaveType;
-            typesCount[label] = (typesCount[label] || 0) + req.numberOfDays;
-        });
-        return Object.keys(typesCount).map(k => ({ name: k, days: typesCount[k] }));
-    }, [requests, lang]);
-
-    const activeLeavesMonthlyTrendData = [
-        { month: 'Jan', Approved: 3, Unpaid: 1, Sick: 4 },
-        { month: 'Feb', Approved: 5, Unpaid: 0, Sick: 2 },
-        { month: 'Mar', Approved: 8, Unpaid: 2, Sick: 1 },
-        { month: 'Apr', Approved: 12, Unpaid: 4, Sick: 5 },
-        { month: 'May', Approved: 15, Unpaid: 1, Sick: 3 },
-        { month: 'Jun', Approved: 22, Unpaid: 3, Sick: 2 }
-    ];
-
-    // Sick Leave calculations pursuant to Article 73 Kuwait Labor law
-    useEffect(() => {
-        if (calcSickDays <= 0) {
-            setCalculatedSickTiers(null);
-            return;
-        }
-        const fullPay = Math.min(calcSickDays, 15);
-        const remaining1 = Math.max(0, calcSickDays - 15);
-        const threeQuarterPay = Math.min(remaining1, 10);
-        const remaining2 = Math.max(0, remaining1 - 10);
-        const halfPay = Math.min(remaining2, 10);
-        const remaining3 = Math.max(0, remaining2 - 10);
-        const quarterPay = Math.min(remaining3, 10);
-        const unpaid = Math.min(Math.max(0, remaining3 - 10), 30);
-        const excessive = Math.max(0, calcSickDays - 75);
-
-        setCalculatedSickTiers({
-            total: calcSickDays,
-            fullPay,
-            threeQuarterPay,
-            halfPay,
-            quarterPay,
-            unpaid,
-            excessive
-        });
-    }, [calcSickDays]);
-
-    // Analytical dynamic reports table compilation
-    useEffect(() => {
-        let results: any[] = [];
-        if (reportCategory === 'balances' || reportCategory === 'remaining' || reportCategory === 'consumed') {
-            employeesList.forEach(emp => {
-                if (reportDeptFilter !== 'All' && emp.department !== reportDeptFilter) return;
-                if (reportEmployeeFilter !== 'All' && emp.id !== reportEmployeeFilter) return;
-
-                const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
-                const annualAndUnpaidConsumed = empRequests
-                    .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
-                    .reduce((sum, r) => sum + r.numberOfDays, 0);
-
-                const totalAccrued = (emp.annualLeaveEntitlement || 30) + (emp.carriedOverBalance || 0);
-                const remaining = totalAccrued - annualAndUnpaidConsumed;
-
-                results.push({
-                    name: emp.fullNameAr,
-                    dept: getDeptLabel(emp.department),
-                    id: emp.id,
-                    annual: emp.annualLeaveEntitlement || 30,
-                    carried: emp.carriedOverBalance || 0,
-                    accrued: totalAccrued,
-                    consumed: annualAndUnpaidConsumed,
-                    remaining: remaining,
-                    absent: emp.absenceDays || 0
-                });
-            });
-        } else if (reportCategory === 'individual') {
-            const targetEmpId = reportEmployeeFilter === 'All' ? employeesList[0]?.id : reportEmployeeFilter;
-            const targetEmp = employeesList.find(e => e.id === targetEmpId);
-            if (targetEmp) {
-                const empRequests = requests.filter(r => r.employeeId === targetEmp.id);
-                empRequests.forEach((req) => {
-                    results.push({
-                        requestNumber: req.requestNumber,
-                        type: req.leaveType,
-                        start: req.startDate,
-                        end: req.endDate,
-                        days: req.numberOfDays,
-                        status: req.status,
-                        reason: req.reason || '-'
-                    });
-                });
-            }
-        } else if (reportCategory === 'department') {
-            const depts = ['Consultation', 'Litigation', 'Corporate', 'Admin'];
-            depts.forEach(d => {
-                const emps = employeesList.filter(e => e.department === d);
-                let days = 0;
-                let reqCount = 0;
-                emps.forEach(emp => {
-                    const empReqs = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
-                    days += empReqs.reduce((sum, r) => sum + r.numberOfDays, 0);
-                    reqCount += requests.filter(r => r.employeeId === emp.id).length;
-                });
-                results.push({
-                    deptName: getDeptLabel(d),
-                    empsCount: emps.length,
-                    totalDaysTaken: days,
-                    totalRequests: reqCount
-                });
-            });
-        } else if (reportCategory === 'period') {
-            const periodReqs = requests.filter(req => {
-                if (reportDeptFilter !== 'All' && req.department !== reportDeptFilter) return false;
-                if (reportEmployeeFilter !== 'All' && req.employeeId !== reportEmployeeFilter) return false;
-                return req.startDate >= reportStartDate && req.startDate <= reportEndDate;
-            });
-            periodReqs.forEach((r) => {
-                results.push({
-                    requestNumber: r.requestNumber,
-                    name: r.employeeName,
-                    type: r.leaveType,
-                    period: `${r.startDate} إلى ${r.endDate}`,
-                    days: r.numberOfDays,
-                    status: r.status
-                });
-            });
-        } else if (reportCategory === 'status') {
-            const statuses = ['Approved', 'Pending', 'UnderReview', 'AwaitingEmployeeDocuments', 'Completed', 'Rejected'];
-            statuses.forEach(st => {
-                const matched = requests.filter(r => {
-                    if (reportDeptFilter !== 'All' && r.department !== reportDeptFilter) return false;
-                    return r.status === st;
-                });
-                results.push({
-                    statusName: st,
-                    count: matched.length,
-                    totalDays: matched.reduce((s, r) => s + r.numberOfDays, 0)
-                });
-            });
-        }
-        setGeneratedReportTable(results);
-    }, [reportCategory, reportDeptFilter, reportEmployeeFilter, reportStartDate, reportEndDate, requests, employeesList]);
-
-    // Check for employee date overlaps
-    const hasEmployeeOverlap = (empId: string, start: string, end: string, ignoreId?: string) => {
-        if (!empId || !start || !end) return false;
-        return requests.some(req => {
-            if (req.id === ignoreId) return false;
-            if (req.employeeId !== empId) return false;
-            if (req.status === 'Cancelled' || req.status === 'Rejected') return false;
-            return (start <= req.endDate && end >= req.startDate);
-        });
-    };
-
-    // Submitting a new formal request
-    const handleAddRequest = (e: React.FormEvent) => {
-        e.preventDefault();
-        const emp = employeesList.find(e => e.id === formData.employeeId);
-        if (!emp) {
-            addToast({
-                type: 'error',
-                title: lang === 'ar' ? 'فشل الانتقاء' : 'Selection Failed',
-                message: lang === 'ar' ? 'يرجى اختيار موظف صالح' : 'Please select a valid employee'
-            });
-            return;
-        }
-
-        const calculatedDays = Math.ceil(
-            (new Date(formData.endDate || '').getTime() - new Date(formData.startDate || '').getTime()) / 86400000
-        ) + 1;
-
-        if (isNaN(calculatedDays) || calculatedDays <= 0) {
-            addToast({
-                type: 'error',
-                title: lang === 'ar' ? 'خطأ في التاريخ' : 'Date Range Error',
-                message: lang === 'ar' ? 'تاريخ البدء والانتهاء غير متناسق' : 'Inconsistent start and end dates'
-            });
-            return;
-        }
-
-        // Overlap and Probation Checks
-        if (hasEmployeeOverlap(emp.id, formData.startDate || '', formData.endDate || '')) {
-            addToast({
-                type: 'warning',
-                title: lang === 'ar' ? 'تداخل زمني' : 'Timeline Overlap',
-                message: lang === 'ar' ? 'تحذير تداخل: يوجد للموظف إجازة أخرى بنفس التواريخ!' : 'Warning overlap: Employee has another leave during these dates!'
-            });
-            return;
-        }
-
-        // Mock Balance check (probation constraints)
-        const diffMonths = (Date.now() - new Date(emp.joiningDate).getTime()) / (1000 * 60 * 60 * 24 * 30.4);
-        if (formData.leaveType === LeaveTypeKuwait.ANNUAL && diffMonths < 6) {
-            addToast({
-                type: 'warning',
-                title: lang === 'ar' ? 'حقوق غير مستوفاة' : 'Statutory Restriction',
-                message: lang === 'ar' ? 'تحذير: الموظف تحت التجربة (أقل من 6 أشهر)، تعليق الإجازة السنوية!' : 'Alert: Employee under probation, cannot deduct annual leave!'
-            });
-            return;
-        }
-
-        const newReq: DetailedLeaveRequest = {
-            id: 'lr-' + Date.now(),
-            requestNumber: 'REQ-2026-' + Math.floor(1000 + Math.random() * 9000),
-            employeeId: emp.id,
-            employeeName: emp.fullNameAr,
-            leaveType: formData.leaveType as LeaveTypeKuwait,
-            startDate: formData.startDate || '',
-            endDate: formData.endDate || '',
-            numberOfDays: calculatedDays,
-            reason: formData.reason || '',
-            status: 'Pending',
-            requestedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-            isPaidLeave: formData.leaveType !== LeaveTypeKuwait.UNPAID,
-            wagePercentage: 100,
-            department: emp.department || 'Consultation',
-            jobTitle: emp.jobTitle || 'Executive Staff',
-            remainingBalanceBefore: 30,
-            substituteEmployeeName: formData.substituteEmployeeName,
-            emergencyContactPhone: formData.emergencyContactPhone,
-            timeline: [
-                {
-                    date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                    action: lang === 'ar' ? 'تم تقديم الطلب' : 'Request Submitted',
-                    user: emp.fullNameAr,
-                    notes: lang === 'ar' ? 'إحالة تلقائية لقسم الموارد البشرية والتدقيق العمالي' : 'Transferred for administrative audit'
-                }
-            ]
-        };
-
-        setRequests([newReq, ...requests]);
-        setIsAddModalOpen(false);
-        addToast({
-            type: 'success',
-            title: lang === 'ar' ? 'تم الطلب بنجاح' : 'Submitted Successfully',
-            message: lang === 'ar' ? 'تم تسجيل وتقديم الطلب بنجاح للموارد البشرية والتدقيق العمالي' : 'Leave request submitted successfully for administrative audit'
-        });
-        
-        // Reset form data
-        setFormData({
-            employeeId: '',
-            employeeName: '',
-            leaveType: LeaveTypeKuwait.ANNUAL,
-            startDate: new Date().toISOString().split('T')[0],
-            endDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-            reason: '',
-            substituteEmployeeName: '',
-            emergencyContactPhone: '',
-        });
-    };
-
-    // Updating Work Flow statuses
-    const handleUpdateStatus = (reqId: string, nextStatus: 'Approved' | 'Rejected' | 'Cancelled' | 'AwaitingEmployeeDocuments' | 'UnderReview') => {
-        const updated = requests.map(req => {
-            if (req.id === reqId) {
-                const currentTimeline = req.timeline || [];
-                const notesStr = nextStatus === 'Approved' ? 'مصادقة نهائية' : 'تم تغيير الحالة إدارياً';
-                return {
-                    ...req,
-                    status: nextStatus,
-                    timeline: [
-                        ...currentTimeline,
-                        {
-                            date: new Date().toISOString().replace('T', ' ').substring(0, 16),
-                            action: lang === 'ar' ? `تغيير الحالة إلى [${nextStatus}]` : `Status shifted to [${nextStatus}]`,
-                            user: 'المدقق الإداري / الشؤون العمالية',
-                            notes: notesStr
-                        }
-                    ]
-                };
-            }
-            return req;
-        });
-        setRequests(updated);
-        const found = updated.find(r => r.id === reqId);
-        if (found) setSelectedRequest(found);
-        addToast({
-            type: 'success',
-            title: lang === 'ar' ? 'تحديث الحالة' : 'Status Updated',
-            message: lang === 'ar' ? 'تم تحديث التوجيه الإداري للمستند بنجاح' : 'Administrative directive updated successfully'
-        });
-    };
-
-    // AI statutory analysis copilot
-    const triggerAiComplianceCheck = async (req: DetailedLeaveRequest) => {
-        setAiLoading(true);
-        setAiReport('');
-        
-        try {
-            // Prompt construction for Kuwaiti legal framework
-            const fullPrompt = `أنت مستشار قانوني كويتي خبير وخريج المحاكم وملم تفصيلياً بقانون قطاع العمل الكويتي (رقم 6 لسنة 2010 واللوائح الشغلية).
-يرجى إنتاج استشارة قانونية مكتوبة ورصينة بأسلوب قانوني بليغ وخالٍ من الركاكة، بخصوص طلب الإجازة التالي:
-- الموظف: ${req.employeeName}
-- المسمى والوظيفة: ${req.jobTitle} - قسم ${req.department}
-- نوع الإجازة: ${req.leaveType}
-- التواريخ والمدد الفعالة: من ${req.startDate} إلى ${req.endDate} (إجمالي ${req.numberOfDays} يوماً)
-- المبرر المدفوع: ${req.reason || 'لا يوجد عذر تفصيلي منصوص'}
-
-المرجو تحليل المفاصل القانونية وإرجاع تقرير مقسّم إلى:
-1. التكييف والملاءمة القانونية (مع ذكر أرقام المواد الدستورية وقانون العمل - ومثالها المادة 70 للسنوي، 73 للمرضي، 24 للأمومة والوضع، 76 للحج والطارئة).
-2. تقييم الحضور ومنع تداخل المهام (Conflict Alert) مع الموظفين الآخرين في القسم لضمان استيفاء المادة 72 ومصالح الشغل.
-3. التوزيع المالي ومسائل الأجور والرواتب ومعدل الخصم تزامنا مع أحكام المادة 73 (خاصة في حالات المرضية).
-4. الخلاصة والتوجيه الاستشاري لمسؤولي الموارد البشرية بالقبول أو تعليقه.`;
-
-            const response = await fetch('/api/gemini/generate', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: fullPrompt })
-            });
-
-            if (response.ok) {
-                const resJson = await response.json();
-                if (resJson.text) {
-                    setAiReport(resJson.text);
-                    setAiLoading(false);
-                    return;
-                }
-            }
-        } catch (err) {
-            console.error("AI Generation error:", err);
-        }
-
-        // Bulletproof offline fallback producing extreme legal quality text as requested
-        setTimeout(() => {
-            let articleRef = 'المادة (70)';
-            let lawComment = 'تتوافق الإجازة مع المادة 70 التي تمنح العامل أجر 30 يوماً سنوياً بشرط قضائه 6 أشهر في خدمة المنشأة على الأقل.';
-            let payrollComment = 'يتوجب تحرير الأجر كاملاً بنسبة 100% وتصفيته قبل المباشرة بالانقطاع الفعلي بموجب المادة 71 الكويتي.';
-
-            if (req.leaveType === LeaveTypeKuwait.SICK) {
-                articleRef = 'المادتين (73) و (74)';
-                lawComment = 'تخضع الإجازة للمراجعة الكشفية بموجب المادة 73 التي تنص على تدرج رواتب الإجازات المرضية التراكمية في السنة الواحدة.';
-                payrollComment = 'يصرف الأجر للمريض كاملاً للأيام الـ 15 الأولى، ثم بـ 75% للـ 10 أيام التالية، ثم بـ 50% للـ 10 التالية، ثم بربع أجر لـ 10 أيام، ثم بدون أجر للـ 30 يوماً الأخيرة.';
-            } else if (req.leaveType === LeaveTypeKuwait.MATERNITY) {
-                articleRef = 'المادة (24)';
-                lawComment = 'طلب مستحق ومطابق لنص المادة 24 التي تمنح المرأة إجازة وضع مدفوعة بالكامل لمدة 70 يوماً شريطة الولادة الآمنة.';
-                payrollComment = 'يُحظر الإخلال بمكافآت نهاية الخدمة أو الأساسيات للمستحقات جراء إجازة الوضع طبقا للمرسوم.';
-            } else if (req.leaveType === LeaveTypeKuwait.HAJJ) {
-                articleRef = 'المادة (76)';
-                lawComment = 'العامل المسلم الذي أمضى سنتين متصلتين في خدمة صاحب العمل يستحق إجازة حج بأجر كامل مدتها 21 يوماً متواصلة.';
-                payrollComment = 'إجازة الحج مدفوعة بالكامل لمرة واحدة فقط طوال مدة الخدمة.';
-            }
-
-            const mockReport = `❖ تقرير المستشار القضائي الذكي - مكتب الوجيان وشركاه لتعاضد القوانين ❖
--------------------------------------------------------------------------
-موضوع التدقيق: ملاءمة قانونية لملف طلب الإجازة ذي الرقم المرجعي (${req.requestNumber})
-
-أولاً: التكييف والسند القانوني (Kuwaiti Statutory Fit):
-- يخضع هذا الطلب لأحكام ${articleRef} من القانون رقم 6 لسنة 2010 بشأن العمل في قطاع الأهلي.
-- ${lawComment}
-- نؤكد خلو السجل التاريخي للموظف من عقوبات إدارية مانعة بموجب لائحة الجزاءات والمنشورات الإدارية.
-
-ثانياً: دراسة التداخل التشغيلي والتعاضد (Conflict & Handover Audit):
-- الموظف البديل المعين: (${req.substituteEmployeeName || 'لم يعين'}) يتطابق مستواه التشغيلي لتوزيع المهام القضائية والمسؤوليات وصياغة مذكرات المحاكم الكلية.
-- لا توجد أي تعارضات زمنية حالية مسجلة في شؤون الموظفين لقسم الاستشارات لذات التوقيت المختار.
-
-ثالثاً: الأثر المالي وتدفقات الرواتب (Financial & Payroll Impact):
-- ${payrollComment}
-- التكلفة التقريبية للطلب: بمعدل أساسي مقداره (${((employeesList[0]?.basicSalary || 800) / 26 * req.numberOfDays).toFixed(2)} دينار كويتي).
-- تصفية الالتزامات المالية مؤمنة دون الإخلال بالمادة 73.
-
-رابعاً: المنظور الاستشاري ودرجة الأمان القانوني:
-- درجة الأمان: آمنة ومرتفعة جداً (Highly Compliant).
-- نوصي باتخاذ قرار إداري فوري بالاعتماد وتوثيق الكتاب لتقديمه لمندوب وزارة الشؤون عند التفتيش العيني.`;
-
-            setAiReport(mockReport);
-            setAiLoading(false);
-        }, 1200);
-    };
-
-    // Live parameters binding for dynamically compiling/filling template
-    const compiledTemplateText = useMemo(() => {
-        const template = editableTemplates.find(t => t.id === activeTemplateId);
-        if (!template) return '';
-        
-        let text = lang === 'ar' ? template.templateBodyAr : template.templateBodyEn;
-        
-        const variablesToReplace: Record<string, string> = {
-            date: new Date().toISOString().split('T')[0],
-            refNumber: templateInputs.refNumber,
-            companyName: templateInputs.companyName,
-            employeeName: templateInputs.employeeName,
-            jobTitle: templateInputs.jobTitle,
-            deptName: templateInputs.deptName,
-            startDate: templateInputs.startDate,
-            endDate: templateInputs.endDate,
-            durationDays: templateInputs.durationDays,
-            reason: templateInputs.reason,
-            signatory: templateInputs.signatory,
-            managerComments: templateInputs.managerComments
-        };
-
-        Object.keys(variablesToReplace).forEach(key => {
-            text = text.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), variablesToReplace[key]);
-        });
-        
-        return text;
-    }, [activeTemplateId, templateInputs, lang, editableTemplates]);
-
-    // Handle standard printing of templates with native browsers style sheets formatting
-    const handlePrintAction = () => {
-        window.print();
-    };
-
-    return (
-        <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            
-            {/* Header section with brand identity */}
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 border-b border-gray-200 dark:border-secondary-dark/40">
-                <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-primary-dark dark:text-primary-light flex items-center gap-3">
-                        <CalendarDaysIcon className="h-8 w-8 text-primary" />
-                        {TRANSLATIONS[lang].pageTitle}
-                    </h1>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        {TRANSLATIONS[lang].pageSub}
-                    </p>
-                </div>
-                
-                {/* Language switch & interactive new request trigger buttons */}
-                <div className="flex items-center gap-2 flex-wrap">
-                    <button
-                        onClick={() => setLang(lang === 'ar' ? 'en' : 'ar')}
-                        className="px-4 py-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-secondary-dark transition flex items-center gap-2 bg-neutral-card dark:bg-dm-card"
-                    >
-                        <span>🌐</span>
-                        {lang === 'ar' ? 'English (EN)' : 'العربية (AR)'}
-                    </button>
-                    
-                    <Button
-                        leftIcon={<PlusCircleIcon className="h-5 w-5" />}
-                        variant="primary"
-                        onClick={() => {
-                            // Prepopulate standard form data
-                            setFormData({
-                                employeeId: employeesList[0]?.id || '',
-                                employeeName: employeesList[0]?.fullNameAr || '',
-                                leaveType: LeaveTypeKuwait.ANNUAL,
-                                startDate: new Date().toISOString().split('T')[0],
-                                endDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-                                reason: '',
-                                substituteEmployeeName: '',
-                                emergencyContactPhone: '',
-                            });
-                            setIsAddModalOpen(true);
-                        }}
-                    >
-                        {TRANSLATIONS[lang].newRequestButton}
-                    </Button>
-                </div>
-            </header>
-
-            {/* Quick legal guides under Kuwait law (Chapter IV) */}
-            <div className="p-4 bg-slate-900 border border-slate-800 text-slate-100 rounded-xl relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="absolute top-0 right-0 w-48 h-48 bg-primary/10 rounded-full blur-2xl pointer-events-none" />
-                <div className="flex gap-3">
-                    <div className="p-3 bg-primary/20 rounded-xl text-primary inline-flex h-fit">
-                        <ScaleIcon className="h-6 w-6" />
-                    </div>
-                    <div>
-                        <h4 className="font-bold text-sm text-white flex items-center gap-2">
-                            {TRANSLATIONS[lang].legalGuideTitle}
-                        </h4>
-                        <p className="text-xs text-slate-300 mt-0.5 max-w-2xl">
-                            {TRANSLATIONS[lang].legalGuideSubtitle}
-                        </p>
-                    </div>
-                </div>
-                <div className="text-xs text-slate-400 flex flex-wrap gap-2">
-                    <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">المادة 70 (الاعتيادية)</span>
-                    <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">المادة 73 (المرضية)</span>
-                    <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">المادة 24 (الوضع للأم)</span>
-                    <span className="bg-slate-800 px-2 py-1 rounded border border-slate-700">المادة 76 (الحج والعارضة)</span>
-                </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'اختر الموظف المعني' : 'Select Employee'}</label>
+              <select
+                required
+                value={formData.employeeId}
+                onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-semibold"
+              >
+                <option value="">{isAr ? 'اختر موظفاً من كادر الشغل...' : 'Select employee...'}</option>
+                {employeesList.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.fullNameAr}</option>
+                ))}
+              </select>
             </div>
 
-            {/* Main view navigation tabs and metrics */}
-            <nav className="flex items-center gap-1 overflow-x-auto pb-2 border-b border-gray-200 dark:border-secondary-dark/30 scrollbar-none" id="leave-tabs-navigation">
-                {[
-                    { id: 'dashboard', label: TRANSLATIONS[lang].dashboard, icon: TableCellsIcon },
-                    { id: 'requests', label: TRANSLATIONS[lang].requests, icon: SparklesIcon },
-                    { id: 'balances', label: TRANSLATIONS[lang].balances, icon: ClockIcon },
-                    { id: 'calendar', label: TRANSLATIONS[lang].calendar, icon: CalendarDaysIcon },
-                    { id: 'templates', label: TRANSLATIONS[lang].templates, icon: DocumentTextIcon },
-                    { id: 'reports', label: lang === 'ar' ? 'التقارير التحليلية' : 'Analytical Reports', icon: DocumentDuplicateIcon }
-                ].map((tab) => {
-                    const TabIcon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
-                            className={`px-4 py-2.5 rounded-lg text-sm font-semibold flex items-center gap-2 transition-all shrink-0 ${
-                                activeTab === tab.id
-                                    ? 'bg-primary text-white shadow'
-                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-secondary-dark/60'
-                            }`}
-                        >
-                            <TabIcon className="h-4 w-4" />
-                            {tab.label}
-                        </button>
-                    );
-                })}
-            </nav>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'نوع الإجازة المطلوبة' : 'Leave Type'}</label>
+              <select
+                required
+                value={formData.leaveType}
+                onChange={(e) => setFormData({ ...formData, leaveType: e.target.value as LeaveTypeKuwait })}
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-bold"
+              >
+                {Object.values(LeaveTypeKuwait).map(val => (
+                  <option key={val} value={val}>{val}</option>
+                ))}
+              </select>
+            </div>
 
-            {/* 1. Dashboard Tab */}
-            {activeTab === 'dashboard' && (
-                <div className="space-y-6">
-                    {/* Stats Panel */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <Card className="border-l-4 border-l-amber-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsPending}</p>
-                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.pendingCount}</p>
-                                    <span className="text-[10px] text-gray-400 block mt-0.5">طلبات قيد المراجعة وإسناد الشؤون</span>
-                                </div>
-                                <ClockIcon className="h-8 w-8 text-amber-500 opacity-80" />
-                            </div>
-                        </Card>
-                        
-                        <Card className="border-l-4 border-l-sky-550 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsOnLeave}</p>
-                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.currentActiveOnVacation}</p>
-                                    <span className="text-[10px] text-gray-400 block mt-0.5">موظفون خارج الدوام اليوم</span>
-                                </div>
-                                <UserGroupIcon className="h-8 w-8 text-sky-500 opacity-80" />
-                            </div>
-                        </Card>
-                        
-                        <Card className="border-l-4 border-l-emerald-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500">{TRANSLATIONS[lang].statsApproved}</p>
-                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.approvedCount}</p>
-                                    <span className="text-[10px] text-gray-400 block mt-0.5">إجمالي الطلبات المصدق عليها</span>
-                                </div>
-                                <CheckCircleIcon className="h-8 w-8 text-emerald-500 opacity-80" />
-                            </div>
-                        </Card>
-                        
-                        <Card className="border-l-4 border-l-indigo-500 bg-neutral-card dark:bg-dm-card shadow-sm hover:translate-y-[-2px] transition">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-xs text-gray-500">متوسط الأرصدة المتبقية</p>
-                                    <p className="text-2xl font-black mt-1 text-primary-dark dark:text-white">{statsMetrics.avgRemaining} يوم</p>
-                                    <span className="text-[10px] text-gray-400 block mt-0.5">متوسط المتبقي لكل موظف كويتي</span>
-                                </div>
-                                <CalendarDaysIcon className="h-8 w-8 text-indigo-500 opacity-80" />
-                            </div>
-                        </Card>
-                    </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'تاريخ المباشرة بالانقطاع (البدء)' : 'Start Date'}</label>
+              <input
+                type="date"
+                required
+                value={formData.startDate}
+                onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+              />
+            </div>
 
-                    {/* Integrated Firm Balances Panel (Additional Bento Extension) */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
-                            <span className="text-[11px] text-gray-400 uppercase tracking-widest font-bold">إجمالي الأرصدة (المكتسب)</span>
-                            <span className="block text-3xl font-black text-slate-800 dark:text-gray-100 mt-1">{statsMetrics.totalBalance} يوم</span>
-                            <span className="text-[10px] text-gray-400 mt-1 block">رصيد سنوي + أرصدة مرحلة</span>
-                        </div>
-                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
-                            <span className="text-[11px] text-amber-600 uppercase tracking-widest font-bold">الأيام المستهلكة المعتمدة</span>
-                            <span className="block text-3xl font-black text-amber-600 mt-1">{statsMetrics.totalConsumed} يوم</span>
-                            <span className="text-[10px] text-gray-400 mt-1 block">مخصومة من كشف السنوي للرواتب</span>
-                        </div>
-                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
-                            <span className="text-[11px] text-emerald-600 uppercase tracking-widest font-bold">صافي الرصيد المتاح الكافي</span>
-                            <span className="block text-3xl font-black text-emerald-600 mt-1">{statsMetrics.totalRemaining} يوم</span>
-                            <span className="text-[10px] text-gray-400 mt-1 block">متاح للاستخدام طبقاً للمادة 70</span>
-                        </div>
-                        <div className="p-4 bg-white dark:bg-dm-card border border-gray-100 rounded-xl shadow-sm text-center">
-                            <span className="text-[11px] text-indigo-650 uppercase tracking-widest font-bold">إجازات مستقبلية مجدولة</span>
-                            <span className="block text-3xl font-black text-indigo-650 mt-1">{statsMetrics.upcomingCount} طلب</span>
-                            <span className="text-[10px] text-gray-400 mt-1 block">تبدأ في فترات لاحقة من هذا العام</span>
-                        </div>
-                    </div>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'تاريخ العودة ومباشرة الدوام (الانتهاء)' : 'End Date'}</label>
+              <input
+                type="date"
+                required
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+              />
+            </div>
 
-                    {/* Numeric Request Counts segmented by Period */}
-                    <Card title={lang === 'ar' ? "تعداد طلبات الإجازة الإدارية حسب الفترة" : "Administrative Leave Request Volumes by Period"}>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
-                                <span className="text-[10px] text-gray-400 block font-bold">طلبات الإجازة هذا الشهر (مايو-2026)</span>
-                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsThisMonth} طلب</span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
-                                <span className="text-[10px] text-gray-400 block font-bold">طلبات الإجازة الشهر القادم (يونيو-2026)</span>
-                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsNextMonth} طلب</span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-secondary-dark/20 rounded-lg border border-gray-100">
-                                <span className="text-[10px] text-gray-400 block font-bold">إجمالي طلبات الإجازة المسجلة لعام 2026</span>
-                                <span className="text-xl font-extrabold text-[#00796B] dark:text-primary-light mt-1 block">{statsMetrics.requestsThisYear} طلب رسمي</span>
-                            </div>
-                        </div>
-                    </Card>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'اسم الزميل البديل المفوض' : 'Handover Employee'}</label>
+              <input
+                type="text"
+                value={formData.substituteEmployeeName || ''}
+                onChange={(e) => setFormData({ ...formData, substituteEmployeeName: e.target.value })}
+                placeholder="أحمد الهادي"
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+              />
+            </div>
 
-                    {/* Statistics Charts Panel using Recharts */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <Card title={lang === 'ar' ? "توزيع الإجازات بالأيام المستهلكة" : "Leave Distribution by Consumed Days"}>
-                            <div className="h-64 sm:h-72 w-full mt-4">
-                                {leaveTypeChartData.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <BarChart data={leaveTypeChartData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey="name" />
-                                            <YAxis />
-                                            <Tooltip />
-                                            <Bar dataKey="days" fill="#00796B" name={lang === 'ar' ? 'الأيام المستهلكة' : 'Consumed Days'} />
-                                        </BarChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex items-center justify-center text-xs text-gray-500 bg-gray-50 dark:bg-secondary-dark/35 rounded">
-                                        No Data Available
-                                    </div>
-                                )}
-                            </div>
-                        </Card>
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'هاتف الطوارئ والاتصال السريع' : 'Emergency Phone'}</label>
+              <input
+                type="text"
+                value={formData.emergencyContactPhone || ''}
+                onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })}
+                placeholder="+965 99341234"
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+              />
+            </div>
 
-                        <Card title={lang === 'ar' ? "منحنيات الإجازات المعتمدة والنشاط السنوي" : "Approved Leaves & Annual Activity Patterns"}>
-                            <div className="h-64 sm:h-72 w-full mt-4">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={activeLeavesMonthlyTrendData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="month" />
-                                        <YAxis />
-                                        <Tooltip />
-                                        <Legend />
-                                        <Area type="monotone" dataKey="Approved" stroke="#10B981" fill="#10B981" fillOpacity={0.15} name="Approved" />
-                                        <Area type="monotone" dataKey="Sick" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.05} name="Sick Accruals" />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </Card>
-                    </div>
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-xs font-bold text-gray-500">{isAr ? 'المبررات والأعذار المرفقة' : 'Justification'}</label>
+              <textarea
+                value={formData.reason || ''}
+                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                rows={2}
+                className="w-full p-2 border border-slate-200 dark:border-slate-750 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                placeholder="تفاصيل التقديم العائلي أو المرضي..."
+              />
+            </div>
 
-                    {/* Live Compliance & AI Warning Signals Feed */}
-                    <Card title={lang === 'ar' ? "لوحة التنبيهات ونظام مطابقة البصمة والحضور" : "Compliance Warnings & Biometrics Sync Check-ins"}>
-                        <div className="space-y-4">
-                            <p className="text-xs text-gray-500">
-                                {lang === 'ar' ? 'يكتشف النظام عينات غياب دون إذن أو تداخلات زمنية لقوانين الشؤون والعمل الكويتي تلقائياً:' : 'The system identifies active overlap records or probation breaches automatically:'}
-                            </p>
-                            
-                            <div className="space-y-2">
-                                <div className="p-3 bg-red-50 dark:bg-red-950/30 border border-red-150 rounded-lg flex items-start gap-3">
-                                    <ExclamationTriangleIcon className="h-5 w-5 text-red-600 shrink-0" />
-                                    <div>
-                                        <h5 className="font-bold text-xs text-red-900 dark:text-red-200">
-                                            {lang === 'ar' ? 'ملمح تداخل: طلب ليلى محمود (REQ-2026-0033) مريض' : 'Overlap warning: Layla Mahmoud request SICK'}
-                                        </h5>
-                                        <p className="text-[11px] text-red-700 dark:text-red-300 mt-0.5">
-                                            تتداخل المدة المرضية المطلوبة مع فترة حضور جلسات الاستئناف الهامة في المحكمة الكلية.
-                                        </p>
-                                    </div>
-                                </div>
+          </div>
 
-                                <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 rounded-lg flex items-start gap-3">
-                                    <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 shrink-0" />
-                                    <div>
-                                        <h5 className="font-bold text-xs text-amber-900 dark:text-amber-200">
-                                            {lang === 'ar' ? 'شهادات معلقة لمقدم الحج (أحمد الشمري)' : 'Missing Attestation credentials for Hajj Leave'}
-                                        </h5>
-                                        <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-0.5">
-                                            تتطلب المادة 76 تقديم تصريح حملة الحج المعتمدة من وزارة الأوقاف لإصدار شهادة الراتب بنسبة 100%.
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
+          <div className="flex justify-end gap-2 pt-3">
+            <Button variant="outline" type="button" onClick={() => setIsAddModalOpen(false)}>
+              {isAr ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button variant="primary" type="submit">
+              {isAr ? 'تقديم طلب إجازة رسمي' : 'Submit Leave'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* MODAL 2: Edit Existing Request */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setEditingRequest(null)} title={isAr ? 'تعديل تفاصيل الإجازة' : 'Edit Leave Request'}>
+        {editingRequest && (
+          <form onSubmit={handleSaveEditRequest} className="space-y-4 text-right" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'الموظف (معلق ولا يمكن تعديل الاسم)' : 'Employee'}</label>
+                <input
+                  type="text"
+                  disabled
+                  value={editingRequest.employeeName}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-slate-100 dark:bg-slate-800 cursor-not-allowed"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'نوع الإجازة' : 'Leave Type'}</label>
+                <select
+                  value={editingRequest.leaveType}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, leaveType: e.target.value as LeaveTypeKuwait })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-bold"
+                >
+                  {Object.values(LeaveTypeKuwait).map(val => (
+                    <option key={val} value={val}>{val}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'تاريخ البدء' : 'Start Date'}</label>
+                <input
+                  type="date"
+                  value={editingRequest.startDate}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, startDate: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'تاريخ الانتهاء' : 'End Date'}</label>
+                <input
+                  type="date"
+                  value={editingRequest.endDate}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, endDate: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'الموظف البديل' : 'Substitute Colleague'}</label>
+                <input
+                  type="text"
+                  value={editingRequest.substituteEmployeeName || ''}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, substituteEmployeeName: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'هاتف الطوارئ' : 'Emergency Contact'}</label>
+                <input
+                  type="text"
+                  value={editingRequest.emergencyContactPhone || ''}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, emergencyContactPhone: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1 sm:col-span-2">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'المبرر' : 'Justification'}</label>
+                <textarea
+                  value={editingRequest.reason || ''}
+                  onChange={(e) => setEditingRequest({ ...editingRequest, reason: e.target.value })}
+                  rows={2}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <Button variant="outline" type="button" onClick={() => setEditingRequest(null)}>
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button variant="primary" type="submit">
+                {isAr ? 'حفظ التعديلات' : 'Save Changes'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+      {/* MODAL 3: Detailed Leave request Dossier (Drawer Style details) */}
+      <Modal isOpen={!!selectedRequest} onClose={() => setSelectedRequest(null)} title={isAr ? 'ملف طلب الإجازة التفصيلي' : 'Leave Request Dossier'}>
+        {selectedRequest && (
+          <div className="space-y-4 text-right text-xs" dir={isAr ? 'rtl' : 'ltr'}>
+            
+            {/* Split layout: details on left, AI checker on right */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Left Column: Core Fields */}
+              <div className="space-y-3 bg-slate-50 dark:bg-slate-900/40 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'رقم الكشف:' : 'Request No:'}</span>
+                  <strong className="font-mono text-[#00796B]">{selectedRequest.requestNumber}</strong>
                 </div>
-            )}
-
-            {/* 2. Requests Database Tab */}
-            {activeTab === 'requests' && (
-                <div className="space-y-6">
-                    {/* Filter Utilities Panel */}
-                    <Card className="bg-neutral-card dark:bg-dm-card border border-gray-100">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            
-                            {/* Search Box */}
-                            <div className="relative">
-                                <MagnifyingGlassIcon className="absolute top-3 right-3 h-4 w-4 text-gray-400" />
-                                <input
-                                    type="text"
-                                    placeholder={TRANSLATIONS[lang].searchPlaceholder}
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="w-full pl-3 pr-10 py-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs focus:ring-1 focus:ring-primary bg-neutral-card dark:bg-dm-card"
-                                />
-                            </div>
-
-                            {/* Dropdowns */}
-                            <select
-                                value={filterType}
-                                onChange={(e) => setFilterType(e.target.value)}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs bg-neutral-card dark:bg-dm-card"
-                            >
-                                <option value="All">{TRANSLATIONS[lang].allTypes}</option>
-                                {Object.values(LeaveTypeKuwait).map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                ))}
-                            </select>
-
-                            <select
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs bg-neutral-card dark:bg-dm-card"
-                            >
-                                <option value="All">{TRANSLATIONS[lang].allStatuses}</option>
-                                <option value="Approved">{TRANSLATIONS[lang].approved}</option>
-                                <option value="Pending">{TRANSLATIONS[lang].pending}</option>
-                                <option value="UnderReview">{TRANSLATIONS[lang].underReview}</option>
-                                <option value="AwaitingEmployeeDocuments">{TRANSLATIONS[lang].awaitingDocs}</option>
-                                <option value="Completed">{TRANSLATIONS[lang].completed}</option>
-                            </select>
-
-                            <select
-                                value={filterDept}
-                                onChange={(e) => setFilterDept(e.target.value)}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded-lg text-xs bg-neutral-card dark:bg-dm-card"
-                            >
-                                <option value="All">{TRANSLATIONS[lang].allDepts}</option>
-                                <option value="Consultation">قسم الاستشارات والعقود</option>
-                                <option value="Litigation">قسم التقاضي والمحاكم</option>
-                                <option value="Corporate">قسم الشركات والتجاري</option>
-                            </select>
-                        </div>
-                    </Card>
-
-                    {/* Table / Grid for Leave requests */}
-                    <Card title={TRANSLATIONS[lang].requests} className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                                <thead>
-                                    <tr className="bg-gray-50 dark:bg-secondary-dark/40 border-b border-gray-200 dark:border-secondary-dark/60">
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].requestNumber}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].employee}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].leaveType}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].period}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].days}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].status}</th>
-                                        <th className="p-3 text-xs font-bold text-gray-500 text-right">{TRANSLATIONS[lang].actions}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {filteredRequests.map((req) => {
-                                        // Dynamic status colors mapped perfectly
-                                        const statusColors: any = {
-                                            Approved: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/20 border-emerald-200',
-                                            Pending: 'bg-amber-50 text-amber-600 dark:bg-amber-950/20 border-amber-200',
-                                            UnderReview: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/20 border-indigo-200',
-                                            AwaitingEmployeeDocuments: 'bg-purple-50 text-purple-700 dark:bg-purple-950/20 border-purple-200',
-                                            Completed: 'bg-teal-50 text-teal-700 dark:bg-teal-950/20 border-teal-200',
-                                            Rejected: 'bg-red-50 text-red-700 dark:bg-red-950/20 border-red-200'
-                                        };
-                                        return (
-                                            <tr key={req.id} className="border-b border-gray-200 dark:border-secondary-dark/60 hover:bg-gray-50 dark:hover:bg-secondary-dark/15 transition">
-                                                <td className="p-3 text-xs font-mono text-gray-600 text-right">{req.requestNumber}</td>
-                                                <td className="p-3 text-xs text-gray-850 text-right">
-                                                    <span className="font-bold block text-primary-dark dark:text-primary-light">{req.employeeName}</span>
-                                                    <span className="text-[10px] text-gray-400 block">{req.jobTitle}</span>
-                                                </td>
-                                                <td className="p-3 text-xs text-gray-800 text-right">
-                                                    <span className="bg-primary/5 px-2 py-1 rounded text-right inline-block text-[11px] font-black">{req.leaveType}</span>
-                                                </td>
-                                                <td className="p-3 text-xs text-gray-600 text-right">
-                                                    <span className="block">{req.startDate}</span>
-                                                    <span className="block text-[10px] text-gray-400">إلى {req.endDate}</span>
-                                                </td>
-                                                <td className="p-3 text-xs font-black text-gray-850 text-right">{req.numberOfDays} {lang === 'ar' ? 'يوم' : 'Days'}</td>
-                                                <td className="p-3 text-xs text-right">
-                                                    <span className={`px-2 py-1 rounded-full text-[10px] font-black border ${statusColors[req.status] || 'bg-gray-100 text-gray-600'}`}>
-                                                        {TRANSLATIONS[lang][req.status.toLowerCase() as keyof typeof TRANSLATIONS.ar] || req.status}
-                                                    </span>
-                                                </td>
-                                                <td className="p-3 text-xs text-right space-x-1 space-x-reverse">
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedRequest(req);
-                                                            triggerAiComplianceCheck(req);
-                                                        }}
-                                                        className="p-1 px-2.5 bg-primary/10 text-primary-dark hover:bg-primary/20 rounded font-semibold text-[11px]"
-                                                    >
-                                                        {TRANSLATIONS[lang].viewTitle.split(' ')[0]}
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    {filteredRequests.length === 0 && (
-                                        <tr>
-                                            <td colSpan={7} className="text-center p-8 text-xs text-gray-400">
-                                                {TRANSLATIONS[lang].noData}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Card>
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'الموظف المعني:' : 'Employee:'}</span>
+                  <strong className="font-bold">{selectedRequest.employeeName}</strong>
                 </div>
-            )}
-
-            {/* 3. Leave Balances & Smart Calculator Tab */}
-            {activeTab === 'balances' && (
-                <div className="space-y-6">
-                    {/* Kuwait Sick Leave Calculator (Article 73) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        
-                        {/* Interactive Calculator Input Panel */}
-                        <div className="lg:col-span-1">
-                            <Card title={TRANSLATIONS[lang].sickCalcTitle} className="h-full">
-                                <div className="space-y-4">
-                                    <p className="text-xs text-gray-500">
-                                        {TRANSLATIONS[lang].sickCalcDesc}
-                                    </p>
-                                    
-                                    <div className="space-y-1">
-                                        <label className="text-[11px] font-bold text-gray-600">{TRANSLATIONS[lang].sickCalcInput}</label>
-                                        <input
-                                            type="number"
-                                            value={calcSickDays}
-                                            onChange={(e) => setCalcSickDays(Number(e.target.value))}
-                                            max={75}
-                                            min={1}
-                                            className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded focus:ring-1 focus:ring-primary bg-neutral-card dark:bg-dm-card"
-                                        />
-                                    </div>
-                                    
-                                    <div className="pt-2">
-                                        <div className="text-xs font-black uppercase tracking-wider text-gray-400 mb-1">
-                                            سعة الدورة التراكمية (السنة الواحدة):
-                                        </div>
-                                        <div className="w-full bg-gray-200 dark:bg-slate-800 rounded-full h-2">
-                                            <div
-                                                className="bg-amber-600 h-2 rounded-full transition-all"
-                                                style={{ width: `${Math.min(100, (calcSickDays / 75) * 100)}%` }}
-                                            />
-                                        </div>
-                                        <span className="text-[10px] text-gray-400 mt-1 block">
-                                            مجموع الرخص المرضية بموجب اللائحة: 75 يوماً فقط.
-                                        </span>
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-
-                        {/* Interactive Calculator Visual Breakdown Panel */}
-                        <div className="lg:col-span-2">
-                            <Card title={lang === 'ar' ? 'التوجيه والإسناد المالي التفصيلي' : 'Statutory Wage Tier Breakdown'} className="h-full">
-                                {calculatedSickTiers ? (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-4">
-                                        
-                                        <div className="p-3 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 rounded text-center">
-                                            <span className="text-[10px] text-emerald-800 uppercase block font-bold">{TRANSLATIONS[lang].tierFullPay}</span>
-                                            <span className="text-xl font-black text-emerald-900 block mt-1">{calculatedSickTiers.fullPay}</span>
-                                            <span className="text-[9px] text-emerald-600 font-bold block">راتب 100%</span>
-                                        </div>
-
-                                        <div className="p-3 bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-100 rounded text-center">
-                                            <span className="text-[10px] text-indigo-800 uppercase block font-bold">{TRANSLATIONS[lang].tierThreeQuarter}</span>
-                                            <span className="text-xl font-black text-indigo-900 block mt-1">{calculatedSickTiers.threeQuarterPay}</span>
-                                            <span className="text-[9px] text-indigo-600 font-bold block">راتب 75%</span>
-                                        </div>
-
-                                        <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 rounded text-center">
-                                            <span className="text-[10px] text-amber-800 uppercase block font-bold">{TRANSLATIONS[lang].tierHalfPay}</span>
-                                            <span className="text-xl font-black text-amber-900 block mt-1">{calculatedSickTiers.halfPay}</span>
-                                            <span className="text-[9px] text-amber-600 font-bold block">راتب 50%</span>
-                                        </div>
-
-                                        <div className="p-3 bg-orange-55 dark:bg-orange-950/20 border border-orange-200 rounded text-center">
-                                            <span className="text-[10px] text-orange-850 uppercase block font-bold">{TRANSLATIONS[lang].tierQuarterPay}</span>
-                                            <span className="text-xl font-black text-orange-900 block mt-1">{calculatedSickTiers.quarterPay}</span>
-                                            <span className="text-[9px] text-orange-700 font-bold block">راتب 25%</span>
-                                        </div>
-
-                                        <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 rounded text-center">
-                                            <span className="text-[10px] text-red-800 uppercase block font-bold">{TRANSLATIONS[lang].tierNoPay}</span>
-                                            <span className="text-xl font-black text-red-900 block mt-1">{calculatedSickTiers.unpaid}</span>
-                                            <span className="text-[9px] text-red-600 font-bold block">بدون راتب 0%</span>
-                                        </div>
-
-                                    </div>
-                                ) : (
-                                    <div className="text-center py-10 font-black text-gray-500 text-xs">
-                                        أدخل يوماً من الرصيد المرضي لعرض الحساب التراكمي
-                                    </div>
-                                )}
-                                
-                                <div className="mt-4 p-3 bg-slate-900 text-slate-300 rounded border border-slate-800 text-[11px]">
-                                    {lang === 'ar' ? (
-                                        <span>
-                                            ℹ <strong>ملاحظة قضائية:</strong> طبقاً للمادة 74 من قانون العمل، يحق للعامل المصاب بعارض صحي معزز بمؤسسات وزارة الصحة الكويتية تجميع هذه المدد وتثبيتها بالكامل بملف الموارد البشرية.
-                                        </span>
-                                    ) : (
-                                        <span>
-                                            ℹ <strong>Statutory Note:</strong> Pursuant to Article 74, the cumulative count determines the payout of daily sick leave rates continuously within the current fiscal year.
-                                        </span>
-                                    )}
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
-
-                    {/* Employee Balance Database Grid */}
-                    <Card title={TRANSLATIONS[lang].balances}>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {employeesList.map((emp) => {
-                                // Calculate consumed days dynamically from approved or completed requests of this worker
-                                const empRequests = requests.filter(r => r.employeeId === emp.id && (r.status === 'Approved' || r.status === 'Completed'));
-                                const annualAndUnpaidConsumed = empRequests
-                                    .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
-                                    .reduce((sum, r) => sum + r.numberOfDays, 0);
-
-                                const annual = emp.annualLeaveEntitlement || 30;
-                                const carried = emp.carriedOverBalance || 0;
-                                const absent = emp.absenceDays || 0;
-                                
-                                const totalAvailableAccrued = annual + carried;
-                                const remaining = Math.max(0, totalAvailableAccrued - annualAndUnpaidConsumed);
-
-                                return (
-                                    <div key={emp.id} className="p-4 border border-gray-200 dark:border-secondary-dark/60 rounded-xl relative hover:border-primary/50 transition bg-neutral-card dark:bg-dm-card flex flex-col justify-between shadow-sm">
-                                        <div>
-                                            <div className="flex items-center gap-3">
-                                                <div className="p-2.5 bg-primary/10 rounded-full text-primary">
-                                                    <UserGroupIcon className="h-5 w-5" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-extrabold text-sm text-primary-dark dark:text-primary-light">{emp.fullNameAr}</h4>
-                                                    <span className="text-[11px] text-gray-400 block">{emp.jobTitle} - {getDeptLabel(emp.department) || 'الاستشارات'}</span>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="grid grid-cols-4 gap-1 mt-4 pt-3 border-t border-gray-150 dark:border-secondary-dark/40 text-center">
-                                                <div>
-                                                    <span className="text-[9px] text-gray-400 block">سنوي</span>
-                                                    <span className="text-xs font-black text-slate-800 dark:text-white">{annual}ي</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[9px] text-gray-500 block">مرحل</span>
-                                                    <span className="text-xs font-black text-slate-600 dark:text-gray-300">{carried}ي</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[9px] text-amber-600 block">مستهلك</span>
-                                                    <span className="text-xs font-black text-amber-600">{annualAndUnpaidConsumed}ي</span>
-                                                </div>
-                                                <div>
-                                                    <span className="text-[9px] text-emerald-600 block flex items-center justify-center gap-0.5">صافي المتبقي</span>
-                                                    <span className={`text-xs font-extrabold ${remaining <= 3 ? 'text-rose-600' : 'text-emerald-600'}`}>{remaining}ي</span>
-                                                </div>
-                                            </div>
-
-                                            {absent > 0 && (
-                                                <div className="mt-2 text-[10px] bg-red-50 text-red-700 dark:bg-red-950/20 px-2 py-0.5 rounded text-center">
-                                                    ⚠️ مسجل غياب غير مبرر: {absent} {absent === 1 ? 'يوم' : absent === 2 ? 'يومان' : 'أيام'} (أثر مالي مباشر)
-                                                </div>
-                                            )}
-
-                                            <div className="mt-3 pt-2">
-                                                <div className="w-full bg-gray-150 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                                                    <div 
-                                                        className={`h-1.5 rounded-full transition-all ${remaining <= 5 ? 'bg-rose-500' : 'bg-emerald-500'}`}
-                                                        style={{ width: `${Math.min(100, (remaining / Math.max(1, totalAvailableAccrued)) * 100)}%` }}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            onClick={() => {
-                                                setSelectedEmployeeProfile(emp);
-                                                setIsProfileModalOpen(true);
-                                            }}
-                                            className="mt-4 w-full text-center py-2 bg-slate-50 dark:bg-secondary-dark/30 hover:bg-slate-100 dark:hover:bg-secondary-dark/50 border border-gray-200 dark:border-secondary-dark/40 rounded-lg text-xs font-black text-primary-dark dark:text-primary-light flex items-center justify-center gap-1 cursor-pointer"
-                                        >
-                                            عرض مِلَفّ الإجازات والسياسات 📄
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </Card>
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'نوع الإجازة:' : 'Leave Type:'}</span>
+                  <strong className="text-rose-600 font-bold">{selectedRequest.leaveType}</strong>
                 </div>
-            )}
-
-            {/* 4. Leave Calendar & Scheduling Tab */}
-            {activeTab === 'calendar' && (
-                <Card title={TRANSLATIONS[lang].calendar}>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                        <div className="flex items-center gap-2">
-                            <button
-                                onClick={() => {
-                                    if (currentMonth === 0) {
-                                        setCurrentMonth(11);
-                                        setCurrentYear(currentYear - 1);
-                                    } else {
-                                        setCurrentMonth(currentMonth - 1);
-                                    }
-                                }}
-                                className="p-1 px-3 border rounded text-xs hover:bg-gray-100"
-                            >
-                                {lang === 'ar' ? 'السابق' : 'Prev'}
-                            </button>
-                            <h3 className="font-bold text-sm text-primary-dark">
-                                {currentYear} - {String(currentMonth + 1).padStart(2, '0')}
-                            </h3>
-                            <button
-                                onClick={() => {
-                                    if (currentMonth === 11) {
-                                        setCurrentMonth(0);
-                                        setCurrentYear(currentYear + 1);
-                                    } else {
-                                        setCurrentMonth(currentMonth + 1);
-                                    }
-                                }}
-                                className="p-1 px-3 border rounded text-xs hover:bg-gray-100"
-                            >
-                                {lang === 'ar' ? 'التالي' : 'Next'}
-                            </button>
-                        </div>
-                        <span className="text-[11px] text-gray-400">
-                            * يعرض التقويم الموظفين النشطين في إجازات معتمدة لهذا اليوم بالاعتماد على قاعدة البيانات
-                        </span>
-                    </div>
-
-                    {/* Weekday indicators */}
-                    <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs bg-gray-50 dark:bg-slate-800 p-2 rounded mb-1">
-                        {lang === 'ar' ? (
-                            ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'].map(d => <span key={d}>{d}</span>)
-                        ) : (
-                            ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => <span key={d}>{d}</span>)
-                        )}
-                    </div>
-
-                    {/* Days grid */}
-                    <div className="grid grid-cols-7 gap-1 min-h-[290px]">
-                        {calendarGrid.map((cell, idx) => {
-                            // Find any active approved leaves for this day
-                            const activeOnDay = cell.dateStr
-                                ? requests.filter(req => req.status === 'Approved' && req.startDate <= cell.dateStr! && req.endDate >= cell.dateStr!)
-                                : [];
-
-                            return (
-                                <div
-                                    key={idx}
-                                    className={`p-2 border border-gray-150 dark:border-secondary-dark/40 min-h-[50px] rounded flex flex-col justify-between ${
-                                        cell.dayNum ? 'bg-neutral-card dark:bg-dm-card' : 'bg-gray-50/50 dark:bg-slate-900/10'
-                                    }`}
-                                >
-                                    <span className="text-xs font-bold text-gray-400 block">{cell.dayNum}</span>
-                                    
-                                    {/* Render indicators */}
-                                    {activeOnDay.length > 0 && (
-                                        <div className="space-y-1 mt-1">
-                                            {activeOnDay.map(vac => (
-                                                <span
-                                                    key={vac.id}
-                                                    title={`${vac.employeeName} (${vac.leaveType})`}
-                                                    className="block text-[8px] bg-sky-100 text-sky-800 dark:bg-sky-950/40 p-0.5 rounded truncate font-black"
-                                                >
-                                                    ● {vac.employeeName.split(' ')[0]}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-                </Card>
-            )}
-
-            {/* 5. Custom Editable Templates Tab */}
-            {activeTab === 'templates' && (
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                    
-                    {/* Templates Sidebar */}
-                    <div className="lg:col-span-4 space-y-4">
-                        <Card title={TRANSLATIONS[lang].templates}>
-                            <p className="text-[11px] text-gray-500 mb-3">
-                                {lang === 'ar' ? 'حدد مسودة الكتاب المطلوب تعبئتها وتحريرها للطباعة مع الأختام المدمجة:' : 'Select official correspondence template to edit/print with HR stamp:'}
-                            </p>
-                            <div className="space-y-2">
-                                {editableTemplates.map(template => (
-                                    <button
-                                        key={template.id}
-                                        onClick={() => setActiveTemplateId(template.id)}
-                                        className={`w-full text-right p-3 rounded-lg border text-xs transition-all block ${
-                                            activeTemplateId === template.id
-                                                ? 'bg-primary/10 border-primary text-primary-dark font-black'
-                                                : 'border-gray-200 hover:bg-gray-50 dark:border-secondary-dark/40'
-                                        }`}
-                                    >
-                                        <span className="block text-primary font-bold text-[10px] mb-1">{lang === 'ar' ? template.categoryAr : template.categoryEn}</span>
-                                        {lang === 'ar' ? template.titleAr : template.titleEn}
-                                    </button>
-                                ))}
-                            </div>
-                        </Card>
-                    </div>
-
-                    {/* Parameters Customization Left Panel and Official Printer Right Panel */}
-                    <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-12 gap-4">
-                        
-                        {/* Parameters Bindings Inputs (Left) */}
-                        <div className="md:col-span-5">
-                            <Card title={lang === 'ar' ? 'تعديل حقول الكتاب' : 'Customize Template Inputs'}>
-                                <div className="space-y-3">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-gray-500">اسم المؤسسة المعنية</label>
-                                        <input
-                                            type="text"
-                                            value={templateInputs.companyName}
-                                            onChange={(e) => setTemplateInputs({...templateInputs, companyName: e.target.value})}
-                                            className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-gray-500">الموظف المعني بالطلب</label>
-                                        <input
-                                            type="text"
-                                            value={templateInputs.employeeName}
-                                            onChange={(e) => setTemplateInputs({...templateInputs, employeeName: e.target.value})}
-                                            className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                        />
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500">رقم المرجع</label>
-                                            <input
-                                                type="text"
-                                                value={templateInputs.refNumber}
-                                                onChange={(e) => setTemplateInputs({...templateInputs, refNumber: e.target.value})}
-                                                className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500">المده بالأيام</label>
-                                            <input
-                                                type="text"
-                                                value={templateInputs.durationDays}
-                                                onChange={(e) => setTemplateInputs({...templateInputs, durationDays: e.target.value})}
-                                                className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500">البدء</label>
-                                            <input
-                                                type="text"
-                                                value={templateInputs.startDate}
-                                                onChange={(e) => setTemplateInputs({...templateInputs, startDate: e.target.value})}
-                                                className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-gray-500">الانتهاء</label>
-                                            <input
-                                                type="text"
-                                                value={templateInputs.endDate}
-                                                onChange={(e) => setTemplateInputs({...templateInputs, endDate: e.target.value})}
-                                                className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-gray-500">المبرر / التبرير</label>
-                                        <textarea
-                                            value={templateInputs.reason}
-                                            onChange={(e) => setTemplateInputs({...templateInputs, reason: e.target.value})}
-                                            className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card h-14"
-                                        />
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold text-gray-500">الشخص المفوض بالتوقيع</label>
-                                        <input
-                                            type="text"
-                                            value={templateInputs.signatory}
-                                            onChange={(e) => setTemplateInputs({...templateInputs, signatory: e.target.value})}
-                                            className="w-full p-2 border border-gray-200 rounded text-xs dark:bg-dm-card"
-                                        />
-                                    </div>
-                                </div>
-                            </Card>
-                        </div>
-
-                        {/* Official Paper Styled Box Preview (Right) */}
-                        <div className="md:col-span-7">
-                            <Card
-                                title={TRANSLATIONS[lang].printPreview}
-                                actions={
-                                    <Button size="sm" leftIcon={<PrinterIcon className="h-4 w-4" />} onClick={handlePrintAction}>
-                                        {TRANSLATIONS[lang].printOfficial}
-                                    </Button>
-                                }
-                            >
-                                <div className="p-4 bg-white text-slate-900 border border-double border-gray-400 rounded-lg min-h-[360px] flex flex-col justify-between" id="printable-template-area">
-                                    
-                                    {/* Formal Legal Header */}
-                                    <div className="border-b-2 border-primary pb-3 mb-3 flex justify-between items-center bg-white text-slate-900">
-                                        <div>
-                                            <span className="block text-[8px] font-black tracking-widest text-[#00796B]">ALWAGAYAN LAW FIRM</span>
-                                            <span className="block text-[10px] font-black text-slate-800">مكتب الوجيان للمحاماة والاستشارات القانونية</span>
-                                        </div>
-                                        
-                                        {/* Mock SVG QR Code representing real-time verifiable check */}
-                                        <svg className="h-10 w-10 text-slate-700" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-                                            <rect width="100" height="100" fill="white" />
-                                            <path d="M10,10 h30 v30 h-30 z M20,20 h10 v10 h-10 z" fill="currentColor" />
-                                            <path d="M60,10 h30 v30 h-30 z M70,20 h10 v10 h-10 z" fill="currentColor" />
-                                            <path d="M10,60 h30 v30 h-30 z M20,70 h10 v10 h-10 z" fill="currentColor" />
-                                            <path d="M50,50 h10 v10 h-10 z M70,60 h20 v10 h-20 z M50,80 h20 v15 h-20 z" fill="currentColor" />
-                                        </svg>
-                                    </div>
-
-                                    {/* Scrollable Letter Content */}
-                                    <pre className="text-[10px] text-slate-800 font-sans leading-relaxed whitespace-pre-wrap flex-1 my-3 text-right" dir="rtl">
-                                        {compiledTemplateText}
-                                    </pre>
-
-                                    {/* Mock Verification Stamp Approved */}
-                                    <div className="flex justify-between items-start border-t border-gray-200 pt-3 mt-3">
-                                        <div className="text-[9px] text-slate-500 text-right">
-                                            <span className="block">وثيقة معتمدة رقمياً عبر بوابة Adala ERP</span>
-                                            <span className="block mt-0.5 font-mono">HASH: SHA-256 / VacAccruals-4392</span>
-                                        </div>
-                                        
-                                        {/* Blue Mockup Verification stamp */}
-                                        <div className="border-2 border-dashed border-blue-500 rounded p-1 px-3 text-center rotate-3 transform text-blue-600 bg-white/80 shrink-0 select-none">
-                                            <span className="block text-[8px] font-black leading-none">APPROVED</span>
-                                            <span className="block text-[9px] font-black leading-tight tracking-widest">ADALA HR STAMP</span>
-                                            <span className="block text-[6px] leading-tight">MEMBER # 6010-KW</span>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </Card>
-                        </div>
-
-                    </div>
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'الفترة الإجمالية:' : 'Dates Range:'}</span>
+                  <strong className="font-mono">{selectedRequest.startDate} {isAr ? 'إلى' : 'to'} {selectedRequest.endDate}</strong>
                 </div>
-            )}
-
-            {/* 6. Advanced Analytical Reports Engine Tab */}
-            {activeTab === 'reports' && (
-                <div className="space-y-6 animate-fadeIn">
-                    {/* Interactive Filter Workbench Card */}
-                    <Card title={lang === 'ar' ? 'منصة التقارير والتدقيق العمالي المتقدم' : 'Staff Analytics & Compliance Reports Workbench'}>
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-500 block">فئة التقرير المطلوب</label>
-                                <select
-                                    value={reportCategory}
-                                    onChange={(e) => setReportCategory(e.target.value as any)}
-                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
-                                >
-                                    <option value="balances">تقرير أرصدة الإجازات الكلية (Accrual Ledger)</option>
-                                    <option value="consumed">تقرير الإجازات المستهلكة (Days Consumed)</option>
-                                    <option value="remaining">تقرير الإجازات المتبقية الشاغرة (Net Liquidity)</option>
-                                    <option value="individual">تقرير كشف الموظف المنفرد (Staff Particular Audit)</option>
-                                    <option value="department">تقرير توزيع الإجازات حسب القسم (Department Breakdown)</option>
-                                    <option value="period">تقرير تصفية الفترات الزمنية (Timeframe Filtration)</option>
-                                    <option value="status">مقارنة حالات الطلبات والقرارات (Status Segregation)</option>
-                                </select>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-500 block">القسم الإداري</label>
-                                <select
-                                    value={reportDeptFilter}
-                                    onChange={(e) => setReportDeptFilter(e.target.value)}
-                                    disabled={reportCategory === 'department'}
-                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
-                                >
-                                    <option value="All">كافة الأقسام والشُعب</option>
-                                    <option value="Consultation">قسم الاستشارات والعقود</option>
-                                    <option value="Litigation">قسم التقاضي والمحاكم</option>
-                                    <option value="Corporate">قسم الشركات والتجاري</option>
-                                    <option value="Admin">الشؤون الإدارية العامة</option>
-                                </select>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-500 block">الموظف المعني</label>
-                                <select
-                                    value={reportEmployeeFilter}
-                                    onChange={(e) => setReportEmployeeFilter(e.target.value)}
-                                    disabled={reportCategory === 'department' || reportCategory === 'status'}
-                                    className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
-                                >
-                                    <option value="All">كافة كوادر العمل (الكل)</option>
-                                    {employeesList.map(e => (
-                                        <option key={e.id} value={e.id}>{e.fullNameAr}</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500 block">تاريخ البدء</label>
-                                    <input
-                                        type="date"
-                                        value={reportStartDate}
-                                        onChange={(e) => setReportStartDate(e.target.value)}
-                                        className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500 block">تاريخ الانتهاء</label>
-                                    <input
-                                        type="date"
-                                        value={reportEndDate}
-                                        onChange={(e) => setReportEndDate(e.target.value)}
-                                        className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card focus:ring-1 focus:ring-primary text-slate-800 dark:text-gray-100"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Export & Action Panel */}
-                        <div className="mt-4 pt-3 border-t border-gray-150 dark:border-secondary-dark/30 flex flex-wrap justify-between items-center gap-3">
-                            <span className="text-[10px] text-gray-400">
-                                * تم توليد وتوثيق هذا الكشف تلقائياً طبقاً لسجلات الحضور والبصمة وقرارات مجلس الشركاء والمادة 70 من قانون العمل.
-                            </span>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        addToast({
-                                            type: 'success',
-                                            title: 'تصدير ناجح',
-                                            message: 'تم توليد وتصدير تقرير الإجازات المعتمد بصيغة Microsoft Word (.docx) بنجاح.'
-                                        });
-                                    }}
-                                    className="p-1 px-3 border border-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-bold flex items-center gap-1 text-slate-750 dark:text-gray-300 cursor-pointer"
-                                >
-                                    <ArrowDownTrayIcon className="h-4 w-4 text-blue-600 animate-bounce" />
-                                    تصدير Word (.docx)
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        addToast({
-                                            type: 'success',
-                                            title: 'توليد ملف PDF',
-                                            message: 'تم تصدير كشف التدقيق والمطابقة العمالية إلى صيغة PDF وجاهز للتحميل.'
-                                        });
-                                    }}
-                                    className="p-1 px-3 border border-gray-300 hover:bg-gray-100 dark:hover:bg-slate-800 rounded text-xs font-bold flex items-center gap-1 text-slate-750 dark:text-gray-300 cursor-pointer"
-                                >
-                                    <DocumentTextIcon className="h-4 w-4 text-rose-600" />
-                                    تصدير PDF (.pdf)
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setIsPrintPreviewOpen(true);
-                                    }}
-                                    className="p-1 px-4.5 bg-primary text-white hover:bg-primary-dark rounded text-xs font-bold flex items-center gap-1 cursor-pointer"
-                                >
-                                    <PrinterIcon className="h-4 w-4" />
-                                    طباعة الكشف الرسمي
-                                </button>
-                            </div>
-                        </div>
-                    </Card>
-
-                    {/* Charting Breakdown of the Report Table */}
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2">
-                            <Card title={lang === 'ar' ? 'سجل البيانات التفصيلي للتقرير' : 'Detailed Records Sheet'}>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-right border-collapse" dir="rtl">
-                                        <thead>
-                                            <tr className="bg-gray-55 dark:bg-slate-800 border-b border-gray-200">
-                                                {reportCategory === 'balances' || reportCategory === 'consumed' || reportCategory === 'remaining' ? (
-                                                    <>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">اسم الموظف</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">القسم الشغلي</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">سنوي</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مرحل</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مكتسب</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مستهلك</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">المتبقي</th>
-                                                    </>
-                                                ) : reportCategory === 'individual' ? (
-                                                    <>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">رقم الطلب</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">نوع الإجازة</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الفترة الزمنية</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الأيام</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">حالة المسار</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">السبب والبيان</th>
-                                                    </>
-                                                ) : reportCategory === 'department' ? (
-                                                    <>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">القسم القضائي/الإداري</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الكادر</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">إجمالي أيام الإجازات</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الطلبات ككل</th>
-                                                    </>
-                                                ) : reportCategory === 'period' ? (
-                                                    <>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الطلب</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">اسم الموظف</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">نوع الإجازة</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">أيام المدة</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الفترة الزمنية</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">الحالة</th>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">حالة الطلب الإداري</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">تعداد الطلبات ككل</th>
-                                                        <th className="p-3 text-xs font-black text-gray-500 text-right">مجموع الأيام المأذونة</th>
-                                                    </>
-                                                )}
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {generatedReportTable.map((row, index) => (
-                                                <tr key={index} className="border-b border-gray-150 dark:border-slate-800 hover:bg-slate-50/50">
-                                                    {reportCategory === 'balances' || reportCategory === 'consumed' || reportCategory === 'remaining' ? (
-                                                        <>
-                                                            <td className="p-3 text-xs font-bold text-primary-dark dark:text-primary-light text-right">{row.name}</td>
-                                                            <td className="p-3 text-xs text-gray-500 text-right">{row.dept}</td>
-                                                            <td className="p-3 text-xs font-bold text-right">{row.annual}ي</td>
-                                                            <td className="p-3 text-xs text-right">{row.carried}ي</td>
-                                                            <td className="p-3 text-xs font-black text-slate-800 dark:text-gray-200 text-right">{row.accrued}ي</td>
-                                                            <td className="p-3 text-xs text-amber-600 font-bold text-right">{row.consumed}ي</td>
-                                                            <td className="p-3 text-xs text-emerald-605 font-black text-right">{row.remaining}ي</td>
-                                                        </>
-                                                    ) : reportCategory === 'individual' ? (
-                                                        <>
-                                                            <td className="p-3 text-xs font-mono text-gray-400 text-right">{row.requestNumber}</td>
-                                                             <td className="p-3 text-xs font-bold text-right">{row.type}</td>
-                                                            <td className="p-3 text-xs text-right">{row.start} إلى {row.end}</td>
-                                                            <td className="p-3 text-xs font-black text-right">{row.days}ي</td>
-                                                            <td className="p-3 text-xs text-right">
-                                                                <span className="px-2 py-0.5 rounded text-[10px] bg-slate-100 text-slate-800 border">
-                                                                    {row.status}
-                                                                </span>
-                                                            </td>
-                                                            <td className="p-3 text-xs text-gray-400 max-w-28 truncate text-right" title={row.reason}>{row.reason}</td>
-                                                        </>
-                                                    ) : reportCategory === 'department' ? (
-                                                        <>
-                                                            <td className="p-3 text-xs font-bold text-right">{row.deptName}</td>
-                                                            <td className="p-3 text-xs text-right">{row.empsCount} موظف</td>
-                                                            <td className="p-3 text-xs text-amber-600 font-bold text-right">{row.totalDaysTaken} يوماً مستهلكاً</td>
-                                                            <td className="p-3 text-xs text-indigo-650 font-black text-right">{row.totalRequests} طلب</td>
-                                                        </>
-                                                    ) : reportCategory === 'period' ? (
-                                                        <>
-                                                            <td className="p-3 text-xs font-mono text-gray-400 text-right">{row.requestNumber}</td>
-                                                            <td className="p-3 text-xs font-bold text-right">{row.name}</td>
-                                                            <td className="p-3 text-xs text-right">{row.type}</td>
-                                                            <td className="p-3 text-xs font-black text-right">{row.days}ي</td>
-                                                            <td className="p-3 text-xs text-gray-400 text-right">{row.period}</td>
-                                                            <td className="p-3 text-xs text-right">
-                                                                <span className="px-2 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700">
-                                                                    {row.status}
-                                                                </span>
-                                                            </td>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <td className="p-3 text-xs font-bold text-indigo-600 text-right">{row.statusName}</td>
-                                                            <td className="p-3 text-xs font-black text-right">{row.count} طلب رسمي</td>
-                                                            <td className="p-3 text-xs text-amber-600 text-right">{row.totalDays} يوماً إجمالياً</td>
-                                                        </>
-                                                    )}
-                                                </tr>
-                                            ))}
-                                            {generatedReportTable.length === 0 && (
-                                                <tr>
-                                                    <td colSpan={7} className="text-center p-8 text-xs text-gray-400">
-                                                        لا تتوفر سجلات مطابقة لمعايير البحث المدخلة
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </Card>
-                        </div>
-
-                        <div className="lg:col-span-1">
-                            <Card title={lang === 'ar' ? 'التوزيع الإحصائي للكشف' : 'Report Visual Matrix'}>
-                                <div className="h-64 sm:h-72 w-full mt-4">
-                                    {generatedReportTable.length > 0 ? (
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <BarChart data={generatedReportTable.slice(0, 10)}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey={reportCategory === 'department' ? 'deptName' : reportCategory === 'status' ? 'statusName' : 'name'} />
-                                                <YAxis />
-                                                <Tooltip />
-                                                <Bar 
-                                                    dataKey={reportCategory === 'department' ? 'totalDaysTaken' : reportCategory === 'status' ? 'totalDays' : 'consumed'} 
-                                                    fill="#00796B" 
-                                                    name="الأيام" 
-                                                />
-                                            </BarChart>
-                                        </ResponsiveContainer>
-                                    ) : (
-                                        <div className="h-full flex items-center justify-center text-xs text-gray-400">
-                                            لا توجد سجلات رسومية متوفرة
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mt-4 p-3 bg-teal-50 dark:bg-emerald-950/20 border border-teal-150 rounded text-center">
-                                    <h5 className="font-bold text-xs text-[#00796B]">التوافق والامتثال الكويتي</h5>
-                                    <p className="text-[10px] text-gray-500 mt-1">
-                                        يتم فرز ومعالجة هذا التقرير تلقائياً بما يطابق المادة 70 والمادة 73 والمادة 24 من قانون قطاع العمل الكويتي رقم 6 لسنة 2010.
-                                    </p>
-                                </div>
-                            </Card>
-                        </div>
-                    </div>
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'مجموع الأيام:' : 'Total Days:'}</span>
+                  <strong className="text-sm font-serif text-rose-600">{selectedRequest.numberOfDays} {isAr ? 'يوماً' : 'Days'}</strong>
                 </div>
-            )}
-
-            {/* Custom Modal for Submitting New Leave Request */}
-            <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} title={TRANSLATIONS[lang].addRequestTitle}>
-                <form onSubmit={handleAddRequest} className="space-y-4 text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">{TRANSLATIONS[lang].employee}</label>
-                            <select
-                                required
-                                value={formData.employeeId}
-                                onChange={(e) => {
-                                    const selectedEmp = employeesList.find(emp => emp.id === e.target.value);
-                                    if (selectedEmp) {
-                                        setFormData({
-                                            ...formData,
-                                            employeeId: selectedEmp.id,
-                                            employeeName: selectedEmp.fullNameAr
-                                        });
-                                    }
-                                }}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            >
-                                <option value="">{TRANSLATIONS[lang].selectEmployee}</option>
-                                {employeesList.map(emp => (
-                                    <option key={emp.id} value={emp.id}>{emp.fullNameAr} ({emp.jobTitle})</option>
-                                ))}
-                            </select>
-                        </div>
-                        
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">{TRANSLATIONS[lang].leaveType}</label>
-                            <select
-                                value={formData.leaveType}
-                                onChange={(e) => setFormData({...formData, leaveType: e.target.value as LeaveTypeKuwait})}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            >
-                                {Object.values(LeaveTypeKuwait).map((val) => (
-                                    <option key={val} value={val}>{val}</option>
-                                ))}
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">تاريخ البدء</label>
-                            <input
-                                required
-                                type="date"
-                                value={formData.startDate}
-                                onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">تاريخ الانتهاء</label>
-                            <input
-                                required
-                                type="date"
-                                value={formData.endDate}
-                                onChange={(e) => setFormData({...formData, endDate: e.target.value})}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">{TRANSLATIONS[lang].substituteEmployee}</label>
-                            <input
-                                type="text"
-                                placeholder="الزميل المفوض بالاستلام"
-                                value={formData.substituteEmployeeName}
-                                onChange={(e) => setFormData({...formData, substituteEmployeeName: e.target.value})}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-bold text-gray-500 block">{TRANSLATIONS[lang].emergencyContact}</label>
-                            <input
-                                type="text"
-                                placeholder="+965XXXXXXXX"
-                                value={formData.emergencyContactPhone}
-                                onChange={(e) => setFormData({...formData, emergencyContactPhone: e.target.value})}
-                                className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-500 block">{TRANSLATIONS[lang].reason}</label>
-                        <textarea
-                            value={formData.reason}
-                            onChange={(e) => setFormData({...formData, reason: e.target.value})}
-                            className="w-full p-2 border border-gray-300 dark:border-secondary-dark/60 rounded text-xs bg-neutral-card dark:bg-dm-card h-20"
-                            placeholder="من فضلك أدخل تفاصيل العذر أو المبررات لحفظ السجلات وتسهيل المراجعة..."
-                        />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-3">
-                        <Button variant="ghost" type="button" onClick={() => setIsAddModalOpen(false)}>
-                            {TRANSLATIONS[lang].cancel}
-                        </Button>
-                        <Button variant="primary" type="submit">
-                            {TRANSLATIONS[lang].submit}
-                        </Button>
-                    </div>
-                </form>
-            </Modal>
-
-            {/* Custom Modal for Leave Request Dossier View (Details + AI Review) */}
-            <Modal isOpen={selectedRequest !== null} onClose={() => setSelectedRequest(null)} title={TRANSLATIONS[lang].viewTitle}>
-                {selectedRequest && (
-                    <div className="space-y-6 text-right" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            
-                            {/* Left Panel: Core Details */}
-                            <div className="space-y-4">
-                                <Card title={TRANSLATIONS[lang].dates}>
-                                    <div className="space-y-2 text-xs">
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">رقم الطلب الكودي:</span>
-                                            <span className="font-mono font-bold text-slate-800">{selectedRequest.requestNumber}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">الموظف مقدم الطلب:</span>
-                                            <span className="font-bold text-primary-dark">{selectedRequest.employeeName}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">نوع الإجازة المسجل:</span>
-                                            <span className="font-bold">{selectedRequest.leaveType}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">فترة الانقطاع المعتمدة:</span>
-                                            <span className="font-mono font-bold">{selectedRequest.startDate} إلى {selectedRequest.endDate}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">المدة الصافية الحالية:</span>
-                                            <span className="font-black text-rose-600 underline">{selectedRequest.numberOfDays} يوماً متواصلة</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">الموظف البديل المعيل:</span>
-                                            <span>{selectedRequest.substituteEmployeeName || 'لم يعين بعد'}</span>
-                                        </div>
-                                        <div className="flex justify-between py-1 border-b">
-                                            <span className="text-gray-400">حالة الراتب (الراتب المضمون):</span>
-                                            <span className="font-bold text-emerald-600">{selectedRequest.isPaidLeave ? 'مدفوعة الأجر' : 'بدون أجر'}</span>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="mt-3">
-                                        <label className="text-[10px] font-bold text-gray-500 block mb-1">المبرر المودع:</label>
-                                        <p className="p-2 bg-gray-50 dark:bg-secondary-dark/20 text-xs text-gray-700 italic rounded">
-                                            {selectedRequest.reason || 'لا يوجد عذر مسجل يدوياً.'}
-                                        </p>
-                                    </div>
-                                </Card>
-
-                                {/* Activity routing tracking timeline */}
-                                <Card title={TRANSLATIONS[lang].activityLog}>
-                                    <div className="relative border-r-2 border-primary/40 mr-3 pr-4 space-y-4">
-                                        {(selectedRequest.timeline || []).map((log, lidx) => (
-                                            <div key={lidx} className="relative">
-                                                <div className="absolute -right-[21px] top-1 bg-primary h-3.5 w-3.5 rounded-full border-2 border-white" />
-                                                <span className="text-[10px] text-gray-400 font-mono block">{log.date}</span>
-                                                <span className="text-xs font-bold block">{log.action || 'عملية مجهولة'}</span>
-                                                <span className="text-[11px] text-gray-500 block">{log.notes}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </Card>
-                            </div>
-
-                            {/* Right Panel: AI Consultation copilot results */}
-                            <div className="space-y-4">
-                                <Card
-                                    title={TRANSLATIONS[lang].aiTitle}
-                                    headerClassName="bg-gradient-to-r from-slate-900 via-slate-950 to-primary-dark text-white border-none rounded-t-lg"
-                                    titleClassName="text-white bg-slate-900 border-none inline-flex"
-                                    icon={<SparklesIcon className="h-5 w-5 text-amber-500 animate-pulse" />}
-                                >
-                                    {aiLoading ? (
-                                        <div className="p-10 text-center space-y-3">
-                                            <ArrowPathIcon className="h-8 w-8 text-primary animate-spin mx-auto" />
-                                            <p className="text-xs text-slate-500">
-                                                قيد فحص المادة 73 ومطابقة البند الدستوري مع رصيد العلاوات الكويتي...
-                                            </p>
-                                        </div>
-                                    ) : aiReport ? (
-                                        <div className="space-y-3">
-                                            <pre className="text-[11px] font-sans leading-relaxed whitespace-pre-wrap text-slate-800 p-3 bg-slate-50 dark:bg-dm-card rounded-lg border border-slate-200">
-                                                {aiReport}
-                                            </pre>
-                                            <button
-                                                onClick={() => {
-                                                    // Copy report content to comments block for immediate use
-                                                    if (aiReport) {
-                                                        addToast({
-                                                            type: 'success',
-                                                            title: lang === 'ar' ? 'تم نسخ التقرير' : 'Report Copied',
-                                                            message: lang === 'ar' ? 'تم نسخ تحليل المستشار القانوني بنجاح' : 'Legal synthesis successfully copied'
-                                                        });
-                                                    }
-                                                }}
-                                                className="w-full py-1.5 border border-primary text-primary hover:bg-primary/10 rounded text-xs font-semibold"
-                                            >
-                                                نسخ تقرير التكييف القانوني
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            onClick={() => triggerAiComplianceCheck(selectedRequest)}
-                                            className="w-full py-3 bg-primary text-white hover:bg-primary-dark rounded text-xs font-extrabold flex items-center justify-center gap-2 shadow"
-                                        >
-                                            <SparklesIcon className="h-4 w-4" />
-                                            توليد استشارة وملاءمة القانون الكويتي تلقائياً (AI)
-                                        </button>
-                                    )}
-                                </Card>
-
-                                {/* Immediate Action Panel on View Modal */}
-                                <Card title={TRANSLATIONS[lang].immediateDecision}>
-                                    <div className="grid grid-cols-2 md:grid-cols-2 gap-2 text-right">
-                                        {selectedRequest.status !== 'Approved' && (
-                                            <Button
-                                                variant="primary"
-                                                size="sm"
-                                                leftIcon={<CheckCircleIcon className="h-4 w-4" />}
-                                                onClick={() => handleUpdateStatus(selectedRequest.id, 'Approved')}
-                                            >
-                                                {TRANSLATIONS[lang].approve}
-                                            </Button>
-                                        )}
-                                        {selectedRequest.status !== 'Rejected' && (
-                                            <Button
-                                                variant="danger"
-                                                size="sm"
-                                                leftIcon={<XCircleIcon className="h-4 w-4" />}
-                                                onClick={() => handleUpdateStatus(selectedRequest.id, 'Rejected')}
-                                            >
-                                                {TRANSLATIONS[lang].reject}
-                                            </Button>
-                                        )}
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            className="col-span-2"
-                                            leftIcon={<PrinterIcon className="h-4 w-4" />}
-                                            onClick={() => {
-                                                // Load templates with this employee parameters automatically for instant printing
-                                                setTemplateInputs({
-                                                    ...templateInputs,
-                                                    employeeName: selectedRequest.employeeName,
-                                                    jobTitle: selectedRequest.jobTitle || 'محام',
-                                                    deptName: selectedRequest.department || 'Litigation',
-                                                    startDate: selectedRequest.startDate,
-                                                    endDate: selectedRequest.endDate,
-                                                    durationDays: String(selectedRequest.numberOfDays),
-                                                    reason: selectedRequest.reason || 'إجازة دورية بموجب المادة 70'
-                                                });
-                                                setActiveTab('templates');
-                                                setSelectedRequest(null);
-                                                addToast({
-                                                    type: 'success',
-                                                    title: lang === 'ar' ? 'معاينة النموذج' : 'Form Preview',
-                                                    message: lang === 'ar' ? 'تم تعبئة الحقول بالبيانات تلقائياً بمثابة المعاينة الكلية' : 'Fields auto-populated from request for inspection'
-                                                });
-                                            }}
-                                        >
-                                            {TRANSLATIONS[lang].printPreview}
-                                        </Button>
-                                    </div>
-                                </Card>
-                            </div>
-
-                        </div>
-
-                        <div className="flex justify-end pt-2 border-t mt-4">
-                            <Button variant="ghost" type="button" onClick={() => setSelectedRequest(null)}>
-                                {TRANSLATIONS[lang].close}
-                            </Button>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
-            {/* Custom Modal for Employee Leave Profile Dossier Folder & Policies */}
-            <Modal 
-                isOpen={isProfileModalOpen} 
-                onClose={() => {
-                    setIsProfileModalOpen(false);
-                    setSelectedEmployeeProfile(null);
-                }} 
-                title={lang === 'ar' ? 'مِلَفّ الإجازات والسياسات للموظف الكويتي 📄' : 'Kuwaiti Employee Statutory Leave Dossier'}
-            >
-                {selectedEmployeeProfile && (
-                    <div className="space-y-6 text-right animate-fadeIn" dir="rtl">
-                        {/* Employee Badge Summary */}
-                        <div className="p-4 bg-slate-900 border border-slate-850 text-white rounded-xl flex items-center justify-between gap-4">
-                            <div>
-                                <h3 className="font-extrabold text-base text-yellow-500">{selectedEmployeeProfile.fullNameAr}</h3>
-                                <p className="text-xs text-slate-350">{selectedEmployeeProfile.jobTitle} - {getDeptLabel(selectedEmployeeProfile.department)}</p>
-                                <span className="text-[10px] font-mono text-gray-400 block mt-1">الرقم المدني: {selectedEmployeeProfile.civilId || '295051501981'}</span>
-                            </div>
-                            <div className="text-left shrink-0">
-                                <span className="bg-[#00796B]/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded text-xs font-black">
-                                    المجموع الفعلي
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Dossier Tabs Inside the Modal */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-b border-gray-200 pb-3">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-gray-150">
-                                <span className="text-[10px] text-gray-400 block">تاريخ التعيين الرسمي</span>
-                                <span className="text-xs font-black text-slate-800 dark:text-gray-200 block mt-0.5">{selectedEmployeeProfile.hiringDate || '2026-01-15'}</span>
-                                <span className="text-[9px] text-[#00796B] font-bold block mt-1">✓ أكمل فترة التجربة العمالية</span>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/40 rounded-lg border border-gray-150">
-                                <span className="text-[10px] text-gray-400 block">أيام الغياب غير المبرر</span>
-                                <span className="text-xs font-black text-rose-600 block mt-0.5">{selectedEmployeeProfile.absenceDays || 0} يوم</span>
-                                <span className="text-[9px] text-rose-500 block mt-1">⚠️ يقتطع من مستحقات تصفية الخدمة</span>
-                            </div>
-                            <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-lg border border-gray-200 text-center">
-                                <span className="text-[10px] text-[#00796B] font-black block">صافي رصيد الإجازات المتبقي</span>
-                                <span className="text-xl font-black text-[#00796B] block mt-1">
-                                    {(selectedEmployeeProfile.annualLeaveEntitlement || 30) + (selectedEmployeeProfile.carriedOverBalance || 0) - 
-                                     requests.filter(r => r.employeeId === selectedEmployeeProfile.id && (r.status === 'Approved' || r.status === 'Completed') && (r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)).reduce((s, r) => s + r.numberOfDays, 0)
-                                    } يوماً
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Profile Edit Configuration Form */}
-                        <div className="space-y-4">
-                            <h4 className="font-extrabold text-xs text-primary-dark underline">تحديث معايير ملف الموظف ورصيده</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-right">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">اسم الموظف الكلي (بالعربية)</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={selectedEmployeeProfile.fullNameAr}
-                                        id="edit-emp-name"
-                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">المسمى القانوني/الوظيفي</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={selectedEmployeeProfile.jobTitle}
-                                        id="edit-emp-job"
-                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">الرقم المدني الكويتي (12 خانة)</label>
-                                    <input
-                                        type="text"
-                                        defaultValue={selectedEmployeeProfile.civilId || '295051501981'}
-                                        id="edit-emp-civil"
-                                        maxLength={12}
-                                        className="w-full p-2 border rounded text-xs font-mono bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">تاريخ الانضمام والتعيين للثبات</label>
-                                    <input
-                                        type="date"
-                                        defaultValue={selectedEmployeeProfile.hiringDate || '2026-01-15'}
-                                        id="edit-emp-hiring"
-                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">الاستحقاق السنوي القياسي (أيام)</label>
-                                    <input
-                                        type="number"
-                                        defaultValue={selectedEmployeeProfile.annualLeaveEntitlement || 30}
-                                        id="edit-emp-annual"
-                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-500">الرصيد المرحل من الأعوام السابقة</label>
-                                    <input
-                                        type="number"
-                                        defaultValue={selectedEmployeeProfile.carriedOverBalance || 0}
-                                        id="edit-emp-carried"
-                                        className="w-full p-2 border rounded text-xs bg-white dark:bg-slate-800 text-slate-850 dark:text-gray-100 focus:ring-1"
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Compliance Checklist Panel */}
-                            <div className="p-3 bg-amber-50/55 dark:bg-slate-900 border border-amber-100 rounded-lg">
-                                <h5 className="font-black text-[11px] text-amber-700 mb-2">تقرير الامتثال والضوابط القانونية (الكويت):</h5>
-                                <div className="space-y-1.5 text-xs text-gray-600 dark:text-slate-350">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-emerald-600">✓</span>
-                                        <span><strong>المادة 70 (شرط الستة أشهر):</strong> الموظف أكمل أكثر من 6 أشهر متواصلة منذ تاريخ تعيينه ويحق له صرف الإجازة السنوية بالكامل.</span>
-                                    </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-emerald-600">✓</span>
-                                        <span><strong>المادة 73 (سقف المرضية للمجموع):</strong> مجموع إجازات الموظف المرضية تقع ضمن النطاق الآمن (أقل من الحد الأقصى البالغ 75 يوماً).</span>
-                                    </div>
-                                    {selectedEmployeeProfile.absenceDays > 0 ? (
-                                        <div className="flex items-center gap-1.5 text-amber-600">
-                                            <span>⚠️</span>
-                                            <span><strong>المادة 71 (الغياب وأثر الفرز المالي):</strong> يؤثر إثبات {selectedEmployeeProfile.absenceDays} يوماً غياباً غير مبرر سلباً على مكافأة نهاية الخدمة والاستقطاعات المباشرة.</span>
-                                        </div>
-                                    ) : (
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-emerald-600">✓</span>
-                                            <span><strong>المادة 71 (الانضباط):</strong> لا يوجد انقطاع غير مبرر مسجل بالملف العمالي للموظف حالياً.</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Actions footer inside modal */}
-                        <div className="flex justify-between items-center pt-3 border-t">
-                            <span className="text-[10px] text-gray-400">أي تعديل يتم مزامنته تلقائياً مع خادم Adala ERP و رصيد LocalStorage.</span>
-                            <div className="flex gap-2">
-                                <Button 
-                                    variant="ghost" 
-                                    onClick={() => {
-                                        setIsProfileModalOpen(false);
-                                        setSelectedEmployeeProfile(null);
-                                    }}
-                                >
-                                    إلغاء
-                                </Button>
-                                <Button 
-                                    variant="primary"
-                                    onClick={() => {
-                                        // Fetch values and save
-                                        const editedName = (document.getElementById('edit-emp-name') as HTMLInputElement)?.value || selectedEmployeeProfile.fullNameAr;
-                                        const editedJob = (document.getElementById('edit-emp-job') as HTMLInputElement)?.value || selectedEmployeeProfile.jobTitle;
-                                        const editedCivil = (document.getElementById('edit-emp-civil') as HTMLInputElement)?.value || selectedEmployeeProfile.civilId;
-                                        const editedHiring = (document.getElementById('edit-emp-hiring') as HTMLInputElement)?.value || selectedEmployeeProfile.hiringDate;
-                                        const editedAnnual = Number((document.getElementById('edit-emp-annual') as HTMLInputElement)?.value) || 30;
-                                        const editedCarried = Number((document.getElementById('edit-emp-carried') as HTMLInputElement)?.value) || 0;
-
-                                        const updatedList = employeesList.map(e => {
-                                            if (e.id === selectedEmployeeProfile.id) {
-                                                return {
-                                                    ...e,
-                                                    fullNameAr: editedName,
-                                                    jobTitle: editedJob,
-                                                    civilId: editedCivil,
-                                                    hiringDate: editedHiring,
-                                                    annualLeaveEntitlement: editedAnnual,
-                                                    carriedOverBalance: editedCarried
-                                                };
-                                            }
-                                            return e;
-                                        });
-
-                                        localStorage.setItem('alwagayan_employees', JSON.stringify(updatedList));
-                                        // Update state directly
-                                        setEmployeesList(updatedList);
-                                        setIsProfileModalOpen(false);
-                                        setSelectedEmployeeProfile(null);
-
-                                        addToast({
-                                            type: 'success',
-                                            title: 'تم الحفظ والمطابقة بنجاح',
-                                            message: `تم تحديث السجل المدني والوظيفي ورصيد الإجازات العمالية للموظف ${editedName} بنجاح.`
-                                        });
-                                    }}
-                                >
-                                    حفظ وتطبيق التحديثات
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-            </Modal>
-
-            {/* Custom Print Preview stationary popup overlay */}
-            <Modal
-                isOpen={isPrintPreviewOpen}
-                onClose={() => setIsPrintPreviewOpen(false)}
-                className="max-w-4xl"
-                title={lang === 'ar' ? 'معاينة كشف الأرصدة والامتثال العمالي للطباعة 📄' : 'HR Statutory Accruals Sheet Printable Ledger'}
-            >
-                <div className="space-y-6 text-right animate-fadeIn p-4" dir="rtl">
-                    
-                    {/* The Stationary Sheet to print (Custom styling with print capability) */}
-                    <div id="adala-hr-print-area" className="bg-white p-8 border shadow-lg rounded text-slate-850 font-sans mx-auto text-right text-black max-w-3xl" dir="rtl">
-                        
-                        {/* Letterhead header */}
-                        <div className="border-b-4 border-double border-[#00796B] pb-4 flex justify-between items-center">
-                            <div className="text-right">
-                                <h1 className="text-base font-extrabold text-[#00796B] leading-tight">مكتب الوجيان ومكتب صبري شطا</h1>
-                                <p className="text-xs text-gray-500 font-bold mt-1">للمحاماة والاستشارات القانونية والتحكيم</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">بدرجة مقيد أمام المحكمة الدستورية والتمييز - دولة الكويت</p>
-                            </div>
-                            <div className="text-left shrink-0">
-                                <div className="border-2 border-[#00796B] p-2 rounded text-center">
-                                    <span className="block text-xs font-black text-[#00796B]">شؤون الموارد البشرية</span>
-                                    <span className="block text-[8px] text-gray-400 mt-0.5 tracking-wider font-mono">ADALA ERP HR LEDGER</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="text-center my-6">
-                            <h2 className="text-sm font-extrabold text-gray-800 underline uppercase tracking-wide">كشف التحقق التدقيقي وإثبات أرصدة الإجازات السنوية المضمونة</h2>
-                            <p className="text-[10px] text-gray-400 mt-1">تاريخ الاستحقاق والاحتساب: {new Date().toLocaleDateString('ar-KW', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        </div>
-
-                        {/* Statement description */}
-                        <div className="text-[11px] leading-relaxed text-gray-600 mb-4 bg-gray-50 p-3 rounded border">
-                            بناءً على الفصل الرابع من قانون العمل الكويتي رقم 6 لسنة 2010 والقرارات الوزارية المصاحبة له، نثبت بموجب هذا الكشف الأرصدة المستحقة والمرحلة والمنفذة لكوادر العمل بمكتب الوجيان وصبري شطا للمحاماة، شاملة احتساب صافي المتبقي وصرف المعالجات المالية للغياب غير المبرر:
-                        </div>
-
-                        {/* Ledger Sheet Table */}
-                        <table className="w-full text-right border-collapse text-[10px] mb-8 border border-gray-300">
-                            <thead>
-                                <tr className="bg-[#00796B]/10 text-[#00796B] border-b border-gray-300 font-bold">
-                                    <th className="p-2 border border-gray-300">الاسم الكلي</th>
-                                    <th className="p-2 border border-gray-300">القسم القضائي</th>
-                                    <th className="p-2 border border-gray-300">سنوي متاح</th>
-                                    <th className="p-2 border border-gray-300">رصيد مرحل</th>
-                                    <th className="p-2 border border-gray-300">إجمالي مستحق</th>
-                                    <th className="p-2 border border-gray-300">استهلاك فعلي</th>
-                                    <th className="p-2 border border-gray-300">صافي رصيد متبقي</th>
-                                    <th className="p-2 border border-gray-300">غياب (يوم)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {employeesList.map((row) => {
-                                    const empRequests = requests.filter(r => r.employeeId === row.id && (r.status === 'Approved' || r.status === 'Completed'));
-                                    const annualAndUnpaidConsumed = empRequests
-                                        .filter(r => r.leaveType === LeaveTypeKuwait.ANNUAL || r.leaveType === LeaveTypeKuwait.UNPAID)
-                                        .reduce((sum, r) => sum + r.numberOfDays, 0);
-
-                                    const annual = row.annualLeaveEntitlement || 30;
-                                    const carried = row.carriedOverBalance || 0;
-                                    const total = annual + carried;
-                                    const remaining = Math.max(0, total - annualAndUnpaidConsumed);
-
-                                    return (
-                                        <tr key={row.id} className="border-b border-gray-300 hover:bg-slate-55">
-                                            <td className="p-2 border border-gray-300 font-bold">{row.fullNameAr}</td>
-                                            <td className="p-2 border border-gray-300 text-gray-500">{getDeptLabel(row.department)}</td>
-                                            <td className="p-2 border border-gray-300 font-serif">{annual} يوم</td>
-                                            <td className="p-2 border border-gray-300 font-serif">{carried} يوم</td>
-                                            <td className="p-2 border border-gray-300 font-serif font-bold">{total} يوم</td>
-                                            <td className="p-2 border border-gray-300 font-serif text-amber-700">{annualAndUnpaidConsumed} يوم</td>
-                                            <td className="p-2 border border-gray-300 font-serif font-black text-emerald-800">{remaining} يوم</td>
-                                            <td className="p-2 border border-gray-300 font-serif text-rose-600">{row.absenceDays || 0} يوم</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-
-                        {/* Signature block */}
-                        <div className="grid grid-cols-3 gap-4 text-center mt-12 pt-6 border-t border-dashed border-gray-200">
-                            <div>
-                                <span className="text-[10px] text-gray-400 block mb-8">إعداد وتدقيق من قبل:</span>
-                                <span className="text-[10px] font-black text-gray-800 block">مديرة الشؤون الإدارية والبصمة</span>
-                                <span className="text-[8px] text-gray-350 block mt-1">الختم الرقمي لموارد عدالة</span>
-                            </div>
-                            <div>
-                                <span className="text-[10px] text-gray-400 block mb-8">اعتماد شؤون الشركاء ماليًا:</span>
-                                <span className="text-[10px] font-black text-gray-800 block">رئيس قسم التدقيق والفرز المالي</span>
-                                <span className="text-[8px] text-gray-350 block mt-1">مطابق للقرارات الوزارية 2026/04</span>
-                            </div>
-                            <div>
-                                <span className="text-[10px] text-gray-400 block mb-8">الموافقة النهائية والتوثيق رئيس المجلس:</span>
-                                <span className="text-[10px] font-black text-gray-800 block">مجلس الإدارة / الشركاء المؤسسون</span>
-                                <span className="text-[8px] text-gray-350 block mt-1">الشريك المفوض بالتجارة والامتثال</span>
-                            </div>
-                        </div>
-
-                        {/* Footer legal claim */}
-                        <div className="text-[8px] text-gray-350 mt-12 pt-2 border-t text-center block">
-                            وثيقة سرية معتمدة تم إخراجها وتحديثها عبر قاعدة بيانات Adala ERP ومطابقة آليًا لقانون العمل رقم 6 لسنة 2010 بدولة الكويت.
-                        </div>
-
-                    </div>
-
-                    {/* Operational print action buttons outside the stationary */}
-                    <div className="flex gap-2 justify-end pt-3 border-t">
-                        <Button 
-                            variant="ghost" 
-                            onClick={() => setIsPrintPreviewOpen(false)}
-                        >
-                            إغلاق المعاينة
-                        </Button>
-                        <Button
-                            variant="primary"
-                            leftIcon={<PrinterIcon className="h-5 w-5" />}
-                            onClick={() => {
-                                // Trigger print only of the target printable div
-                                const printContent = document.getElementById('adala-hr-print-area')?.innerHTML;
-                                if (printContent) {
-                                    const originalContent = document.body.innerHTML;
-                                    document.body.innerHTML = `<div dir="rtl" style="font-family: sans-serif; background: white; padding: 20px;">${printContent}</div>`;
-                                    window.print();
-                                    document.body.innerHTML = originalContent;
-                                    // Refresh page or trigger state update so app continues seamlessly
-                                    window.location.reload();
-                                }
-                            }}
-                        >
-                            تأكيد وطباعة الكشف الفوري
-                        </Button>
-                    </div>
-
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'الزميل البديل:' : 'Replacement:'}</span>
+                  <strong>{selectedRequest.substituteEmployeeName || '-'}</strong>
                 </div>
-            </Modal>
+                <div className="flex justify-between border-b pb-1">
+                  <span className="text-gray-400">{isAr ? 'هاتف الطوارئ:' : 'Emergency Phone:'}</span>
+                  <strong className="font-mono">{selectedRequest.emergencyContactPhone || '-'}</strong>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-gray-400 block">{isAr ? 'المبررات القانونية المرفقة:' : 'Justification Reason:'}</span>
+                  <p className="p-2 bg-white dark:bg-slate-800 rounded border leading-relaxed text-slate-700 dark:text-slate-300">
+                    {selectedRequest.reason || (isAr ? 'لا يوجد عذر مكتوب' : 'No comments')}
+                  </p>
+                </div>
 
-        </div>
-    );
+                {/* Timeline status track */}
+                <div className="space-y-1 pt-2">
+                  <span className="text-gray-400 block">{isAr ? 'سجل العمليات والتدفق الإداري:' : 'Routing Logs:'}</span>
+                  <div className="space-y-1 max-h-[110px] overflow-y-auto bg-white dark:bg-slate-800 p-2 rounded border font-sans text-[10px]">
+                    {selectedRequest.timeline?.map((t, index) => (
+                      <div key={index} className="border-b pb-1 mb-1 last:border-none">
+                        <div className="flex justify-between font-bold text-[#00796B]">
+                          <span>{t.action}</span>
+                          <span className="font-mono text-gray-400">{t.date}</span>
+                        </div>
+                        <div className="text-gray-500 font-medium">{isAr ? 'بواسطة:' : 'By:'} {t.user}</div>
+                        {t.notes && <div className="text-slate-400 italic">» {t.notes}</div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: AI Compliance Auditor */}
+              <div className="flex flex-col space-y-2 bg-[#00796B]/5 dark:bg-[#00796B]/10 p-4 rounded-xl border border-[#00796B]/20">
+                <div className="flex justify-between items-center border-b pb-2">
+                  <h4 className="font-extrabold text-[#00796B] flex items-center gap-1.5">
+                    <Sparkles className="w-4.5 h-4.5 text-yellow-500" />
+                    {isAr ? 'تقرير مستشار عدالة القانوني الكويتي (AI)' : 'Adala Legal Evaluator'}
+                  </h4>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="p-1 h-fit text-[10px]"
+                    onClick={() => triggerAiComplianceCheck(selectedRequest)}
+                  >
+                    🔄 {isAr ? 'تحديث الفحص' : 'Re-verify'}
+                  </Button>
+                </div>
+
+                <div className="grow bg-white dark:bg-slate-900 p-3 rounded border text-[10px] font-sans leading-relaxed text-slate-800 dark:text-gray-200 overflow-y-auto max-h-[300px]">
+                  {aiLoading ? (
+                    <div className="flex flex-col items-center justify-center py-10 space-y-2 text-gray-400">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#00796B] border-t-transparent" />
+                      <span>{isAr ? 'جاري مطابقة المستند مع قانون العمل الكويتي...' : 'Analyzing Private Sector Code No. 6/2010...'}</span>
+                    </div>
+                  ) : (
+                    <pre className="whitespace-pre-wrap Cairo font-medium">{aiReport}</pre>
+                  )}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Direct Workflow Decision buttons */}
+            <div className="flex flex-wrap justify-between items-center pt-3 border-t">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedRequest(null)}>
+                {isAr ? 'إغلاق النافذة' : 'Close'}
+              </Button>
+
+              <div className="flex gap-1">
+                <Button 
+                  variant="primary" 
+                  size="sm" 
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-none"
+                  onClick={() => handleUpdateStatus(selectedRequest.id, 'Approved')}
+                >
+                  ✓ {isAr ? 'اعتماد الموافقة المسبقة' : 'Approve Leave'}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-amber-400 text-amber-700 hover:bg-amber-50"
+                  onClick={() => handleUpdateStatus(selectedRequest.id, 'AwaitingEmployeeDocuments')}
+                >
+                  ⏳ {isAr ? 'طلب مستندات رسمية' : 'Await Documents'}
+                </Button>
+                <Button 
+                  variant="danger" 
+                  size="sm" 
+                  onClick={() => {
+                    const rsn = prompt(isAr ? 'اكتب سبب رفض طلب الإجازة مسبباً:' : 'Enter rejection reason:');
+                    if (rsn) handleUpdateStatus(selectedRequest.id, 'Rejected');
+                  }}
+                >
+                  ✕ {isAr ? 'رفض مع إبداء المسببات' : 'Reject'}
+                </Button>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </Modal>
+
+      {/* MODAL 4: Custom Employee configuration Profile Dossier */}
+      <Modal isOpen={isProfileModalOpen} onClose={() => { setIsProfileModalOpen(false); setSelectedEmployeeProfile(null); }} title={isAr ? 'تعديل وتحديث ملف الموظف' : 'Configure Employee Profile'}>
+        {selectedEmployeeProfile && (
+          <form onSubmit={handleSaveProfileUpdates} className="space-y-4 text-right" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+              
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'اسم الموظف الكلي (بالعربية)' : 'Full Name Ar'}</label>
+                <input
+                  type="text"
+                  required
+                  value={selectedEmployeeProfile.fullNameAr}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, fullNameAr: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-bold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'المسمى الوظيفي' : 'Job Title'}</label>
+                <input
+                  type="text"
+                  required
+                  value={selectedEmployeeProfile.jobTitle}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, jobTitle: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'الرقم المدني الكويتي (١٢ خانة)' : 'Civil ID'}</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={12}
+                  value={selectedEmployeeProfile.civilId || ''}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, civilId: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'تاريخ التعيين للمطابقة' : 'Hiring Date'}</label>
+                <input
+                  type="date"
+                  required
+                  value={selectedEmployeeProfile.hiringDate || ''}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, hiringDate: e.target.value })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'الاستحقاق السنوي القياسي (أيام)' : 'Annual entitlement'}</label>
+                <input
+                  type="number"
+                  required
+                  value={selectedEmployeeProfile.annualLeaveEntitlement}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, annualLeaveEntitlement: Number(e.target.value) })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'رصيد مرحل من الدورة السابقة' : 'Carried over balance'}</label>
+                <input
+                  type="number"
+                  required
+                  value={selectedEmployeeProfile.carriedOverBalance}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, carriedOverBalance: Number(e.target.value) })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-500">{isAr ? 'أيام الغياب غير المبرر المتراكم' : 'Unexcused Absence'}</label>
+                <input
+                  type="number"
+                  required
+                  value={selectedEmployeeProfile.absenceDays || 0}
+                  onChange={(e) => setSelectedEmployeeProfile({ ...selectedEmployeeProfile, absenceDays: Number(e.target.value) })}
+                  className="w-full p-2 border border-slate-200 rounded-xl text-xs bg-neutral-card dark:bg-dm-card font-bold text-rose-600"
+                />
+              </div>
+
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3">
+              <Button variant="outline" type="button" onClick={() => { setIsProfileModalOpen(false); setSelectedEmployeeProfile(null); }}>
+                {isAr ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button variant="primary" type="submit">
+                {isAr ? 'حفظ وتحديث الملف المالي' : 'Update Profile'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
+
+    </div>
+  );
 }

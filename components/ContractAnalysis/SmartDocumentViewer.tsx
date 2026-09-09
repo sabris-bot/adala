@@ -17,6 +17,15 @@ interface Annotation {
     date: string;
 }
 
+interface Annotation {
+    id: string;
+    clauseIndex: number;
+    author: string;
+    type: 'legal' | 'hr' | 'finance';
+    comment: string;
+    date: string;
+}
+
 interface SmartDocumentViewerProps {
     viewerText: string;
     setViewerText: (text: string) => void;
@@ -26,7 +35,7 @@ interface SmartDocumentViewerProps {
     setAnnotations: React.Dispatch<React.SetStateAction<Annotation[]>>;
     selectedParagraph: number;
     setSelectedParagraph: (idx: number) => void;
-    onRunAI: () => void;
+    onRunAI: (jurisdiction: string, contractType: string) => void;
     isLoading: boolean;
     isSealed: boolean;
     applySealStampWithAnimation: () => void;
@@ -74,6 +83,9 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
     const [newAnnotationType, setNewAnnotationType] = useState<'legal' | 'hr' | 'finance'>('legal');
     const [isDragOver, setIsDragOver] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const [targetJurisdiction, setTargetJurisdiction] = useState('الكويت');
+    const [targetContractType, setTargetContractType] = useState('عقد عمل');
 
     // Splitted clauses index for smooth navigation
     const structuredClauses = useMemo(() => {
@@ -408,21 +420,62 @@ export const SmartDocumentViewer: React.FC<SmartDocumentViewerProps> = ({
                         )}
                     </AnimatePresence>
 
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-4">
+                        <div className="bg-slate-50 dark:bg-slate-900/60 p-3.5 rounded-2xl border border-slate-150/60 dark:border-slate-800 text-right space-y-2.5">
+                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                                تخصيص صنف العقد ومطابقة الاختصاص:
+                            </span>
+                            <div className="grid grid-cols-2 gap-2 text-right">
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 block mb-1">الاختصاص القضائي</label>
+                                    <select
+                                        value={targetJurisdiction}
+                                        onChange={(e) => setTargetJurisdiction(e.target.value)}
+                                        className="w-full bg-white dark:bg-dm-card border border-slate-200 dark:border-slate-850 rounded-xl h-8.5 px-2 text-[10px] font-black text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#134D41] cursor-pointer"
+                                    >
+                                        <option value="دولة الكويت">الكويت (6/2010 والمدني)</option>
+                                        <option value="المملكة العربية السعودية">السعودية (نظام العمل)</option>
+                                        <option value="دولة الإمارات">الإمارات (تنظيم العمل)</option>
+                                        <option value="جمهورية مصر العربية">مصر (القانون المدني)</option>
+                                        <option value="لوائح دولية عامة">لوائح دولية وعامة</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[9px] font-black text-slate-400 block mb-1">نوع وتصنيف العقد</label>
+                                    <select
+                                        value={targetContractType}
+                                        onChange={(e) => setTargetContractType(e.target.value)}
+                                        className="w-full bg-white dark:bg-dm-card border border-slate-200 dark:border-slate-850 rounded-xl h-8.5 px-2 text-[10px] font-black text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-1 focus:ring-[#134D41] cursor-pointer"
+                                    >
+                                        <option value="عقد عمل">عقد عمل</option>
+                                        <option value="عقد إيجار">عقد إيجار</option>
+                                        <option value="عقد شراكة">عقد شراكة</option>
+                                        <option value="عقد بيع">عقد بيع</option>
+                                        <option value="عقد خدمات">عقد خدمات</option>
+                                        <option value="اتفاقية سرية">اتفاقية سرية (NDA)</option>
+                                        <option value="عقد استثمار">عقد استثمار</option>
+                                        <option value="عقد مقاولات">عقد مقاولات / إنشاء</option>
+                                        <option value="تأمين وتوريد">عقد تأمين وتوريد</option>
+                                        <option value="آخر">تصنيف مخصص آخر</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
                         <button 
                             className="w-full bg-[#134D41] hover:bg-[#0f2d25] disabled:opacity-50 text-white rounded-xl h-11 font-black text-xs flex items-center justify-center gap-2 shadow-lg transition-all"
-                            onClick={onRunAI}
+                            onClick={() => onRunAI(targetJurisdiction, targetContractType)}
                             disabled={isLoading || !viewerText.trim()}
                         >
                             {isLoading ? (
                                 <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                             ) : (
-                                <Sparkles className="w-4 h-4 text-emerald-300" />
+                                <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
                             )}
-                            تفعيل الفحص والتحليل القانوني للبنود (AI)
+                            تحليل المستند والتحقق الفني الشامل (AI)
                         </button>
-                        <p className="text-[9px] text-slate-400 font-bold text-center animate-pulse">
-                            يتم قراءة الصك ومطابقة التوافق مع مرسوم قانون العمل الكويتي 6/2010 والملحق المدني
+                        <p className="text-[9px] text-[#134D41] dark:text-emerald-400 font-extrabold text-center">
+                            يتم الآن التدقيق ومطابقة التوافق مع لوائح {targetJurisdiction} لصنف {targetContractType}.
                         </p>
                     </div>
                 </div>

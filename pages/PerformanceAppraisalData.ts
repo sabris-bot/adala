@@ -1,8 +1,148 @@
 import { LocalEmployee, LocalAppraisal } from './PerformanceAppraisalTypes';
 
-export const mockEmployeesList: LocalEmployee[] = [];
+export const mockEmployeesList: LocalEmployee[] = [
+  {
+    id: 'emp-101',
+    employeeId: 'K-101',
+    civilId: '292021500123',
+    fullName: { ar: 'فاطمة علي حسين السيد', en: 'Fatima Ali Husain Al-Sayed' },
+    jobTitle: { ar: 'مستشار قانوني أول', en: 'Senior Legal Consultant' },
+    department: { ar: 'الاستشارات', en: 'Consultation' },
+    joiningDate: '2021-01-15',
+    basicSalary: 1850,
+    allowancesAmount: 350,
+    nationality: { ar: 'كويتي', en: 'Kuwaiti' },
+    warningsCount: 0,
+    avatarInitials: 'ف ع',
+    hireDate: '2021-01-15'
+  },
+  {
+    id: 'emp-102',
+    employeeId: 'E-102',
+    civilId: '288051200987',
+    fullName: { ar: 'أحمد محمود مبارك', en: 'Ahmed Mahmoud Mubarak' },
+    jobTitle: { ar: 'محاسب رئيسي لشؤون قضايا الموكلين', en: 'Accountant' },
+    department: { ar: 'المالية', en: 'Finance' },
+    joiningDate: '2020-03-01',
+    basicSalary: 950,
+    allowancesAmount: 200,
+    nationality: { ar: 'مصري', en: 'Egyptian' },
+    warningsCount: 1,
+    avatarInitials: 'أ م',
+    hireDate: '2020-03-01'
+  },
+  {
+    id: 'emp-103',
+    employeeId: 'K-103',
+    civilId: '294082200456',
+    fullName: { ar: 'بدر فهد المطيري', en: 'Bader Fahad Al-Mutairi' },
+    jobTitle: { ar: 'أمين سر جلسات وسكرتارية قانونية', en: 'Legal Secretary / Court Clerk' },
+    department: { ar: 'التقاضي والمحاكم', en: 'Litigation' },
+    joiningDate: '2023-05-10',
+    basicSalary: 1100,
+    allowancesAmount: 100,
+    nationality: { ar: 'كويتي', en: 'Kuwaiti' },
+    warningsCount: 1,
+    avatarInitials: 'ب ف',
+    hireDate: '2023-05-10'
+  }
+];
 
-export const initialAppraisalsSeed: LocalAppraisal[] = [];
+export const initialAppraisalsSeed: LocalAppraisal[] = [
+  {
+    id: 'app-101-2026',
+    employeeId: 'emp-101',
+    appraisalPeriod: 'Q1 2026',
+    appraisalDate: '2026-04-01',
+    status: 'Certified',
+    appraiserName: { ar: 'لجنة الشركاء برئاسة أ. صبري شطا', en: 'Partnership Committee led by S. Shatta' },
+    overallScore: 4.75,
+    scores: {
+      drafting: 4.9,
+      successRate: 4.8,
+      clientRelations: 4.7,
+      compliance: 4.6
+    },
+    strengths: { 
+      ar: 'مستوى استثنائي في صياغة مذكرات التمييز والدستورية واستنباط الدفوع الدقيقة أمام محكمة الاستئناف العليا وتوجيه مسار القضايا الكبرى بنجاح.', 
+      en: 'Exceptional skill in drafting Cassation & Constitutional briefs, discovering vital loopholes before Court of Appeals, and leading multi-million KWD cases.' 
+    },
+    improvements: { 
+      ar: 'مزيد من التمكين اللغوي باللغة الإنجليزية القانونية لتناسب العقود التجارية والتحكيم الدولي التناظري بمشاركة جمعية المحامين الكويتية.', 
+      en: 'Further skill training in bilingual English legal drafting to cater to complex commercial contracts and international arbitration.' 
+    },
+    training: { 
+      ar: 'ورشة عمل العقود التجارية الدولية وصياغة الشروط التحكيمية النموذجية - جامعة الكويت.', 
+      en: 'Bilingual International Arbitration Advocacy Course - KBA accredited.' 
+    },
+    refId: 'QA-PERF-2026-101',
+    signatureCode: 'SHA-256-4921-FATIMA-ALSAYED',
+    signeeName: { ar: 'أ. صبري شطا', en: 'Sabri Shatta, Esq.' },
+    signedAt: '2026-04-01'
+  },
+  {
+    id: 'app-102-2026',
+    employeeId: 'emp-102',
+    appraisalPeriod: 'Q1 2026',
+    appraisalDate: '2026-04-03',
+    status: 'Certified',
+    appraiserName: { ar: 'الإدارة المالية والموارد البشرية', en: 'Finance & HR Directorate' },
+    overallScore: 4.15,
+    scores: {
+      drafting: 3.5,
+      successRate: 4.2,
+      clientRelations: 4.4,
+      compliance: 4.5
+    },
+    strengths: { 
+      ar: 'دقة عالية ومواظبة تامة في ضبط تسوية القيد القضائي ومتابعة الرسوم الدورية لوزارة العدل وتصنيف الذمم المالية ومستندات الخبراء بحيادية كاملة.', 
+      en: 'Highly meticulous in court fee settlements, expert reports accounting, client billing tracking, and regular financial balances auditing.' 
+    },
+    improvements: { 
+      ar: 'تحديث سجل البصمة بانتظام وتجنب الإنذارات اللائحية مع التنسيق الفوري مع HR لتجديد الإقامة والبطاقة المدنية المنتهية تفادياً لغرامات القوى العاملة.', 
+      en: 'Ensure continuous attendance log conformity, avoid biometric lag warnings, and initiate timely residency renewal with HR.' 
+    },
+    training: { 
+      ar: 'دورة النظام المحاسبي المتطور للمكاتب الاستشارية والمحاسبة القضائية.', 
+      en: 'Advanced Court Accounting & Forensic Auditing Seminar.' 
+    },
+    refId: 'QA-PERF-2026-102',
+    signatureCode: 'SHA-256-9912-AHMED-MUBARAK',
+    signeeName: { ar: 'أ. صبري شطا', en: 'Sabri Shatta, Esq.' },
+    signedAt: '2026-04-03'
+  },
+  {
+    id: 'app-103-2026',
+    employeeId: 'emp-103',
+    appraisalPeriod: 'Q1 2026',
+    appraisalDate: '2026-04-10',
+    status: 'Certified',
+    appraiserName: { ar: 'رئاسة قسم التقاضي وإعلانات المحاكم', en: 'Litigation & Court Liaison Dept' },
+    overallScore: 3.85,
+    scores: {
+      drafting: 3.2,
+      successRate: 4.1,
+      clientRelations: 4.0,
+      compliance: 4.1
+    },
+    strengths: { 
+      ar: 'متابعة ميدانية حازمة لملفات الإعلان، مراجعة الجدول بالمحكمة الكلية الكبرى، تقديم الطعون القضائية بالآجال المحددة بنسبة كسب وتكامل تتخطى المتوقع.', 
+      en: 'Excellent field execution of court notifications, diligent checkups at the High Court registry, and on-time appeal filing.' 
+    },
+    improvements: { 
+      ar: 'تسليم تقارير الجلسات المنجزة دورياً للمستشارين لتضمينها في مذكرات الدفوع وتفادي إيقاف التنافسية أو تجميد حافز الدوام.', 
+      en: 'Provide structured daily court reports to lead counsel to optimize briefing schedules and prevent docket overlap.' 
+    },
+    training: { 
+      ar: 'ورشة أصول الإعلانات والتبليغات القضائية الرسمية في المشرع الكويتي الحديث.', 
+      en: 'Modern Notification Standards & Court Procedures Seminar.' 
+    },
+    refId: 'QA-PERF-2026-103',
+    signatureCode: 'SHA-256-1045-BADER-ALMUTAIRI',
+    signeeName: { ar: 'أ. صبري شطا', en: 'Sabri Shatta, Esq.' },
+    signedAt: '2026-04-10'
+  }
+];
 
 export const translations = {
   ar: {

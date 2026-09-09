@@ -157,16 +157,26 @@ export const StructuredAnalysisPanel: React.FC<StructuredAnalysisPanelProps> = (
                     <div className="border border-slate-200/60 bg-white dark:bg-dm-card rounded-2xl p-5 text-center flex flex-col justify-center">
                         <span className="text-[10px] text-slate-500 font-extrabold block">القانون المرجعي للتدقيق</span>
                         <strong className="text-md sm:text-lg font-black text-slate-800 dark:text-white block mt-1">
-                            قانون العمل الكويتي (٦/٢٠١٠)
+                            {contract.category === 'عقد عمل' 
+                                ? (contract.financials?.currency === 'SAR' ? 'نظام العمل السعودي (مرسوم م/51)' : contract.financials?.currency === 'AED' ? 'قانون تنظيم علاقات العمل الإماراتي' : contract.financials?.currency === 'EGP' ? 'قانون العمل المصري رقم 12 لسنة 2003' : 'قانون العمل الكويتي (٦/٢٠١٠)')
+                                : contract.category === 'عقد إيجار'
+                                ? (contract.financials?.currency === 'SAR' ? 'نظام المعاملات المدنية السعودي (الإيجار)' : 'قانون الإيجارات وإيجار العقارات')
+                                : (contract.financials?.currency === 'SAR' ? 'أنظمة المعاملات المدنية والتجارية بالمملكة' : contract.financials?.currency === 'AED' ? 'قانون المعاملات المدنية والتجارية الإماراتي' : contract.financials?.currency === 'EGP' ? 'القانون المدني والتجاري المصري' : 'القانون المدني والتجاري الكويتي')}
                         </strong>
-                        <span className="text-[9px] text-slate-400 font-bold mt-1">تحديث الفتوى والتشريع للمحاكم</span>
+                        <span className="text-[9px] text-slate-400 font-bold mt-1">محدث طِبقاً لآخر التعديلات التشريعية للمحاكم</span>
                     </div>
                 </div>
 
                 <div className="bg-white dark:bg-dm-card border border-slate-150/65 dark:border-slate-800 p-4 rounded-2xl text-right space-y-2">
                     <span className="text-[10px] font-black text-[#134D41] block">ديباجة رأي هيئة المراجعة:</span>
                     <p className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 leading-relaxed">
-                        بموجب المراجعة الرقمية لملف التعاقد للطرف الثاني ({contract.parties.secondParty})، تمت المقارنة الآلية لبنود ساعات العمل، فترات الراحة، شروط التجربة المحددة بـ {contract.duration || 'عقد معتاد'} وبدل رصيد الإجازات. تلتزم الصياغة بالحدود القانونية وحقوق العمالة المستقرة.
+                        {contract.category === 'عقد عمل' ? (
+                            `بموجب المراجعة الرقمية لملف التعاقد للطرف الثاني (${contract.parties.secondParty})، تمت المقارنة الآلية لبنود ساعات العمل، فترات الراحة، شروط التجربة المحددة بـ ${contract.duration || 'عقد معتاد'} وبدل رصيد الإجازات. تلتزم الصياغة بالحدود القانونية وحقوق العمالة المستقرة.`
+                        ) : contract.category === 'عقد إيجار' ? (
+                            `بموجب الفحص الفني لملف الإيجار للأطراف (${contract.parties.firstParty}) و(${contract.parties.secondParty})، تمت مراجعة بنود العين المؤجرة، القيمة الإيجارية الشهرية المقدرة بـ ${contract.financials?.value ? contract.financials.value.toLocaleString() : 'المدونة'} ${contract.financials?.currency || 'KWD'}، ومطابقة التوافق مع النظم التنظيمية وقواعد المحكمة.`
+                        ) : (
+                            `بموجب الفحص الفني والآلي الذكي لعقد (${contract.category || 'مخصص'}) بين الأطراف (${contract.parties.firstParty}) و (${contract.parties.secondParty})، تم تدقيق بنود الالتزامات المشتركة، بنود الإشعار، نطاق المسؤولية والشرط الجزائي، والمطابقة مع القواعد العامة للالتزام بموجب الباب الخاص بنوع التعاقد.`
+                        )}
                     </p>
                 </div>
             </div>

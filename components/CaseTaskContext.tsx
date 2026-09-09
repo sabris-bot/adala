@@ -46,6 +46,11 @@ export const CaseTaskProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [tasks, setTasks] = useState<AdminTask[]>(initialMockTasks);
   const [hearings, setHearings] = useState<Hearing[]>(generateInitialHearings(initialCases));
 
+  // Two-Way real-time synchronization with notification service
+  React.useEffect(() => {
+    notificationService.syncWithSystem(tasks, hearings);
+  }, [tasks, hearings]);
+
   const runAutomationRules = useCallback((trigger: { type: 'HEARING_COMPLETED'; caseId: string }) => {
     if (trigger.type === 'HEARING_COMPLETED') {
         const affectedCases = cases.filter(c => c.id === trigger.caseId);

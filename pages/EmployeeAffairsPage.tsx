@@ -12,7 +12,7 @@ import {
     ArrowDownTrayIcon, PaperAirplaneIcon, ChatBubbleLeftRightIcon, ClockIcon,
     BriefcaseIcon, AcademicCapIcon, MapPinIcon, ShieldExclamationIcon,
     ArrowPathIcon, PlusIcon, PrinterIcon, CheckIcon, WrenchScrewdriverIcon,
-    XMarkIcon, BanknotesIcon, PlusCircleIcon
+    XMarkIcon, BanknotesIcon, PlusCircleIcon, MagnifyingGlassIcon
 } from '../constants';
 import Button from '../components/ui/Button';
 import PrintHeader from '../components/ui/PrintHeader';
@@ -29,6 +29,7 @@ interface FeatureCardProps {
   linkTo: string;
   icon: React.ReactNode;
   color?: string;
+  category?: string;
 }
 
 const FeatureCard: React.FC<FeatureCardProps> = ({ title, description, linkTo, icon, color = 'indigo' }) => (
@@ -56,7 +57,18 @@ const EmployeeAffairsPage: React.FC = () => {
     // --- State and Local Storage Integrations ---
     const [employees, setEmployees] = useState<any[]>(() => {
         const stored = localStorage.getItem('alwagayan_employees');
-        return stored ? JSON.parse(stored) : initialEmployees;
+        if (stored) {
+            const parsed = JSON.parse(stored);
+            // Auto refresh if our newly introduced metadata field (emergencyContact) is missing
+            const hasEmergency = parsed.every((emp: any) => emp.emergencyContact !== undefined);
+            const hasCorrectExpiry = parsed.some((emp: any) => emp.id === 'emp-102' && emp.civilIdExpiry === '2026-05-15');
+            if (!hasEmergency || !hasCorrectExpiry) {
+                localStorage.setItem('alwagayan_employees', JSON.stringify(initialEmployees));
+                return initialEmployees;
+            }
+            return parsed;
+        }
+        return initialEmployees;
     });
 
     const [leaveRequests, setLeaveRequests] = useState<any[]>(() => {
@@ -107,6 +119,8 @@ const EmployeeAffairsPage: React.FC = () => {
 
     const [language, setLanguage] = useState<'ar' | 'en'>('ar');
     const [activeTab, setActiveTab] = useState<'dashboard' | 'submodules' | 'alerts' | 'requests' | 'timeline' | 'official_docs' | 'ai' | 'compliance_audit'>('dashboard');
+    const [selectedSubmoduleCategory, setSelectedSubmoduleCategory] = useState<string>('all');
+    const [submoduleSearchQuery, setSubmoduleSearchQuery] = useState<string>('');
 
     // --- Official Doc Generator Selection State ---
     const [docType, setDocType] = useState<'salary' | 'experience' | 'warning' | 'social_pifss' | 'settlement'>('salary');
@@ -515,77 +529,88 @@ const EmployeeAffairsPage: React.FC = () => {
             description: 'السجلات القانونية الكاملة، الأوراق الثبوتية، البيانات الاجتماعية والعملية والبنكية.',
             linkTo: '/employee-affairs/profiles',
             icon: <UserCircleIcon className="w-7 h-7" />,
-            color: 'indigo'
+            color: 'indigo',
+            category: 'core'
         },
         {
             title: 'رواتب الموظفين والبدلات',
             description: 'مسير الرواتب الشهري الموحد، البدلات والخصومات ومطابقة شروط حماية الأجور WPS.',
             linkTo: '/employee-affairs/payroll',
             icon: <CurrencyDollarIcon className="w-7 h-7" />,
-            color: 'emerald'
+            color: 'emerald',
+            category: 'payroll'
         },
         {
             title: 'سلف وقروض الموظفين',
             description: 'إدارة السلف والقروض الحسنة للموظفين واحتساب الأقساط الشهرية والتسويات القانونية.',
             linkTo: '/employee-affairs/loans',
             icon: <BanknotesIcon className="w-7 h-7" />,
-            color: 'teal'
+            color: 'teal',
+            category: 'payroll'
         },
         {
             title: 'نهاية الخدمة والمستحقات',
             description: 'تنفيذ احتساب مكافأة نهاية الخدمة الفورية بالتوافق الكامل مع المادة 51 من قانون العمل.',
             linkTo: '/employee-affairs/end-of-service',
             icon: <CalculatorIcon className="w-7 h-7" />,
-            color: 'rose'
+            color: 'rose',
+            category: 'payroll'
         },
         {
             title: 'الاستقطاب والتوظيف الجديد',
             description: 'إدارة فرص العمل الشاغرة، فرز المترشحين، ومطابقات المستندات مع الهيئة العامة للقوى العاملة.',
             linkTo: '/employee-affairs/recruitment',
             icon: <PlusCircleIcon className="w-7 h-7" />,
-            color: 'cyan'
+            color: 'cyan',
+            category: 'core'
         },
         {
             title: 'عقود العمل الوطنية والوافدة',
             description: 'صياغة وتوثيق العقود المحددة وغير المحددة، ومراقبة فترات الاختبار والديباجات الثنائية.',
             linkTo: '/employee-affairs/contracts',
             icon: <DocumentTextIcon className="w-7 h-7" />,
-            color: 'indigo'
+            color: 'indigo',
+            category: 'core'
         },
         {
             title: 'إدارة الإجازات والأرصدة',
             description: 'نظام رصد وحساب استهلاك الإجازات (السنوية، العائلية، الطارئة والمرضية المتدرجة).',
             linkTo: '/employee-affairs/leave-management',
             icon: <CalendarDaysIcon className="w-7 h-7" />,
-            color: 'amber'
+            color: 'amber',
+            category: 'attendance'
         },
         {
             title: 'الإجراءات التأديبية والإنذارات',
             description: 'تنفيذ القواعد الإدارية والجزاءات التراكمية المعتمدة وفقاً للائحة والمواد العمالية.',
             linkTo: '/employee-affairs/disciplinary',
             icon: <ExclamationTriangleIcon className="w-7 h-7" />,
-            color: 'orange'
+            color: 'orange',
+            category: 'compliance'
         },
         {
             title: 'لجان التحقيق الإداري',
             description: 'تحضير وإتمام التحقيقات الإدارية والعرائض القانونية بمحاضر اجتماعات متماسكة.',
             linkTo: '/employee-affairs/investigations',
             icon: <GavelIcon className="w-7 h-7" />,
-            color: 'amber'
+            color: 'amber',
+            category: 'compliance'
         },
         {
             title: 'تقييم الأداء والتقارير الشاملة',
             description: 'نظام رصد الكفاءات السنوي وربط مؤشرات العمل والتقديرات لغايات الترقيات والعلاوات.',
             linkTo: '/employee-affairs/performance',
             icon: <ChartBarIcon className="w-7 h-7" />,
-            color: 'blue'
+            color: 'blue',
+            category: 'compliance'
         },
         {
             title: 'إدارة طلبات الموظفين',
             description: 'قبول وتعديل واعتماد الطلبات الإدارية كطلب شهادات الرواتب وتسييل الإجازات المتراكمة.',
             linkTo: '/employee-affairs/requests',
             icon: <ChatBubbleLeftEllipsisIcon className="w-7 h-7" />,
-            color: 'indigo'
+            color: 'indigo',
+            category: 'attendance'
         }
     ];
 
@@ -1209,21 +1234,144 @@ const EmployeeAffairsPage: React.FC = () => {
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.98 }}
                             key="submodules"
-                            className="space-y-8"
+                            className="space-y-8 animate-fade-in"
                         >
-                            <div className="flex items-center justify-between mb-2">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-150">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2 h-8 bg-indigo-600 rounded-full" />
-                                    <h2 className="text-2xl font-black text-slate-900">{translate('منظومة الموارد البشرية وشؤون الموظفين المتطورة', 'Advanced HR & Personnel Management Submodules')}</h2>
+                                    <div className="w-2 h-8 bg-indigo-650 rounded-full" />
+                                    <div>
+                                        <h2 className="text-2xl font-black text-slate-900">{translate('منظومة الموارد البشرية وشؤون الموظفين المتطورة', 'Advanced HR & Personnel Management Submodules')}</h2>
+                                        <p className="text-xs text-slate-400 mt-0.5">{translate('بوابة الموارد البشرية المتكاملة لتنظيم وتتبع شؤون الموظفين قانونياً ومالياً وإدارياً', 'Integrated HR portal to organize and monitor employee files, payroll, and compliance rules')}</p>
+                                    </div>
                                 </div>
-                                <span className="text-[10px] font-black text-indigo-650 bg-indigo-50 px-4 py-2 rounded-full uppercase tracking-widest">{features.length} ACTIVE Submodules</span>
+                                <span className="text-[10px] font-black text-indigo-650 bg-indigo-50 px-4 py-2 rounded-full uppercase tracking-widest self-start md:self-center shrink-0">{features.length} ACTIVE Submodules</span>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                {features.map(f => (
-                                    <FeatureCard key={f.title} {...f} />
-                                ))}
+                            {/* Search and Categories Toolbar */}
+                            <div className="bg-white p-5 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+                                <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4">
+                                    {/* Category Filter Pills */}
+                                    <div className="flex flex-wrap gap-2">
+                                        {[
+                                            { id: 'all', titleAr: 'جميع الوحدات', titleEn: 'All Units', count: features.length },
+                                            { id: 'core', titleAr: 'الملفات والتعيين', titleEn: 'Core Records', count: features.filter(f => f.category === 'core').length },
+                                            { id: 'payroll', titleAr: 'الرواتب والمالية', titleEn: 'Payroll & Finance', count: features.filter(f => f.category === 'payroll').length },
+                                            { id: 'attendance', titleAr: 'الإجازات والطلبات', titleEn: 'Leaves & Requests', count: features.filter(f => f.category === 'attendance').length },
+                                            { id: 'compliance', titleAr: 'الامتثال والتقييم', titleEn: 'Compliance & Performance', count: features.filter(f => f.category === 'compliance').length },
+                                        ].map(cat => (
+                                            <button
+                                                key={cat.id}
+                                                onClick={() => setSelectedSubmoduleCategory(cat.id)}
+                                                className={`px-4 py-2.5 rounded-xl font-black text-xs transition-all flex items-center gap-2 ${
+                                                    selectedSubmoduleCategory === cat.id
+                                                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
+                                                    : 'bg-slate-50 text-slate-650 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                <span>{language === 'ar' ? cat.titleAr : cat.titleEn}</span>
+                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                                                    selectedSubmoduleCategory === cat.id
+                                                    ? 'bg-white/20 text-white'
+                                                    : 'bg-slate-200 text-slate-500'
+                                                }`}>{cat.count}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Search Input Box */}
+                                    <div className="relative flex-grow lg:max-w-md">
+                                        <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center pointer-events-none text-slate-400">
+                                            <MagnifyingGlassIcon className="w-4 h-4" />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={submoduleSearchQuery}
+                                            onChange={(e) => setSubmoduleSearchQuery(e.target.value)}
+                                            placeholder={translate('البحث السريع عن وحدة إدارية أو مالية...', 'Search for a submodule...')}
+                                            className="w-full pl-4 pr-10 py-3 bg-slate-50 border border-slate-150 rounded-2xl font-bold text-xs focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-right placeholder:text-slate-400"
+                                        />
+                                        {submoduleSearchQuery && (
+                                            <button
+                                                onClick={() => setSubmoduleSearchQuery('')}
+                                                className="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400 hover:text-slate-600"
+                                            >
+                                                <XMarkIcon className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
+
+                            {/* Rendered Columns & Submodules */}
+                            {(() => {
+                                // Filter submodules based on criteria
+                                const filteredFeatures = features.filter(f => {
+                                    const matchesCat = selectedSubmoduleCategory === 'all' || f.category === selectedSubmoduleCategory;
+                                    const matchesSearch = submoduleSearchQuery.trim() === '' || 
+                                        f.title.toLowerCase().includes(submoduleSearchQuery.toLowerCase()) ||
+                                        f.description.toLowerCase().includes(submoduleSearchQuery.toLowerCase());
+                                    return matchesCat && matchesSearch;
+                                });
+
+                                if (filteredFeatures.length === 0) {
+                                    return (
+                                        <Card className="p-16 rounded-[2.5rem] bg-white border border-slate-100 text-center shadow-sm">
+                                            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mx-auto mb-4">
+                                                <MagnifyingGlassIcon className="w-8 h-8 text-slate-400" />
+                                            </div>
+                                            <h3 className="text-base font-black text-slate-800">{translate('لا توجد نتائج بحث مطابقة', 'No Matching Submodules Found')}</h3>
+                                            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">{translate('مراجعة كلمة البحث أو فئة التصنيف وضبط الفلتر.', 'Please clarify your spelling or select a different category filter.')}</p>
+                                        </Card>
+                                    );
+                                }
+
+                                // If category is "all" and search input is clean, render them beautifully categorized under header sections
+                                if (selectedSubmoduleCategory === 'all' && submoduleSearchQuery.trim() === '') {
+                                    const categoriesList = [
+                                        { id: 'core', titleAr: 'البيانات والملفات العمالية الأساسية', titleEn: 'Core Personnel & Records', descAr: 'ملفات الكوادر الوطنية والوافدة، نماذج العقود وبوابة الاستقطاب والتوظيف', descEn: 'Personnel files, dual employment contracts and hiring modules', color: 'indigo' },
+                                        { id: 'payroll', titleAr: 'الأجور والرواتب والعمليات المالية', titleEn: 'Payroll & Financial Treasury', descAr: 'مسيرات الرواتب، السداد المالي، حسابات التأمينات وسلف القروض ونهاية الخدمة', descEn: 'Monthly payroll lists, PIFSS contributions, loans and indemnities', color: 'emerald' },
+                                        { id: 'attendance', titleAr: 'الدوام والإجازات والمعاملات', titleEn: 'Attendance, Leaves & Requests', descAr: 'نظام رصد الإجازات السنوية والمرضية، وبوابة معالجة طلبات الشهادات الإدارية', descEn: 'Leave balance monitoring and workflow requests', color: 'amber' },
+                                        { id: 'compliance', titleAr: 'الرقابة والامتثال وتقييم الأداء', titleEn: 'Discipline, Compliance & Performance', descAr: 'سجلات الجزاءات والخصومات والمخالفات، إدارة لجان التحقيق، وتقارير الكفاءة السنوية', descEn: 'Disciplinary warnings, official inquiries and annual appraisals', color: 'rose' }
+                                    ];
+
+                                    return (
+                                        <div className="space-y-10">
+                                            {categoriesList.map(cat => {
+                                                const catFeatures = filteredFeatures.filter(f => f.category === cat.id);
+                                                if (catFeatures.length === 0) return null;
+                                                return (
+                                                    <div key={cat.id} className="space-y-4">
+                                                        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-dashed border-slate-200 pb-3">
+                                                            <div className="text-right">
+                                                                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                                                                    <span className={`w-3 h-3 rounded-full bg-${cat.color}-500`} />
+                                                                    <span>{language === 'ar' ? cat.titleAr : cat.titleEn}</span>
+                                                                </h3>
+                                                                <p className="text-xs text-slate-400 mt-0.5">{language === 'ar' ? cat.descAr : cat.descEn}</p>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold text-slate-400 mt-2 md:mt-0">{catFeatures.length} {translate('وحدات نشطة', 'active units')}</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                            {catFeatures.map(f => (
+                                                                <FeatureCard key={f.title} {...f} />
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                }
+
+                                // Otherwise, render a clean flat grid of filtered items
+                                return (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                        {filteredFeatures.map(f => (
+                                            <FeatureCard key={f.title} {...f} />
+                                        ))}
+                                    </div>
+                                );
+                            })()}
                         </motion.div>
                     )}
 
